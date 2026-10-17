@@ -118,6 +118,17 @@ async fn info(
     blocking(move || recording_info(&path)).await.map(Json)
 }
 
+#[derive(Serialize)]
+struct Topic {
+    topic: String,
+    schema_name: Option<String>,
+    /// Lets the client name types in the schema's own language (ROS 2, protobuf, ...).
+    schema_encoding: Option<String>,
+    message_count: Option<u64>,
+    fields: Vec<FieldInfo>,
+    error: Option<String>,
+}
+
 #[derive(Clone, Serialize)]
 struct FieldInfo {
     /// Field-name segments, rather than ambiguous dot-separated identifiers.
@@ -344,6 +355,77 @@ fn numeric_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>)
             _ => {}
         }
     }
+}
+
+async fn topics(
+    State(state): State<AppState>,
+    Path(id): Path<usize>,
+) -> Result<Json<Vec<Topic>>, ApiError> {
+    let path = state.file(id)?;
+    blocking(move || {
+        let reader = reader();
+        let summary = recording::recording_summary(&path)?;
+        let mut schemas =
+            std::collections::HashMap::<(u16, String), Result<FieldDefs, String>>::new();
+        reader
+            .list_topics(&path)?
+            .into_iter()
+            .map(|info| {
+                let mut fields = Vec::new();
+                let channels: Vec<_> = summary
+                    .channels
+                    .values()
+                    .filter(|c| c.topic == info.topic)
+                    .collect();
+                let cache_key = if channels.len() == 1 {
+                    channels[0]
+                        .schema
+                        .as_ref()
+                        .map(|s| (s.id, channels[0].message_encoding.clone()))
+                } else {
+                    None
+                };
+                let defs = if let Some(key) = cache_key {
+                    schemas
+                        .entry(key)
+                        .or_insert_with(|| {
+                            reader
+                                .topic_field_defs(&path, &info.topic)
+                                .map_err(|e| e.to_string())
+                        })
+                        .clone()
+                } else {
+                    reader
+                        .topic_field_defs(&path, &info.topic)
+                        .map_err(|e| e.to_string())
+                };
+                let schema = channels.iter().find_map(|channel| channel.schema.as_ref());
+                let type_names = schema
+                    .and_then(|schema| {
+                        schema_type_names(&schema.name, &schema.encoding, &schema.data).ok()
+                    })
+                    .unwrap_or_default();
+                let schema_encoding = schema.map(|schema| schema.encoding.clone());
+                let error = match defs {
+                    Ok(defs) => {
+                        schema_fields(&defs, &[], &type_names, &mut fields);
+                        None
+                    }
+                    Err(e) => Some(e),
+                };
+                Ok(Topic {
+                    topic: info.topic,
+                    schema_name: info.schema_name,
+                    schema_encoding,
+                    message_count: info.message_count,
+                    fields,
+                    error,
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+    })
+    .await
+    .map(Json)
 }
 
 async fn blocking<T: Send + 'static>(
