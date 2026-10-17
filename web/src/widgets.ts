@@ -2,12 +2,12 @@ import type { MosaicDirection, MosaicNode } from "react-mosaic-component";
 import type { DragMode, PlotView } from "./Plot";
 import { defaultPlotView } from "./Plot";
 import type { TimeDisplay } from "./timeDisplay";
+import { clampColumnWidth } from "./table";
 import {
   colors,
   keyOf,
   kindsMatch,
   seriesKind,
-  valueKind,
   type Field,
   type Selected,
   type ValueKind,
@@ -164,18 +164,6 @@ export const addAt = (
   before: edge === "left" || edge === "top",
 });
 
-const defaultTitle = (type: Widget["type"], number: number | string) =>
-  `${widgetSpecs[type].titlePrefix} ${number}`;
-/** Series a widget of the given type can keep after switching to it. */
-export function compatibleSeries(type: Widget["type"], series: Selected[]) {
-  const spec = widgetSpecs[type];
-  const kind = (s: Selected) => valueKind(s.dataType, s.enumValues);
-  const accepted = series.filter((s) => acceptsKind(spec, kind(s)));
-  const first = seriesKind(accepted);
-  return accepted
-    .filter((s) => !spec.sameKind || kindsMatch(first, kind(s)))
-    .slice(0, spec.maxSeries);
-}
 const widget = (number: number, type: Widget["type"] = "time-series"): Widget => ({
   id: `widget-${number}`,
   type,

@@ -6,7 +6,6 @@ import {
   leaves,
   addAt,
   dropEdge,
-  compatibleSeries,
 } from "./widgets";
 import { defaultPlotView } from "./Plot";
 import { keyOf, type Selected } from "./types";
@@ -184,17 +183,9 @@ describe("widget workspace", () => {
     });
     expect(state.activeId).toBe("widget-3");
   });
-  it("switches a widget's type, keeping only series the new type can show", () => {
-    const of = (name: string, dataType: string, enumValues?: { name: string; value: number }[]) => ({
-      ...series, key: keyOf("/t", [name]), topic: "/t", path: [name], dataType, enumValues,
-    });
-    const flag = of("flag", "bool");
-    const mode = of("mode", "enum", [{ name: "IDLE", value: 0 }]);
-    const speed = of("speed", "f64");
-    expect(compatibleSeries("state", [speed, flag, mode])).toEqual([flag, mode]);
-    expect(compatibleSeries("time-series", [flag, mode, of("b", "bool")]).map((s) => s.key))
-      .toEqual([flag.key, keyOf("/t", ["b"])]);
-    let state = reduce(initialWorkspace(), { type: "series", id: "widget-1", update: () => [speed, flag] });
+  it("switches a widget's type by replacing it with a fresh widget in the same slot", () => {
+    let state = reduce(initialWorkspace(), { type: "series", id: "widget-1", update: () => [series] });
+    state = reduce(state, { type: "time-display", id: "widget-1", value: "relative" });
     state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "state" });
     expect(state.widgets["widget-1"]).toMatchObject({
       id: "widget-1",
