@@ -1298,6 +1298,11 @@ header .local {
   text-shadow: 0 1px 2px #000;
 }
 .state-segment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.state-segment .state-empty {
+  color: #c3c9d1;
+  font-weight: 400;
+  font-style: italic;
+}
 .state-axis {
   display: flex;
   justify-content: space-between;

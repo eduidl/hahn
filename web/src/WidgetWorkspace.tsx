@@ -58,6 +58,8 @@ function stateValue(series: Series, raw: number | string | boolean | null) {
   return series.enumValues?.find((entry) => entry.value === Number(raw))?.name ?? String(raw);
 }
 function stateColor(value: string) {
+  // A neutral color keeps empty strings apart from real states.
+  if (value === "") return "#3a3f46";
   if (value === "true") return "#00a896";
   if (value === "false") return "#657b91";
   const hash = [...value].reduce((result, char) => (result * 31 + char.charCodeAt(0)) | 0, 0);
@@ -109,9 +111,13 @@ function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; seri
                   key={`${segment.ns}-${i}`}
                   className="state-segment"
                   style={{ left: `${left}%`, width: `${right - left}%`, backgroundColor: segment.color }}
-                  title={`${formatter.tooltip(segment.start)} · ${segment.value}`}
+                  title={`${formatter.tooltip(segment.start)} · ${segment.value === "" ? "空文字列" : segment.value}`}
                 >
-                  <span>{segment.value}</span>
+                  {segment.value === "" ? (
+                    <span className="state-empty">（空文字列）</span>
+                  ) : (
+                    <span>{segment.value}</span>
+                  )}
                 </div>
               );
             })}
