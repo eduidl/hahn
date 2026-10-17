@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useCallback,
   useEffect,
   useRef,
@@ -13,6 +15,7 @@ import { Plot, defaultPlotView, type PlotView, type Series } from "./Plot";
 import { timeFormatter } from "./timeDisplay";
 import type { DropVerdict } from "./drop";
 import { SeriesName } from "./SeriesName";
+import { usePlayback } from "./playback";
 import { dragMime, type Info } from "./types";
 import {
   addAt,
@@ -77,6 +80,12 @@ function stateSegments(series: Series, fullEnd: number) {
   if (current) segments.push(current);
   return segments;
 }
+function StatePlayhead({ fullEnd }: { fullEnd: number }) {
+  const time = usePlayback((s) => s.time);
+  const ratio = Math.max(0, Math.min(1, time / fullEnd));
+  return <div className="playhead" style={{ left: `${ratio * 100}%`, top: 0, bottom: 0 }} />;
+}
+
 function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; series: Series[]; fullEnd: number; originNs: string | null }) {
   const formatter = timeFormatter(originNs, widget.timeDisplay);
   const visible = series.filter((s) => !s.hidden);
@@ -106,6 +115,7 @@ function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; seri
                 </div>
               );
             })}
+            <StatePlayhead fullEnd={fullEnd} />
           </div>
         </div>
       ))}

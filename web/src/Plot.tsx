@@ -21,6 +21,9 @@ import {
   type AxisView,
 } from "./axes";
 import { SeriesName } from "./SeriesName";
+import { linearTicks } from "./ticks";
+import type { LegendSettings } from "./widgets";
+import { usePlayback } from "./playback";
 import { isDiscreteKind, valueKind } from "./types";
 
 export type DragMode = "pan" | "zoom";
@@ -64,6 +67,31 @@ const format = (n: number) =>
   Number.isFinite(n)
     ? n.toLocaleString(undefined, { maximumSignificantDigits: 6 })
     : "—";
+
+/** Isolated so the per-frame playhead updates skip the full canvas redraw. */
+function Playhead({
+  domain,
+  left,
+  top,
+  w,
+  h,
+}: {
+  domain: AxisRange;
+  left: number;
+  top: number;
+  w: number;
+  h: number;
+}) {
+  const time = usePlayback((s) => s.time);
+  const ratio = (time - domain[0]) / (domain[1] - domain[0]);
+  if (!(ratio >= 0 && ratio <= 1)) return null;
+  return (
+    <div
+      className="playhead"
+      style={{ left: left + ratio * w, top, height: h }}
+    />
+  );
+}
 
 export function Plot({
   series,
@@ -453,8 +481,26 @@ export function Plot({
         }}
         onDoubleClick={reset}
       />
-      {cursor !== null && (
-        <div className="tooltip">
+      <Playhead domain={domain} left={left} top={top} w={w} h={h} />
+      {legend.visible && (
+        <div className="plot-legend" style={legendStyle}>
+          {!hasVisible && (
+            <span className="plot-legend-empty">
+              {selectedCount ? "表示中の系列がありません" : "フィールドを追加してください"}
+            </span>
+          )}
+          {series
+            .filter((s) => !s.hidden)
+            .map((s) => (
+              <div key={s.key} className="tooltip-row">
+                <i style={{ background: s.color }} />
+                <SeriesName source={s.source} topic={s.topic} path={s.path} />
+              </div>
+            ))}
+        </div>
+      )}
+      {cursor !== null && pointerY !== null && hasVisible && (
+        <div className="tooltip" ref={tooltip}>
           <div className="tooltip-time">{time.tooltip(xAt(cursor))}</div>
           {series
             .filter((s) => !s.hidden)
