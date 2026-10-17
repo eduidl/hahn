@@ -8,6 +8,14 @@ Rust 1.95以上、Node.js 22.12以上（または20.19以上）が必要です�
 `Cargo.toml` は手元の `~/repos/eduidl/mcapdecode-rs/mcapdecode/mcapdecode` を相対パスで参照しています。
 別の場所にチェックアウトした場合は、この依存パスを変更してください。
 
+```bash
+cd web
+npm ci
+npm run build
+cd ..
+cargo run --release -- --data-dir "$HOME/repos/eduidl/mcapdecode-rs/data"
+```
+
 <http://127.0.0.1:3000> を開き、録画と数値フィールドを選択します。
 初回にros2.mcapを選択し、録画全体の時間軸を設定します。録画の変更はヘッダーのフォルダーアイコンから行い、受信したデータから順次描画します。
 
