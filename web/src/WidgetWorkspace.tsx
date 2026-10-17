@@ -49,6 +49,71 @@ export function widgetSeries(widget: Widget, data: Series[]): Series[] {
   });
 }
 
+const stateColors = ["#168aad", "#f77f00", "#7b2cbf", "#2a9d8f", "#e63946", "#4361ee", "#bc6c25", "#d45087"];
+function stateValue(series: Series, raw: number | string | boolean | null) {
+  if (typeof raw === "boolean") return raw ? "true" : "false";
+  return series.enumValues?.find((entry) => entry.value === Number(raw))?.name ?? String(raw);
+}
+function stateColor(value: string) {
+  if (value === "true") return "#00a896";
+  if (value === "false") return "#657b91";
+  const hash = [...value].reduce((result, char) => (result * 31 + char.charCodeAt(0)) | 0, 0);
+  return stateColors[Math.abs(hash) % stateColors.length];
+}
+function stateSegments(series: Series, fullEnd: number) {
+  const segments: { start: number; end: number; value: string; color: string; ns: string }[] = [];
+  let current: (typeof segments)[number] | null = null;
+  for (const point of series.points) {
+    if (point.raw === null) {
+      if (current) segments.push({ ...current, end: point.x });
+      current = null;
+      continue;
+    }
+    const value = stateValue(series, point.raw);
+    if (current !== null && current.value === value) continue;
+    if (current) segments.push({ ...current, end: point.x });
+    current = { start: point.x, end: fullEnd, value, color: stateColor(value), ns: point.ns };
+  }
+  if (current) segments.push(current);
+  return segments;
+}
+function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; series: Series[]; fullEnd: number; originNs: string | null }) {
+  const formatter = timeFormatter(originNs, widget.timeDisplay);
+  const visible = series.filter((s) => !s.hidden);
+  const segments = useMemo(
+    () => new Map(visible.map((item) => [item.key, stateSegments(item, fullEnd)])),
+    [visible, fullEnd],
+  );
+  return (
+    <div className="state-plot" aria-label="状態遷移">
+      {visible.map((s) => (
+        <div className="state-row" key={s.key}>
+          <div className="state-label">
+            <SeriesName topic={s.topic} path={s.path} />
+          </div>
+          <div className="state-track">
+            {(segments.get(s.key) ?? []).map((segment, i) => {
+              const left = Math.max(0, Math.min(100, segment.start / fullEnd * 100));
+              const right = Math.max(left, Math.min(100, segment.end / fullEnd * 100));
+              return (
+                <div
+                  key={`${segment.ns}-${i}`}
+                  className="state-segment"
+                  style={{ left: `${left}%`, width: `${right - left}%`, backgroundColor: segment.color }}
+                  title={`${formatter.tooltip(segment.start)} · ${segment.value}`}
+                >
+                  <span>{segment.value}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div className="state-axis"><span>{formatter.tick(0).time}</span><span>{formatter.tick(fullEnd / 2).time}</span><span>{formatter.tick(fullEnd).time}</span></div>
+    </div>
+  );
+}
+
 function WidgetDropTarget({ onDrop }: { onDrop: (edge: DropEdge) => void }) {
   const [edge, setEdge] = useState<DropEdge | null>(null);
   const edgeAt = (event: DragEvent<HTMLDivElement>) => {
