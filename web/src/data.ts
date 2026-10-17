@@ -1,6 +1,6 @@
 export type Row = { time_ns: string; values: (number | string | boolean | null)[] };
-export type StreamEvent =
-  | { type: "batch"; rows: Row[]; scanned_messages: number }
+export type StreamEvent<T = Row> =
+  | { type: "batch"; rows: T[]; scanned_messages: number }
   | { type: "complete"; scanned_messages: number }
   | { type: "error"; message: string };
 export type Point = {
@@ -9,6 +9,14 @@ export type Point = {
   raw: number | string | boolean | null;
   ns: string;
 };
+/** A discrete value as text: enum variant names, `true`/`false`, strings as is. */
+export function stateLabel(
+  raw: number | string | boolean | null,
+  enumValues?: { name: string; value: number }[],
+) {
+  if (typeof raw === "boolean") return raw ? "true" : "false";
+  return enumValues?.find((entry) => entry.value === Number(raw))?.name ?? String(raw);
+}
 export const secondsFrom = (ns: string, origin: string) =>
   Number(BigInt(ns) - BigInt(origin)) / 1e9;
 
@@ -70,9 +78,9 @@ export function appendPoints(current: Point[], incoming: Point[]): Point[] {
   return merged;
 }
 
-export async function consumeStream(
+export async function consumeStream<T = Row>(
   response: Response,
-  onEvent: (event: StreamEvent) => void,
+  onEvent: (event: StreamEvent<T>) => void,
 ) {
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -85,7 +93,7 @@ export async function consumeStream(
     complete = false;
   const accept = (line: string) => {
     if (!line.trim()) return;
-    const event = JSON.parse(line) as StreamEvent;
+    const event = JSON.parse(line) as StreamEvent<T>;
     if (event.type === "error") throw new Error(event.message);
     if (event.type === "complete") complete = true;
     onEvent(event);

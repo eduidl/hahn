@@ -60,10 +60,6 @@ export function widgetSeries(widget: Widget, data: Series[]): Series[] {
 }
 
 const stateColors = ["#168aad", "#f77f00", "#7b2cbf", "#2a9d8f", "#e63946", "#4361ee", "#bc6c25", "#d45087"];
-function stateValue(series: Series, raw: number | string | boolean | null) {
-  if (typeof raw === "boolean") return raw ? "true" : "false";
-  return series.enumValues?.find((entry) => entry.value === Number(raw))?.name ?? String(raw);
-}
 function stateColor(value: string) {
   // A neutral color keeps empty strings apart from real states.
   if (value === "") return "#3a3f46";
@@ -81,7 +77,7 @@ function stateSegments(series: Series, fullEnd: number) {
       current = null;
       continue;
     }
-    const value = stateValue(series, point.raw);
+    const value = stateLabel(point.raw, series.enumValues);
     if (current !== null && current.value === value) continue;
     if (current) segments.push({ ...current, end: point.x });
     current = { start: point.x, end: fullEnd, value, color: stateColor(value), ns: point.ns };
