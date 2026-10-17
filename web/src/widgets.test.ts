@@ -1,3 +1,17 @@
+import { describe, expect, it } from "vitest";
+import {
+  initialWorkspace,
+  workspaceReducer as reduce,
+  requestedSeries,
+  leaves,
+  addAt,
+  dropEdge,
+  compatibleSeries,
+} from "./widgets";
+import { defaultPlotView } from "./Plot";
+import { keyOf, type Selected } from "./types";
+import { widgetSeries } from "./WidgetWorkspace";
+
 const series: Selected = {
   key: keyOf("/pose", ["x"]),
   topic: "/pose",

@@ -1,3 +1,6 @@
+import { describe, expect, it } from "vitest";
+import { displayType, enumDefinitionsMatch, isNumericField, isStateField, kindsMatch, parseDrop, seriesKind, valueKind, type Selected, type Topic } from "./types";
+
 const topics: Topic[] = [
   {
     topic: "/pose",

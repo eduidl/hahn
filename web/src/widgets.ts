@@ -51,6 +51,46 @@ export type WorkspaceAction =
   | { type: "time-display"; id: string; value: TimeDisplay }
   | { type: "recording" };
 
+export const widgetDragMime = "application/x-hahn-widget";
+/** What a widget type shows and which series it takes. */
+export type WidgetSpec = {
+  label: string;
+  titlePrefix: string;
+  description: string;
+  help: string;
+  /** Value kinds the widget can display at all. */
+  accepts: ReadonlySet<ValueKind["type"]>;
+  /** Series must share the first series' kind (one Y axis), or may mix. */
+  sameKind: boolean;
+  /** At 1, adding a field replaces the current series. */
+  maxSeries: number;
+};
+export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
+  "time-series": {
+    label: "Time Series",
+    titlePrefix: "Time series",
+    description: "数値・bool・enum の時系列を重ねて表示",
+    help: "数値・bool・enum フィールドを追加します。最初の系列と同じ型だけを重ねられます。",
+    accepts: new Set(["numeric", "bool", "enum"]),
+    sameKind: true,
+    maxSeries: Infinity,
+  },
+  state: {
+    label: "State Transition",
+    titlePrefix: "State",
+    description: "bool・enum の状態遷移を1系列1行で表示",
+    help: "bool・enum フィールドを追加します。型や enum の定義が異なる系列も並べられます。",
+    accepts: new Set(["bool", "enum"]),
+    sameKind: false,
+    maxSeries: Infinity,
+  },
+};
+export const widgetTypes = Object.keys(widgetSpecs) as Widget["type"][];
+/** Fields per topic and widget; mirrors the series API batch limit. */
+export const maxFieldsPerTopic = 64;
+export const acceptsKind = (spec: WidgetSpec, kind: ValueKind | null) =>
+  kind !== null && spec.accepts.has(kind.type);
+
 /** Append a field as a new series, or replace the series of a single-series widget. */
 export function addSeries(
   list: Selected[],

@@ -1,3 +1,16 @@
+import { describe, expect, it } from "vitest";
+import {
+  axisRange,
+  defaultView,
+  isDefaultView,
+  panAxis,
+  selectAxis,
+  seriesYRange,
+  discreteYValues,
+  zoomAxis,
+} from "./axes";
+import type { Series } from "./Plot";
+
 describe("independent axis magnification", () => {
   it("zooms around the pointer while keeping the other axis unchanged", () => {
     const initial = defaultView();
