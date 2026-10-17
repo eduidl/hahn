@@ -139,7 +139,7 @@ pub(crate) async fn series(
         recording_info(&check_path)?;
         let defs = reader().topic_field_defs(&check_path, &topic)?;
         let mut available = Vec::new();
-        numeric_fields(&defs, &[], &mut available);
+        series_fields(&defs, &[], &mut available);
         fields
             .iter()
             .map(|field| {
@@ -152,6 +152,17 @@ pub(crate) async fn series(
             .collect::<anyhow::Result<Vec<_>>>()
     })
     .await?;
+    Ok(stream_rows(
+        source,
+        request.topic,
+        TimeRange { start, end },
+        move |log_time, value| Row {
+            time_ns: log_time.to_string(),
+            values: paths.iter().map(|p| scalar(&value, p)).collect(),
+        },
+    ))
+}
+
     let (tx, rx) = mpsc::channel(4);
     tokio::task::spawn_blocking(move || {
         let mut rows = Vec::with_capacity(1024);

@@ -44,14 +44,20 @@ export function enumDefinitionsMatch(a: EnumValue[] = [], b: EnumValue[] = []) {
 export type ValueKind =
   | { type: "numeric" }
   | { type: "bool" }
-  | { type: "enum"; values: EnumValue[] };
+  | { type: "string" }
+  | { type: "enum"; values: EnumValue[] }
+  /** Structs, arrays, bytes and maps: only generic viewers show these. */
+  | { type: "other" };
 export function valueKind(
   dataType: string | undefined,
   enumValues?: EnumValue[],
 ): ValueKind | null {
   if (dataType === "bool") return { type: "bool" };
   if (dataType === "enum") return { type: "enum", values: enumValues ?? [] };
-  return dataType !== undefined && isNumericField({ path: [], data_type: dataType })
+  if (dataType !== undefined && /^w?string(\[<=\d+\])?$/.test(dataType))
+    return { type: "string" };
+  if (dataType === undefined) return null;
+  return isNumericField({ path: [], data_type: dataType })
     ? { type: "numeric" }
     : null;
 }

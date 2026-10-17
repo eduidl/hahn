@@ -96,9 +96,16 @@ async fn metadata_includes_all_field_types() {
     assert_eq!(position["data_type"], "struct");
     assert_eq!(position["type_name"], "hahn.Position");
     assert!(fields.iter().any(|f| f["path"] == json!(["tags"])));
+    // Strings stream like other scalars; lists do not.
     let (status, _) = series(
         app.clone(),
         json!({"topic":"/telemetry", "fields":[["label"]]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = series(
+        app.clone(),
+        json!({"topic":"/telemetry", "fields":[["tags"]]}),
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
