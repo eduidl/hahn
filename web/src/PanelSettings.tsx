@@ -435,6 +435,9 @@ function SingleTargetPanel(props: PanelProps) {
 const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
   "time-series": TimeSeriesPanel,
   state: StatePanel,
+  raw: SingleTargetPanel,
+  log: LogPanel,
+  table: SingleTargetPanel,
 };
 
 /** Settings for the selected widget, chosen wholesale by widget type. */
