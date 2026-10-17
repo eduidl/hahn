@@ -57,6 +57,7 @@ export function dropVerdict(
   const topic = index.topics.get(drag.topic);
   if (!topic) return { ok: false, reason: "トピックが見つかりません。" };
   if (topic.error) return { ok: false, reason: "読み込めないトピックです。" };
+  if (topic.message_count === 0) return { ok: false, reason: "メッセージがありません。" };
   const accepted = [...spec.accepts].map(kindLabel).join("・");
   // A topic is its root message: treat it like a struct field.
   if (!drag.path)

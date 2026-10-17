@@ -863,6 +863,10 @@ summary .topic-type {
   color: #6f6f6f;
   font-size: 10px;
 }
+/* Topics without messages stay listed but read as unavailable. */
+.topic-group.no-messages {
+  opacity: 0.45;
+}
 summary .unreadable {
   float: none;
   flex-shrink: 0;

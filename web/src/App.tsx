@@ -372,9 +372,9 @@ export function App() {
                   if (!fields.length && !topicMatch) return null;
                   return (
                     <details
-                      key={t.topic}
-                      open={expandedTopics.has(t.topic)}
-                      className="topic-group"
+                      key={id}
+                      open={expandedTopics.has(id)}
+                      className={`topic-group ${t.message_count === 0 ? "no-messages" : ""}`}
                     >
                       <summary
                         onClick={(e) => {
@@ -392,9 +392,16 @@ export function App() {
                       >
                         <span className="topic-label">
                           <span className="topic-name">{t.topic}</span>
-                          {t.schema_name && (
-                            <span className="topic-type">{t.schema_name}</span>
-                          )}
+                          <span className="topic-type">
+                            {[
+                              t.schema_name,
+                              t.message_count === null
+                                ? null
+                                : `${t.message_count.toLocaleString()} 件`,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
                         </span>
                         {t.error && (
                           <span className="unreadable">読み取り不可</span>

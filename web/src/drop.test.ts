@@ -22,7 +22,8 @@ const topic: Topic = {
   error: null,
 };
 const broken: Topic = { ...topic, topic: "/broken", error: "bad schema" };
-const index = buildFieldIndex([topic, broken]);
+const silent: Topic = { ...topic, topic: "/silent", message_count: 0 };
+const index = buildFieldIndex([topic, broken, silent]);
 const selected = (field: Field): Selected => ({
   key: keyOf("/t", field.path),
   topic: "/t",
@@ -87,7 +88,11 @@ describe("drop verdict", () => {
     expect(verdict(["speed"], widget("time-series", [fields[0]]))).toMatchObject({ reason: "追加済みです。" });
     expect(verdict(["pose"], widget("time-series"))).toMatchObject({ reason: expect.stringMatching(/^struct は扱えません/) });
     expect(verdict(undefined, widget("time-series"))).toMatchObject({ reason: expect.stringMatching(/^struct は扱えません/) });
-    expect(dropVerdict(index, { topic: "/broken", path: ["speed"] }, widget("time-series")).ok).toBe(false);
+    expect(dropVerdict(index, { source: 0, topic: "/broken", path: ["speed"] }, widget("time-series")).ok).toBe(false);
+    expect(dropVerdict(index, { source: 0, topic: "/silent", path: ["speed"] }, widget("time-series"))).toEqual({
+      ok: false,
+      reason: "メッセージがありません。",
+    });
   });
 
   it("replaces the series of a single-series widget", () => {
