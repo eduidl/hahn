@@ -63,6 +63,15 @@ type Props = {
 const right = 24,
   top = 30;
 const wheelZoomFactor = 1.1;
+const axisFont = "11px ui-monospace, monospace";
+let measureContext: CanvasRenderingContext2D | null | undefined;
+/** Rendered width of a tick label, measured once per call on a shared canvas. */
+function labelWidth(text: string) {
+  measureContext ??= document.createElement("canvas").getContext("2d");
+  if (!measureContext) return text.length * 7;
+  measureContext.font = axisFont;
+  return measureContext.measureText(text).width;
+}
 const format = (n: number) =>
   Number.isFinite(n)
     ? n.toLocaleString(undefined, { maximumSignificantDigits: 6 })
@@ -142,9 +151,6 @@ export function Plot({
     ))];
     return labels.length ? labels.join(" / ") : format(value);
   };
-  const left = discrete
-    ? Math.max(76, Math.min(210, ...categories.map((value) => discreteLabel(value).length * 7 + 18)))
-    : 76;
   const categoryIndex = useMemo(
     () => new Map(categories.map((value, index) => [value, index])),
     [categories],
@@ -158,6 +164,14 @@ export function Plot({
   const yBase = pinnedYBase ?? dataYBase;
   const domain = axisRange([0, fullEnd], xView);
   const yDomain = axisRange(yBase, yView);
+  const linear = discrete ? null : linearTicks(yDomain[0], yDomain[1]);
+  const yLabels = discrete ? categories.map(discreteLabel) : linear!.labels;
+  // Fit the Y axis to its widest label, within bounds.
+  const left = Math.round(
+    Math.max(48, Math.min(210, Math.max(0, ...yLabels.map(labelWidth)) + 24)),
+  );
+  // The shared offset/exponent is drawn above the axis, from the canvas edge.
+  const annotationX = 8;
   const canReset =
     !isDefaultView(xView) ||
     !isDefaultView(yView) ||
@@ -232,16 +246,18 @@ export function Plot({
     const py = (y: number) => top + h - ((y - min) / (max - min)) * h;
     const yOf = (value: number) =>
       py(discrete ? categoryIndex.get(value)! : value);
-    ctx.font = "11px ui-monospace, monospace";
+    ctx.font = axisFont;
     const yTicks = discrete
       ? categories.map((value, index) => ({ coordinate: index, label: discreteLabel(value) }))
           .filter((tick) => tick.coordinate >= yDomain[0] && tick.coordinate <= yDomain[1])
           .filter((_, index, all) => index % Math.max(1, Math.ceil(all.length / 6)) === 0)
           .map((tick) => ({ y: py(tick.coordinate), label: tick.label }))
-      : Array.from({ length: 6 }, (_, i) => ({
-          y: top + (h * i) / 5,
-          label: format(yDomain[1] - ((yDomain[1] - yDomain[0]) * i) / 5),
-        }));
+      : linear!.values.map((value, i) => ({ y: py(value), label: linear!.labels[i] }));
+    if (linear?.annotation) {
+      ctx.fillStyle = "#a0a0a0";
+      ctx.textAlign = "left";
+      ctx.fillText(linear.annotation, annotationX, top - 12);
+    }
     for (const tick of yTicks) {
       const y = tick.y;
       ctx.strokeStyle = "#242424";
@@ -370,10 +386,6 @@ export function Plot({
 
   return (
     <div className="plot-wrap">
-      <div className="axis-scales" aria-label="表示倍率">
-        <output aria-label="横軸倍率">X {format(xView.zoom)}×</output>
-        <output aria-label="縦軸倍率">Y {format(yView.zoom)}×</output>
-      </div>
       <canvas
         ref={canvas}
         aria-label={`時系列プロット。ドラッグで${mode === "pan" ? "パン" : "横軸の範囲ズーム"}。ホイールで横軸、Shift＋ホイールで縦軸をズーム。ダブルクリックでリセット。`}
