@@ -13,13 +13,25 @@ import {
   type ValueKind,
 } from "./types";
 
-export type Widget = {
+export type LegendPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export type LegendSettings = { visible: boolean; position: LegendPosition };
+export const legendPositions: Record<LegendPosition, string> = {
+  "top-left": "左上",
+  "top-right": "右上",
+  "bottom-left": "左下",
+  "bottom-right": "右下",
+};
+type WidgetBase = {
   id: string;
   type: "time-series" | "state";
   title: string;
   series: Selected[];
   mode: DragMode;
   timeDisplay: TimeDisplay;
+  legend: LegendSettings;
+  /** JSON-encoded column paths relative to the Table target. Time stays visible. */
+  hiddenColumns: string[];
+  columnWidths: Record<string, number>;
   view: PlotView;
 };
 export type WorkspaceState = {
@@ -171,6 +183,9 @@ const widget = (number: number, type: Widget["type"] = "time-series"): Widget =>
   series: [],
   mode: "pan",
   timeDisplay: "absolute",
+  legend: { visible: true, position: "top-left" },
+  hiddenColumns: [],
+  columnWidths: {},
   view: defaultPlotView(),
 });
 export function initialWorkspace(): WorkspaceState {
@@ -230,6 +245,8 @@ export function hasTabs(node: MosaicNode<string> | null): boolean {
 }
 /** A Y range fitted to one value kind is meaningless for another. */
 function withSeries(current: Widget, series: Selected[]): Widget {
+  if (current.type === "table" && current.series[0]?.key !== series[0]?.key)
+    current = { ...current, hiddenColumns: [], columnWidths: {} };
   if (kindsMatch(seriesKind(current.series), seriesKind(series)))
     return { ...current, series };
   return {
@@ -343,6 +360,8 @@ export function workspaceReducer(
                 }
             : action.type === "time-display"
               ? { ...current, timeDisplay: action.value }
+            : action.type === "legend"
+              ? { ...current, legend: { ...current.legend, ...action.value } }
               : { ...current, mode: action.mode };
       return { ...state, widgets: { ...state.widgets, [action.id]: updated } };
     }

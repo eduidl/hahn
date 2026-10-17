@@ -6,7 +6,9 @@ import type { CachedSeries } from "./useSeries";
 import type { Selected } from "./types";
 import {
   addFieldAction,
+  legendPositions,
   widgetSpecs,
+  type LegendPosition,
   type Widget,
   type WorkspaceAction,
 } from "./widgets";
@@ -14,14 +16,14 @@ import {
 type PanelProps = {
   widget: Widget;
   dispatch: Dispatch<WorkspaceAction>;
-  records: CachedSeries[];
+  records: Pick<CachedSeries, "key" | "status" | "received">[];
   pointCount: number;
   index: FieldIndex;
 };
 /** Rows rendered at once; the search narrows the rest. */
 const pickerLimit = 100;
 
-function statusLabel(record: CachedSeries | undefined) {
+function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefined) {
   if (!record) return "待機中";
   if (record.status === "loading")
     return `読み込み中 · ${record.received.toLocaleString()}`;
@@ -38,7 +40,7 @@ function PanelHeader({ widget }: PanelProps) {
     <>
       <div className="field-heading">
         <span className="eyebrow">{widget.title}</span>
-        <span>{widget.series.length} 系列</span>
+        {widgetSpecs[widget.type].maxSeries !== 1 && <span>{widget.series.length} 系列</span>}
       </div>
       <p className="help">{widgetSpecs[widget.type].help}</p>
     </>
@@ -47,6 +49,8 @@ function PanelHeader({ widget }: PanelProps) {
 
 /** A button opening a searchable list of the fields this widget can take now; picking one closes it. */
 function FieldPicker({ widget, dispatch, index }: PanelProps) {
+  const singleTarget = widgetSpecs[widget.type].maxSeries === 1;
+  const label = singleTarget ? "表示対象を指定" : "フィールドを追加";
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const popover = useRef<HTMLDivElement>(null);
@@ -261,11 +265,42 @@ function SeriesStyle({ widget, dispatch, series: s }: PanelProps & { series: Sel
   );
 }
 
+function LegendSetting({ widget, dispatch }: PanelProps) {
+  const set = (value: Partial<Widget["legend"]>) =>
+    dispatch({ type: "legend", id: widget.id, value });
+  return (
+    <fieldset className="legend-setting">
+      <legend>凡例</legend>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={widget.legend.visible}
+          onChange={(event) => set({ visible: event.target.checked })}
+        />
+        表示する
+      </label>
+      <select
+        aria-label="凡例の位置"
+        value={widget.legend.position}
+        disabled={!widget.legend.visible}
+        onChange={(event) => set({ position: event.target.value as LegendPosition })}
+      >
+        {Object.entries(legendPositions).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </fieldset>
+  );
+}
+
 function TimeSeriesPanel(props: PanelProps) {
   return (
     <>
       <PanelHeader {...props} />
       <TimeDisplaySetting {...props} />
+      <LegendSetting {...props} />
       <FieldPicker {...props} />
       <SeriesList
         {...props}
@@ -295,6 +330,93 @@ function StatePanel(props: PanelProps) {
         {...props}
         row={(s) => <SeriesRow key={s.key} {...props} series={s} />}
       />
+    </>
+  );
+}
+
+/** Values change over time as rows; the dot color tells the series apart. */
+function LogPanel(props: PanelProps) {
+  return (
+    <>
+      <PanelHeader {...props} />
+      <TimeDisplaySetting {...props} />
+      <FieldPicker {...props} />
+      <SeriesList
+        {...props}
+        row={(s) => (
+          <SeriesRow
+            key={s.key}
+            {...props}
+            series={s}
+            marker={<i style={{ background: s.color }} />}
+          />
+        )}
+      />
+    </>
+  );
+}
+
+/** A single display target is specified, rather than managed as a series list. */
+function SingleTargetPanel(props: PanelProps) {
+  const target = props.widget.series[0];
+  const columns = useMemo(
+    () => props.widget.type === "table" && target ? tableColumns(props.index, target) : [],
+    [props.index, props.widget.type, target?.key],
+  );
+  const visibleColumns = columns.filter((column) => !props.widget.hiddenColumns.includes(JSON.stringify(column.path))).length;
+  return (
+    <>
+      <PanelHeader {...props} />
+      <TimeDisplaySetting {...props} />
+      <section className="target-setting" aria-label="表示対象">
+        <div className="legend-heading">表示対象</div>
+        {target ? (
+          <div className="target-summary">
+            <SeriesName source={target.source} topic={target.topic} path={target.path} />
+            {props.widget.type === "table" && (
+              <span className="series-status">
+                {statusLabel(props.records.find((record) => record.key === target.key))}
+              </span>
+            )}
+          </div>
+        ) : <p className="muted">未指定</p>}
+        <FieldPicker {...props} />
+      </section>
+      {props.widget.type === "table" && target && (
+        <section className="target-setting" aria-label="カラムの表示設定">
+          <div className="legend-heading">カラム</div>
+          <div className="table-column-actions" role="group" aria-label="カラムを一括操作">
+            <button
+              disabled={visibleColumns === columns.length}
+              onClick={() => props.dispatch({ type: "table-columns", id: props.widget.id, paths: columns.map((column) => column.path), visible: true })}
+            >全表示</button>
+            <button
+              disabled={visibleColumns === 0}
+              onClick={() => props.dispatch({ type: "table-columns", id: props.widget.id, paths: columns.map((column) => column.path), visible: false })}
+            >全非表示</button>
+          </div>
+          <div className="table-column-options">
+            {columns.map((column) => {
+              const key = JSON.stringify(column.path);
+              return (
+                <label className="table-column-option" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={!props.widget.hiddenColumns.includes(key)}
+                    onChange={(event) => props.dispatch({
+                      type: "table-column",
+                      id: props.widget.id,
+                      path: column.path,
+                      visible: event.target.checked,
+                    })}
+                  />
+                  <span>{column.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </>
   );
 }
