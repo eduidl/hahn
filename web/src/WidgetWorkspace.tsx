@@ -27,6 +27,63 @@ import {
   type WorkspaceState,
 } from "./widgets";
 
+type Props = {
+  state: WorkspaceState;
+  dispatch: Dispatch<WorkspaceAction>;
+  data: Series[];
+  info: Info | null;
+  fullEnd: number;
+  revision: number;
+  /** Whether the topic being dragged fits each widget; null when not dragging. */
+  dragVerdict: (widget: Widget) => DropVerdict | null;
+  /** Widget type being dragged from the catalog, if any. */
+  widgetDrag: Widget["type"] | null;
+  drop: (event: DragEvent, id: string) => void;
+  openSettings: () => void;
+};
+export function widgetSeries(widget: Widget, data: Series[]): Series[] {
+  const byKey = new Map(data.map((series) => [series.key, series]));
+  return widget.series.flatMap((field) => {
+    const cached = byKey.get(field.key);
+    return cached ? [{ ...cached, ...field }] : [];
+  });
+}
+
+function WidgetDropTarget({ onDrop }: { onDrop: (edge: DropEdge) => void }) {
+  const [edge, setEdge] = useState<DropEdge | null>(null);
+  const edgeAt = (event: DragEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return dropEdge(
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+      rect.width,
+      rect.height,
+    );
+  };
+  return (
+    <div
+      className="widget-drop"
+      aria-label="ウィジェットの配置先"
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes(widgetDragMime)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setEdge(edgeAt(event));
+      }}
+      onDragLeave={() => setEdge(null)}
+      onDrop={(event) => {
+        if (!event.dataTransfer.types.includes(widgetDragMime)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onDrop(edgeAt(event));
+        setEdge(null);
+      }}
+    >
+      {edge && <div className={`widget-drop-preview ${edge}`} />}
+    </div>
+  );
+}
+
 function TimeSeriesWindow({
   widget,
   path,
@@ -337,3 +394,55 @@ function TimeSeriesWindow({
   );
 }
 
+export function WidgetWorkspace(props: Props) {
+  const { state, dispatch } = props;
+  const displayedLayout = state.expandedId ?? state.layout;
+  useEffect(() => {
+    if (!state.expandedId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.querySelector(":popover-open"))
+        dispatch({ type: "expand", id: null });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [state.expandedId, dispatch]);
+  return (
+    <div className="workspace-stage">
+      <div className="mosaic-host">
+        <Mosaic<string>
+          value={displayedLayout}
+          onChange={(layout) => dispatch({ type: "layout", layout })}
+          className="hahn-mosaic"
+          dropBehavior="split"
+          resize={{ minimumPaneSizePx: { row: 320, column: 260 } }}
+          zeroStateView={
+            <div
+              className={`workspace-empty ${props.widgetDrag ? "drop-ready" : ""}`}
+              onDragOver={(event) => {
+                if (!event.dataTransfer.types.includes(widgetDragMime)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+              }}
+              onDrop={(event) => {
+                if (!props.widgetDrag) return;
+                event.preventDefault();
+                dispatch({ type: "add", widgetType: props.widgetDrag });
+              }}
+            >
+              <p>ウィジェットがありません</p>
+              <p>「ウィジェットを追加」からここへドラッグしてください。</p>
+            </div>
+          }
+          renderTile={(id, path) => (
+            <TimeSeriesWindow
+              key={id}
+              {...props}
+              widget={state.widgets[id]}
+              path={path}
+            />
+          )}
+        />
+      </div>
+    </div>
+  );
+}
