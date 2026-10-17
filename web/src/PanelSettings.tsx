@@ -45,6 +45,91 @@ function PanelHeader({ widget }: PanelProps) {
   );
 }
 
+/** A button opening a searchable list of the fields this widget can take now; picking one closes it. */
+function FieldPicker({ widget, dispatch, index }: PanelProps) {
+  const [query, setQuery] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const popover = useRef<HTMLDivElement>(null);
+  const candidates = useMemo(() => addableFields(index, widget), [index, widget]);
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? candidates.filter((entry) => entry.label.toLowerCase().includes(needle))
+    : candidates;
+  useEffect(() => {
+    // The popover focuses its `autofocus` descendant when shown; React's
+    // autoFocus prop only focuses on mount and emits no attribute.
+    input.current?.setAttribute("autofocus", "");
+    // React's onToggle does not cover popovers, so listen to the native event.
+    const node = popover.current;
+    const onToggle = (event: Event) => {
+      if ((event as ToggleEvent).newState === "closed") setQuery("");
+    };
+    node?.addEventListener("toggle", onToggle);
+    return () => node?.removeEventListener("toggle", onToggle);
+  }, []);
+  const pick = (entry: IndexedField) => {
+    dispatch(addFieldAction(widget, entry.topic.topic, entry.field));
+    popover.current?.hidePopover();
+  };
+  return (
+    <>
+      <button
+        className="add-field"
+        popoverTarget="field-picker"
+        disabled={!candidates.length}
+      >
+        ＋ フィールドを追加
+      </button>
+      <div
+        id="field-picker"
+        ref={popover}
+        className="field-picker"
+        popover="auto"
+        role="dialog"
+        aria-label="フィールドを追加"
+      >
+        <input
+          ref={input}
+          className="search"
+          type="search"
+          aria-label="追加するフィールドを検索"
+          placeholder={`フィールドを検索（${candidates.length.toLocaleString()} 件）`}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || !matches.length) return;
+            // Closing returns focus to the opener; without this the same
+            // Enter would press it and reopen the list.
+            event.preventDefault();
+            pick(matches[0]);
+          }}
+        />
+        <div className="field-picker-results">
+          {matches.slice(0, pickerLimit).map((entry) => (
+            <button
+              key={entry.key}
+              className="field-option"
+              onClick={() => pick(entry)}
+            >
+              <SeriesName
+                topic={entry.topic.topic}
+                path={entry.field.path}
+                type={entry.typeLabel}
+              />
+            </button>
+          ))}
+          {matches.length > pickerLimit && (
+            <p className="muted">
+              他 {(matches.length - pickerLimit).toLocaleString()} 件。絞り込んでください。
+            </p>
+          )}
+          {!matches.length && <p className="muted">一致するフィールドがありません。</p>}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
   return (
     <label className="time-display-setting">
