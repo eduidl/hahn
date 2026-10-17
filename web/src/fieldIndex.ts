@@ -49,7 +49,10 @@ export function buildFieldIndex(topics: Topic[]): FieldIndex {
       });
     }
   }
-  const readable = [...byKey.values()].filter((entry) => !entry.topic.error);
+  // Unreadable or empty topics have nothing to show in any widget.
+  const readable = [...byKey.values()].filter(
+    (entry) => !entry.topic.error && entry.topic.message_count !== 0,
+  );
   const candidates = Object.fromEntries(
     widgetTypes.map((type) => [
       type,
