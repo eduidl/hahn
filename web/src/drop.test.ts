@@ -46,8 +46,8 @@ describe("field index", () => {
     const paths = (type: Widget["type"]) =>
       index.candidates[type].map((entry) => entry.field.path.join("."));
     expect(paths("time-series")).toEqual(["speed", "flag", "mode", "other_mode"]);
-    expect(paths("state")).toEqual(["flag", "mode", "other_mode"]);
-    expect(index.byKey.get(keyOf("/t", ["speed"]))).toMatchObject({
+    expect(paths("state")).toEqual(["flag", "mode", "other_mode", "name"]);
+    expect(index.byKey.get(keyOf(0, "/t", ["speed"]))).toMatchObject({
       kind: { type: "numeric" },
       typeLabel: "float64",
       label: "/t · speed",
@@ -76,9 +76,10 @@ describe("drop verdict", () => {
   it("lets state widgets mix bool and enum definitions but not numbers", () => {
     expect(verdict(["mode"], widget("state", [fields[1]])).ok).toBe(true);
     expect(verdict(["other_mode"], widget("state", [fields[2]])).ok).toBe(true);
+    expect(verdict(["name"], widget("state", [fields[1]])).ok).toBe(true);
     expect(verdict(["speed"], widget("state"))).toEqual({
       ok: false,
-      reason: "float64 は扱えません。bool・enum を指定してください。",
+      reason: "float64 は扱えません。bool・enum・string を指定してください。",
     });
   });
 
@@ -103,15 +104,15 @@ describe("addable fields", () => {
     expect(names(widget("time-series"))).toEqual(["speed", "flag", "mode", "other_mode"]);
     expect(names(widget("time-series", [fields[2]]))).toEqual([]);
     expect(names(widget("time-series", [fields[1]]))).toEqual([]);
-    expect(names(widget("state", [fields[1]]))).toEqual(["mode", "other_mode"]);
+    expect(names(widget("state", [fields[1]]))).toEqual(["mode", "other_mode", "name"]);
   });
 
   it("appends series with distinct colors and ignores duplicates", () => {
     const spec = widgetSpecs["time-series"];
-    const one = addSeries([], "/t", fields[0], spec);
-    const two = addSeries(one, "/t", { path: ["speed2"], data_type: "f64" }, spec);
+    const one = addSeries([], topic, fields[0], spec);
+    const two = addSeries(one, topic, { path: ["speed2"], data_type: "f64" }, spec);
     expect(two).toHaveLength(2);
     expect(two[0].color).not.toBe(two[1].color);
-    expect(addSeries(two, "/t", fields[0], spec)).toBe(two);
+    expect(addSeries(two, topic, fields[0], spec)).toBe(two);
   });
 });

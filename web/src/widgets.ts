@@ -70,6 +70,8 @@ export type WidgetSpec = {
   titlePrefix: string;
   description: string;
   help: string;
+  /** Shown in an empty widget. */
+  emptyHint: string;
   /** Value kinds the widget can display at all. */
   accepts: ReadonlySet<ValueKind["type"]>;
   /** Series must share the first series' kind (one Y axis), or may mix. */
@@ -83,6 +85,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     titlePrefix: "Time series",
     description: "数値・bool・enum の時系列を重ねて表示",
     help: "数値・bool・enum フィールドを追加します。最初の系列と同じ型だけを重ねられます。",
+    emptyHint: "数値・bool・enum フィールドをドロップ",
     accepts: new Set(["numeric", "bool", "enum"]),
     sameKind: true,
     maxSeries: Infinity,
@@ -90,9 +93,21 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   state: {
     label: "State Transition",
     titlePrefix: "State",
-    description: "bool・enum の状態遷移を1系列1行で表示",
-    help: "bool・enum フィールドを追加します。型や enum の定義が異なる系列も並べられます。",
-    accepts: new Set(["bool", "enum"]),
+    description: "bool・enum・string の状態遷移を1系列1行で表示",
+    help: "bool・enum・string フィールドを追加します。型や enum の定義が異なる系列も並べられます。",
+    emptyHint: "bool・enum・string フィールドをドロップ",
+    accepts: new Set(["bool", "enum", "string"]),
+    sameKind: false,
+    maxSeries: Infinity,
+    loadsSeries: true,
+  },
+  log: {
+    label: "Log",
+    titlePrefix: "Log",
+    description: "string・enum・bool の値の変化を時刻順の一覧で表示",
+    help: "string・enum・bool フィールドを追加します。値が変わった時点だけを時刻順に並べます。",
+    emptyHint: "string・enum・bool フィールドをドロップ",
+    accepts: new Set(["string", "enum", "bool"]),
     sameKind: false,
     maxSeries: Infinity,
   },

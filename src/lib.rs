@@ -28,7 +28,7 @@ struct AppState {
     files: Arc<Vec<FileEntry>>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Serialize)]
 struct FileEntry {
     id: usize,
     name: String,
@@ -329,12 +329,13 @@ fn schema_fields(
     }
 }
 
-fn numeric_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>) {
+/// Scalar fields the `/series` stream can return: numbers, bools, enums and strings.
+fn series_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>) {
     for field in defs.iter() {
         let mut path = prefix.to_vec();
         path.push(field.name.clone());
         match &field.element.data_type {
-            DataTypeDef::Struct(children) => numeric_fields(children, &path, out),
+            DataTypeDef::Struct(children) => series_fields(&children.fields, &path, out),
             DataTypeDef::I8
             | DataTypeDef::I16
             | DataTypeDef::I32
@@ -346,7 +347,11 @@ fn numeric_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>)
             | DataTypeDef::F32
             | DataTypeDef::F64
             | DataTypeDef::Bool
-            | DataTypeDef::Enum(_) => out.push(FieldInfo {
+            | DataTypeDef::Enum(_)
+            | DataTypeDef::String
+            | DataTypeDef::BoundedString(_)
+            | DataTypeDef::WString
+            | DataTypeDef::BoundedWString(_) => out.push(FieldInfo {
                 path,
                 data_type: field.element.data_type.type_name().into(),
                 type_name: None,

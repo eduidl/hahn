@@ -38,7 +38,6 @@ describe("topic drops", () => {
         parseDrop(JSON.stringify({ topic: "/pose", path: field.path }), topics),
       ).toEqual({ topic: "/pose", path: field.path });
       expect(isNumericField(field)).toBe(field.data_type === "f64");
-      expect(isStateField(field)).toBe(["bool", "enum"].includes(field.data_type));
     }
   });
   it("matches enum domains by variant names and values regardless of declaration order", () => {
@@ -77,5 +76,11 @@ describe("topic drops", () => {
     expect(displayType("f64", "protobuf")).toBe("double");
     expect(displayType("bytes", "protobuf")).toBe("bytes");
     expect(displayType("u32")).toBe("u32");
+  });
+  it("classifies strings, including bounded ones, as their own kind", () => {
+    expect(valueKind("string")).toEqual({ type: "string" });
+    expect(valueKind("string[<=8]")).toEqual({ type: "string" });
+    expect(valueKind("wstring")).toEqual({ type: "string" });
+    expect(valueKind("string[]")).toEqual({ type: "other" });
   });
 });

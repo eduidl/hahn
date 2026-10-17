@@ -450,12 +450,13 @@ function TimeSeriesWindow({
               <div className="empty">
                 <p>
                   {info
-                    ? widget.type === "state" ? "bool / enum フィールドをドロップ" : "数値・bool・enum フィールドをドロップ"
+                    ? widgetSpecs[widget.type].emptyHint
                     : "ヘッダーから録画を開いてください"}
                 </p>
               </div>
             )}
           </div>
+          </>}
         </div>
       </MosaicWindow>
     </section>
