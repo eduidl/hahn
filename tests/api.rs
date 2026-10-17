@@ -311,3 +311,59 @@ async fn unindexed_recordings_are_rejected_instead_of_silently_empty() {
         assert!(body["error"].is_string());
     }
 }
+
+#[tokio::test]
+async fn message_at_time_is_latest_at_or_before_with_named_fields() {
+    let dir = fixture(300, true);
+    let app = hahn::router(dir.path()).unwrap();
+    let at = |t: u64| format!("/api/files/0/message?topic=/telemetry&time_ns={t}");
+    // Between samples 25 and 26: the latest at or before wins.
+    let (status, body) = get(app.clone(), &at(support::ORIGIN + 25 * 10_000_000 + 3)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["time_ns"],
+        (support::ORIGIN + 25 * 10_000_000).to_string()
+    );
+    let value = body["value"].as_object().unwrap();
+    // Schema order, exact 64-bit integers, nested structs and lists.
+    assert_eq!(
+        value.keys().collect::<Vec<_>>(),
+        [
+            "signal", "counter", "position", "label", "active", "tags", "mode"
+        ]
+    );
+    assert_eq!(
+        value["counter"],
+        (9_007_199_254_740_993_i64 + 25).to_string()
+    );
+    assert!(value["position"]["x"].is_number());
+    assert_eq!(value["tags"], json!(["test"]));
+    // A field path returns that subtree only.
+    let (_, body) = get(
+        app.clone(),
+        &format!(
+            "{}&path=%5B%22position%22%5D",
+            at(support::ORIGIN + 25 * 10_000_000)
+        ),
+    )
+    .await;
+    assert_eq!(
+        body["value"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
+        ["x"]
+    );
+    // Before the first message the first one is shown; far after the end, the last.
+    let (_, body) = get(app.clone(), &at(1)).await;
+    assert_eq!(body["time_ns"], support::ORIGIN.to_string());
+    let (_, body) = get(app.clone(), &at(support::ORIGIN + 3_600_000_000_000)).await;
+    assert_eq!(
+        body["time_ns"],
+        (support::ORIGIN + 299 * 10_000_000).to_string()
+    );
+    let (status, _) = get(app, &at(0).replace("time_ns=0", "time_ns=abc")).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+

@@ -23,7 +23,9 @@ export function SeriesName({
   return (
     <span className="series-ref">
       <span className="series-ref-topic">{breakable(topic)}</span>
-      <span className="series-ref-path">{breakable(path.join("."))}</span>
+      {path.length > 0 && (
+        <span className="series-ref-path">{breakable(path.join("."))}</span>
+      )}
       {type && <span className="series-ref-type">{breakable(type)}</span>}
     </span>
   );

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addableFields, dropVerdict } from "./drop";
 import { buildFieldIndex } from "./fieldIndex";
 import { keyOf, type Field, type Selected, type Topic } from "./types";
-import { addSeries, initialWorkspace, widgetSpecs, type Widget } from "./widgets";
+import { addSeries, initialWorkspace, requestedSeries, widgetSpecs, type Widget } from "./widgets";
 
 const idle = [{ name: "IDLE", value: 0 }];
 const fields: Field[] = [
@@ -14,6 +14,7 @@ const fields: Field[] = [
   { path: ["pose"], data_type: "struct", type_name: "geometry_msgs/msg/Pose" },
 ];
 const topic: Topic = {
+  source: 0,
   topic: "/t",
   schema_name: "pkg/msg/T",
   schema_encoding: "ros2msg",
@@ -98,8 +99,23 @@ describe("drop verdict", () => {
   it("replaces the series of a single-series widget", () => {
     const single = { ...widgetSpecs["time-series"], maxSeries: 1 };
     const w = widget("time-series", [fields[0]]);
-    expect(dropVerdict(index, { topic: "/t", path: ["flag"] }, w, single)).toMatchObject({ ok: true, replaces: true });
-    expect(addSeries(w.series, "/t", fields[1], single).map((s) => s.key)).toEqual([keyOf("/t", ["flag"])]);
+    expect(dropVerdict(index, { source: 0, topic: "/t", path: ["flag"] }, w, single)).toMatchObject({ ok: true, replaces: true });
+    expect(addSeries(w.series, topic, fields[1], single).map((s) => s.key)).toEqual([keyOf(0, "/t", ["flag"])]);
+  });
+});
+
+describe("raw message widget", () => {
+  it("takes any field or the topic itself, one at a time", () => {
+    expect(verdict(undefined, widget("raw"))).toMatchObject({ ok: true, replaces: false });
+    expect(verdict(["pose"], widget("raw", [fields[0]]))).toMatchObject({ ok: true, replaces: true });
+    expect(verdict(["speed"], widget("raw", [fields[0]]))).toMatchObject({ reason: "追加済みです。" });
+    expect(addableFields(index, widget("raw")).map((entry) => entry.label)).toContain("/t");
+  });
+
+  it("does not stream its selection through /series", () => {
+    const raw = { ...widget("raw", [fields[5]]), id: "raw" };
+    const plot = { ...widget("time-series", [fields[0]]), id: "plot" };
+    expect(requestedSeries({ raw, plot }).map((s) => s.key)).toEqual([keyOf(0, "/t", ["speed"])]);
   });
 });
 

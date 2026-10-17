@@ -59,7 +59,7 @@ export function valueKind(
   if (dataType === undefined) return null;
   return isNumericField({ path: [], data_type: dataType })
     ? { type: "numeric" }
-    : null;
+    : { type: "other" };
 }
 export const fieldKind = (field: Field) =>
   valueKind(field.data_type, field.enum_values);

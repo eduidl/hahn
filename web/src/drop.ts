@@ -59,10 +59,8 @@ export function dropVerdict(
   if (topic.error) return { ok: false, reason: "読み込めないトピックです。" };
   if (topic.message_count === 0) return { ok: false, reason: "メッセージがありません。" };
   const accepted = [...spec.accepts].map(kindLabel).join("・");
-  // A topic is its root message: treat it like a struct field.
-  if (!drag.path)
-    return { ok: false, reason: `struct は扱えません。${accepted} を指定してください。` };
-  const entry = index.byKey.get(keyOf(drag.topic, drag.path));
+  // A dragged topic stands for its root message (empty path).
+  const entry = index.byKey.get(keyOf(drag.source, drag.topic, drag.path ?? []));
   if (!entry) return { ok: false, reason: "フィールドが見つかりません。" };
   if (!acceptsKind(spec, entry.kind))
     return {

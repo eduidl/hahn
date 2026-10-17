@@ -66,7 +66,7 @@ describe("topic drops", () => {
     expect(kindsMatch(valueKind("f64"), valueKind("bool"))).toBe(false);
     expect(kindsMatch(valueKind("enum", idle), valueKind("enum", [...idle]))).toBe(true);
     expect(kindsMatch(valueKind("enum", idle), valueKind("enum", [{ name: "RUN", value: 0 }]))).toBe(false);
-    expect(valueKind("string")).toBeNull();
+    expect(valueKind("u8[]")).toEqual({ type: "other" });
   });
   it("names primitive types in the schema's own language", () => {
     expect(displayType("u32", "ros2msg")).toBe("uint32");

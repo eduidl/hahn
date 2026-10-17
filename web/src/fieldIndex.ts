@@ -37,14 +37,22 @@ export const typeLabel = (topic: Topic, field: Field) =>
 export function buildFieldIndex(topics: Topic[]): FieldIndex {
   const byKey = new Map<string, IndexedField>();
   for (const topic of topics) {
-    for (const field of topic.fields) {
-      const key = keyOf(topic.topic, field.path);
+    // The topic itself is its root message, a struct with an empty path.
+    const root: Field = {
+      path: [],
+      data_type: "struct",
+      type_name: topic.schema_name ?? undefined,
+    };
+    for (const field of [root, ...topic.fields]) {
+      const key = keyOf(topic.source, topic.topic, field.path);
       byKey.set(key, {
         key,
         topic,
         field,
         kind: fieldKind(field),
-        label: `${topic.topic} · ${field.path.join(".")}`,
+        label: field.path.length
+          ? `${topic.topic} · ${field.path.join(".")}`
+          : topic.topic,
         typeLabel: typeLabel(topic, field),
       });
     }

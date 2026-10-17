@@ -167,13 +167,15 @@ function SeriesList({
   widget,
   pointCount,
   row,
-}: PanelProps & { row: (series: Selected) => ReactNode }) {
+  showPoints = true,
+}: PanelProps & { row: (series: Selected) => ReactNode; showPoints?: boolean }) {
   return (
     <section className="legend" aria-label="選択した系列">
       <div className="legend-heading">
         <span className="eyebrow">SERIES</span>
         <span>
-          {widget.series.length} 系列 · {pointCount.toLocaleString()} 点
+          {widget.series.length} 系列
+          {showPoints && ` · ${pointCount.toLocaleString()} 点`}
         </span>
       </div>
       {widget.series.map(row)}
@@ -193,7 +195,14 @@ function SeriesRow({
   series: s,
   marker,
   children,
-}: PanelProps & { series: Selected; marker?: ReactNode; children?: ReactNode }) {
+  showStatus = true,
+}: PanelProps & {
+  series: Selected;
+  marker?: ReactNode;
+  children?: ReactNode;
+  /** Off for widgets that do not stream series, so there is no loading state. */
+  showStatus?: boolean;
+}) {
   const update = (change: (series: Selected[]) => Selected[]) =>
     dispatch({ type: "series", id: widget.id, update: change });
   return (
@@ -212,9 +221,11 @@ function SeriesRow({
         <SeriesName topic={s.topic} path={s.path} />
       </button>
       {children}
-      <span className="series-status">
-        {statusLabel(records.find((r) => r.key === s.key))}
-      </span>
+      {showStatus && (
+        <span className="series-status">
+          {statusLabel(records.find((r) => r.key === s.key))}
+        </span>
+      )}
       <button
         className="remove"
         aria-label={`${name(s)} を削除`}

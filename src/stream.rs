@@ -48,7 +48,7 @@ struct Row {
     values: Vec<serde_json::Value>,
 }
 
-fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
+pub(crate) fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
     let (head, tail) = path.split_first()?;
     let index = defs.iter().position(|f| &f.name == head)?;
     let mut result = vec![index];
@@ -56,7 +56,7 @@ fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
         let mcapdecode::core::DataTypeDef::Struct(children) = &defs[index].element.data_type else {
             return None;
         };
-        result.extend(indexes(children, tail)?);
+        result.extend(indexes(&children.fields, tail)?);
     }
     Some(result)
 }
@@ -93,7 +93,10 @@ fn scalar(root: &Value, path: &[usize]) -> serde_json::Value {
     }
 }
 
-fn send(tx: &mpsc::Sender<Result<Bytes, Infallible>>, event: &Event) -> Result<(), io::Error> {
+fn send<T: Serialize>(
+    tx: &mpsc::Sender<Result<Bytes, Infallible>>,
+    event: &Event<T>,
+) -> Result<(), io::Error> {
     let mut bytes = serde_json::to_vec(event)?;
     bytes.push(b'\n');
     tx.blocking_send(Ok(bytes.into()))

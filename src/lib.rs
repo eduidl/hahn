@@ -1,4 +1,5 @@
-mod recording;
+mod message;
+mod source;
 mod stream;
 
 use axum::{
@@ -59,12 +60,14 @@ pub fn router(root: &FsPath) -> anyhow::Result<Router> {
         .route("/api/files/{id}", get(info))
         .route("/api/files/{id}/topics", get(topics))
         .route("/api/files/{id}/series", post(stream::series))
+        .route("/api/files/{id}/messages", post(message::messages))
+        .route("/api/files/{id}/message", get(message::message))
         .with_state(AppState {
             files: Arc::new(files),
         }))
 }
 
-fn discover(root: &FsPath, paths: &mut Vec<PathBuf>) -> anyhow::Result<()> {
+fn discover(root: &FsPath, paths: &mut Vec<(PathBuf, &'static dyn Format)>) -> anyhow::Result<()> {
     for entry in std::fs::read_dir(root)? {
         let entry = entry?;
         let kind = entry.file_type()?;
