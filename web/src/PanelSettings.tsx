@@ -97,6 +97,12 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
+            // A search input's native Escape only clears the text; close instead.
+            if (event.key === "Escape") {
+              event.preventDefault();
+              popover.current?.hidePopover();
+              return;
+            }
             if (event.key !== "Enter" || !matches.length) return;
             // Closing returns focus to the opener; without this the same
             // Enter would press it and reopen the list.

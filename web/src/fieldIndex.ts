@@ -1,4 +1,12 @@
-import { displayType, fieldKind, keyOf, type Field, type Topic, type ValueKind } from "./types";
+import {
+  displayType,
+  fieldKind,
+  keyOf,
+  topicKey,
+  type Field,
+  type Topic,
+  type ValueKind,
+} from "./types";
 import { acceptsKind, widgetSpecs, widgetTypes, type Widget } from "./widgets";
 
 export type IndexedField = {

@@ -21,11 +21,15 @@ import { secondsFrom } from "./data";
 import { dropVerdict } from "./drop";
 import { buildFieldIndex, typeLabel } from "./fieldIndex";
 import { useSeries } from "./useSeries";
+import { PlaybackBar } from "./PlaybackBar";
+import { PlaybackContext, createPlaybackStore } from "./playback";
+import { SourceNames, mergeInfo, type LoadedSource } from "./sources";
 import {
   dragMime,
   errorMessage,
   keyOf,
   parseDrop,
+  topicKey,
   type Field,
   type FileEntry,
   type Info,
@@ -65,14 +69,19 @@ export function App() {
   const index = useMemo(() => buildFieldIndex(topics), [topics]);
   const [widgetDrag, setWidgetDrag] = useState<Widget["type"] | null>(null);
   const { plotted, records, revision, stop, busy } = useSeries(
-    fileId,
-    info,
+    info?.start_ns ?? null,
     demand,
   );
   const fullEnd = info
     ? Math.max(1e-9, secondsFrom(info.end_ns, info.start_ns))
     : 1;
-  const file = files.find((f) => f.id === fileId);
+  const [playback] = useState(createPlaybackStore);
+  const openFiles = sources.flatMap((id) => files.filter((f) => f.id === id));
+  const sourceNames = useMemo(
+    () => new Map(openFiles.map((f) => [f.id, f.name])),
+    [JSON.stringify(openFiles.map((f) => [f.id, f.name]))],
+  );
+  const multiSource = sources.length > 1;
   const count = activeWidget
     ? widgetSeries(activeWidget, plotted).reduce(
         (n, s) => n + s.points.length,
@@ -112,31 +121,12 @@ export function App() {
     setError("");
     setSearch("");
     setExpandedTopics(new Set());
-    setLoadingInfo(false);
-    if (fileId === null) return;
-    setLoadingInfo(true);
-    Promise.all([
-      get<Info>(`/api/files/${fileId}`, controller.signal).then((data) => {
-        if (!controller.signal.aborted) {
-          setInfo(data);
-        }
-      }),
-      get<Topic[]>(`/api/files/${fileId}/topics`, controller.signal).then(
-        (data) => {
-          if (!controller.signal.aborted) {
-            setTopics(data);
-          }
-        },
-      ),
-    ])
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(errorMessage(e));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingInfo(false);
-      });
-    return () => controller.abort();
-  }, [fileId]);
+  };
+
+  // A new time axis starts paused at its beginning.
+  useEffect(() => {
+    playback.reset(info ? fullEnd : 0);
+  }, [playback, info, fullEnd]);
 
   const startDrag = (event: DragEvent, payload: TopicDrag) => {
     event.stopPropagation();
@@ -193,6 +183,9 @@ export function App() {
   );
 
   return (
+    <FieldCacheContext.Provider value={fieldCache}>
+    <PlaybackContext.Provider value={playback}>
+    <SourceNames.Provider value={sourceNames}>
     <div className="app">
       <header>
         <div className="header-start">
@@ -501,25 +494,12 @@ export function App() {
             drop={drop}
             openSettings={() => setTab("panel")}
           />
-          <div className="bottom-status">
-            <span>
-              <i className={busy ? "pulse" : ""} />
-              {busy ? "データを受信中" : "READY"}
-              {busy && (
-                <button className="stop-loading" onClick={stop}>
-                  停止
-                </button>
-              )}
-            </span>
-            <span>
-              時間軸: log_time ·{" "}
-              {info
-                ? `${fullEnd.toLocaleString(undefined, { maximumFractionDigits: 3 })} s`
-                : "—"}
-            </span>
-          </div>
         </main>
       </div>
+      <PlaybackBar info={info} fullEnd={fullEnd} busy={busy || messages.busy} stop={() => { stop(); messages.stop(); }} />
     </div>
+    </SourceNames.Provider>
+    </PlaybackContext.Provider>
+    </FieldCacheContext.Provider>
   );
 }
