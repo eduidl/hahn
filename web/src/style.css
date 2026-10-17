@@ -425,7 +425,8 @@ canvas {
     monospace;
 }
 .series-toggle i,
-.tooltip i {
+.tooltip i,
+.plot-legend i {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -438,6 +439,45 @@ canvas {
   margin: 0 16px 16px;
   padding: 6px 10px;
   font-size: 12px;
+}
+.target-setting {
+  margin: 0 16px 16px;
+}
+.target-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  font: 12px ui-monospace, monospace;
+}
+.target-setting > .add-field {
+  margin: 0;
+}
+.table-column-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.table-column-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.table-column-actions button {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.table-column-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font: 12px ui-monospace, monospace;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.table-column-option input {
+  flex-shrink: 0;
+  margin: 1px 0 0;
 }
 .field-picker {
   position: fixed;
@@ -568,7 +608,9 @@ canvas {
   font-size: 12px;
   border-left: 2px solid #eaa685;
 }
-.tooltip {
+/* Hover tooltip (placed next to the pointer from Plot.tsx) and the legend share the box. */
+.tooltip,
+.plot-legend {
   position: absolute;
   max-height: 60%;
   overflow: hidden;
@@ -597,13 +639,15 @@ canvas {
   color: #a4a4a4;
   margin-bottom: 8px;
 }
-.tooltip > div:not(:first-child) {
+.tooltip-row {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.tooltip-row + .tooltip-row {
   margin-top: 7px;
 }
-.tooltip .series-ref {
+.plot-legend .series-ref {
   max-width: 280px;
 }
 .tooltip strong {
@@ -702,7 +746,7 @@ canvas {
     flex-direction: column;
     align-items: stretch;
   }
-  .tooltip .series-ref {
+  .plot-legend .series-ref {
     max-width: 140px;
   }
 }
@@ -1269,10 +1313,6 @@ header .local {
   flex-direction: column;
   color: #858585;
   font-size: 12px;
-}
-.workspace > main .bottom-status {
-  flex-shrink: 0;
-  padding: 12px 18px;
 }
 @media (max-width: 640px) {
   header .local {

@@ -58,6 +58,9 @@ type Props = {
   view: PlotView;
   onViewChange: (update: (view: PlotView) => PlotView) => void;
   mode: DragMode;
+  legend: LegendSettings;
+  /** Series chosen in the widget, including ones whose data has not arrived yet. */
+  selectedCount: number;
   onCanReset: (canReset: boolean) => void;
 };
 const right = 24,
@@ -111,6 +114,8 @@ export function Plot({
   view,
   onViewChange,
   mode,
+  legend,
+  selectedCount,
   onCanReset,
 }: Props) {
   const bottom = timeDisplay === "absolute" ? 70 : 52;
@@ -197,6 +202,7 @@ export function Plot({
   const reset = () => onViewChange(() => defaultPlotView());
   const [size, setSize] = useState({ w: 900, h: 500 });
   const [cursor, setCursor] = useState<number | null>(null);
+  const [pointerY, setPointerY] = useState<number | null>(null);
   const [drag, setDrag] = useState<{
     start: number;
     end: number;
@@ -210,6 +216,31 @@ export function Plot({
   dragRef.current = drag;
   const w = Math.max(1, size.w - left - right),
     h = Math.max(1, size.h - top - bottom);
+  // Inset the legend from the chosen corner of the plotting area.
+  const inset = 8;
+  const [vertical, horizontal] = legend.position.split("-");
+  const legendStyle = {
+    [vertical]: vertical === "top" ? top + inset : bottom + inset,
+    [horizontal]: horizontal === "left" ? left + inset : right + inset,
+  };
+  // Hover readouts (cursor line and tooltip) only make sense with something drawn.
+  const hasVisible = series.some((s) => !s.hidden);
+  // The hover tooltip sits below-right of the pointer and flips to the other
+  // side only where it would overflow, which needs its rendered size.
+  const tooltip = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = tooltip.current;
+    if (!node || cursor === null || pointerY === null) return;
+    const offset = 14;
+    const x = cursor + offset + node.offsetWidth > size.w
+      ? cursor - offset - node.offsetWidth
+      : cursor + offset;
+    const y = pointerY + offset + node.offsetHeight > size.h
+      ? pointerY - offset - node.offsetHeight
+      : pointerY + offset;
+    node.style.left = `${Math.max(0, x)}px`;
+    node.style.top = `${Math.max(0, y)}px`;
+  });
   const xAt = (x: number) =>
     domain[0] + ((x - left) / w) * (domain[1] - domain[0]);
   const clearDrag = () => {
@@ -339,7 +370,7 @@ export function Plot({
           }
       }
     }
-    if (cursor !== null) {
+    if (cursor !== null && visible.length) {
       ctx.strokeStyle = "#c7c7c7";
       // Reset the width left over from the last series.
       ctx.lineWidth = 1;
@@ -408,6 +439,7 @@ export function Plot({
             e.clientX - e.currentTarget.getBoundingClientRect().left;
           const x = Math.max(left, Math.min(left + w, pointerX));
           setCursor(x);
+          setPointerY(e.clientY - e.currentTarget.getBoundingClientRect().top);
           const active = dragRef.current;
           if (active) {
             const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
@@ -430,7 +462,10 @@ export function Plot({
             }
           }
         }}
-        onPointerLeave={() => setCursor(null)}
+        onPointerLeave={() => {
+          setCursor(null);
+          setPointerY(null);
+        }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
@@ -522,12 +557,9 @@ export function Plot({
             .map((s) => {
               const p = nearest(s.points, xAt(cursor));
               return (
-                <div key={s.key}>
+                <div key={s.key} className="tooltip-row">
                   <i style={{ background: s.color }} />
-                  <SeriesName topic={s.topic} path={s.path} />
-                  <strong title={p?.ns}>
-                    {p?.raw == null ? "—" : String(p.raw)}
-                  </strong>
+                  <strong title={p?.ns}>{p?.raw == null ? "—" : String(p.raw)}</strong>
                 </div>
               );
             })}

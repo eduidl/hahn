@@ -196,9 +196,15 @@ describe("widget workspace", () => {
       .toEqual([flag.key, keyOf("/t", ["b"])]);
     let state = reduce(initialWorkspace(), { type: "series", id: "widget-1", update: () => [speed, flag] });
     state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "state" });
-    expect(state.widgets["widget-1"]).toMatchObject({ type: "state", title: "State 1", series: [flag] });
-    state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "time-series" });
-    expect(state.widgets["widget-1"]).toMatchObject({ type: "time-series", title: "Time series 1", series: [flag] });
+    expect(state.widgets["widget-1"]).toMatchObject({
+      id: "widget-1",
+      type: "state",
+      title: "State",
+      series: [],
+      timeDisplay: "absolute",
+      view: defaultPlotView(),
+    });
+    expect(state.layout).toBe("widget-1");
   });
   it("duplicates the widget kind and series when splitting below", () => {
     let state = reduce(initialWorkspace(), { type: "change-type", id: "widget-1", widgetType: "state" });
@@ -208,6 +214,15 @@ describe("widget workspace", () => {
     expect(state.layout).toMatchObject({ direction: "column", children: ["widget-1", "widget-2"] });
     expect(state.widgets["widget-2"]).toMatchObject({ type: "state", series: [flag], view: defaultPlotView() });
     expect(state.widgets["widget-2"].series[0]).not.toBe(state.widgets["widget-1"].series[0]);
+  });
+  it("keeps legend settings per widget and copies them when splitting", () => {
+    let state = initialWorkspace();
+    expect(state.widgets["widget-1"].legend).toEqual({ visible: true, position: "top-left" });
+    state = reduce(state, { type: "legend", id: "widget-1", value: { position: "bottom-left" } });
+    state = reduce(state, { type: "legend", id: "widget-1", value: { visible: false } });
+    expect(state.widgets["widget-1"].legend).toEqual({ visible: false, position: "bottom-left" });
+    state = reduce(state, { type: "add", target: "widget-1", duplicate: true });
+    expect(state.widgets["widget-2"].legend).toEqual({ visible: false, position: "bottom-left" });
   });
   it("clears only the target widget's series and view, keeping its settings", () => {
     let state = reduce(initialWorkspace(), { type: "add" });
@@ -236,7 +251,7 @@ describe("widget workspace", () => {
     const numeric = { ...series, dataType: "f64" };
     let state = reduce(initialWorkspace(), { type: "series", id: "widget-1", update: () => [numeric] });
     state = zoomed(state);
-    const other = { ...numeric, key: keyOf("/pose", ["y"]), path: ["y"], dataType: "u8" };
+    const other = { ...numeric, key: keyOf(0, "/pose", ["y"]), path: ["y"], dataType: "u8" };
     state = reduce(state, { type: "series", id: "widget-1", update: (list) => [...list, other] });
     expect(state.widgets["widget-1"].view.pinnedYBase).toEqual([0, 1]);
     // Emptying the widget returns it to the unconstrained state.
