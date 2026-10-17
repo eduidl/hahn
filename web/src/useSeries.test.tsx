@@ -1,3 +1,10 @@
+// @vitest-environment jsdom
+import { StrictMode } from "react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { useSeries } from "./useSeries";
+import { keyOf, type Info, type Selected } from "./types";
+
 const info: Info = {
   start_ns: "1000000000",
   end_ns: "2000000000",

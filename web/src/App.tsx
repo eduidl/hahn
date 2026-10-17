@@ -1,3 +1,38 @@
+import {
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+  type DragEvent,
+} from "react";
+import { WidgetWorkspace, widgetSeries } from "./WidgetWorkspace";
+import { PanelSettings } from "./PanelSettings";
+import {
+  initialWorkspace,
+  workspaceReducer,
+  requestedSeries,
+  addFieldAction,
+  widgetDragMime,
+  widgetSpecs,
+  widgetTypes,
+  type Widget,
+} from "./widgets";
+import { secondsFrom } from "./data";
+import { dropVerdict } from "./drop";
+import { buildFieldIndex, typeLabel } from "./fieldIndex";
+import { useSeries } from "./useSeries";
+import {
+  dragMime,
+  errorMessage,
+  keyOf,
+  parseDrop,
+  type Field,
+  type FileEntry,
+  type Info,
+  type Topic,
+  type TopicDrag,
+} from "./types";
+
 async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
   const body = await response.json();
