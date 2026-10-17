@@ -341,6 +341,8 @@ export function Plot({
     }
     if (cursor !== null) {
       ctx.strokeStyle = "#c7c7c7";
+      // Reset the width left over from the last series.
+      ctx.lineWidth = 1;
       ctx.setLineDash([3, 5]);
       ctx.beginPath();
       ctx.moveTo(cursor, top);
@@ -382,6 +384,7 @@ export function Plot({
     categories,
     categoryIndex,
     left,
+    linear,
   ]);
 
   return (
