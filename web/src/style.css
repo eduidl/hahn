@@ -818,6 +818,19 @@ aside {
 .topic-group {
   margin-bottom: 3px;
 }
+/* Heads each recording's topics when several are open. */
+.source-heading {
+  margin: 12px 4px 6px;
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 0.6px;
+  color: #9e9e9e;
+  overflow-wrap: anywhere;
+}
+.source-heading:first-child {
+  margin-top: 4px;
+}
 .topic-group > summary {
   display: flex;
   align-items: flex-start;
@@ -1313,6 +1326,173 @@ header .local {
   padding: 7px 0 0 calc(22% + 12px);
   color: #858585;
   font-size: 10px;
+}
+/* Log: value changes in time order, one fixed-height row each. */
+.log-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  font:
+    11px ui-monospace,
+    monospace;
+}
+.log-header,
+.log-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: center;
+  padding: 0 12px;
+}
+.log-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  color: #858585;
+  font-size: 10px;
+  border-bottom: 1px solid #242424;
+}
+.log-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.log-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #cecece;
+  text-align: left;
+  font: inherit;
+}
+.log-row:hover {
+  background: #1b1b1b;
+}
+.log-row.current {
+  background: #1d2a40;
+}
+.log-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-time {
+  color: #a0a0a0;
+}
+.log-series {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #a4a4a4;
+}
+.log-series i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.log-value.empty {
+  color: #858585;
+  font-style: italic;
+}
+.log-empty {
+  margin: 12px;
+  color: #858585;
+}
+/* Raw Message: a folding tree of the message at the playback position. */
+/* Fills the chart area and scrolls on its own; the toolbar stays on top. */
+.raw-message {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 8px 12px 12px;
+  font:
+    11px ui-monospace,
+    monospace;
+  color: #cecece;
+}
+.raw-status {
+  margin: 0 0 8px;
+  color: #858585;
+  font-size: 10px;
+}
+.raw-toolbar {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -8px -12px 6px;
+  padding: 6px 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid #242424;
+}
+.raw-toolbar .raw-status {
+  flex: 1;
+  margin: 0;
+}
+.raw-toolbar button {
+  padding: 3px 7px;
+  font-size: 10px;
+}
+.raw-node > summary {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.raw-node > summary::before {
+  content: "›";
+  color: #777;
+  width: 8px;
+}
+.raw-node[open] > summary::before {
+  content: "⌄";
+}
+.raw-children {
+  margin-left: 3px;
+  padding-left: 8px;
+  border-left: 1px solid #2a2a2a;
+}
+.raw-leaf {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0 2px 16px;
+  min-width: 0;
+}
+.raw-error {
+  color: #ffc6ab;
+}
+.raw-key {
+  color: #91b8ff;
+  flex-shrink: 0;
+}
+.raw-meta {
+  color: #6f6f6f;
+}
+.raw-value {
+  overflow-wrap: anywhere;
+}
+.raw-string {
+  color: #b8d88a;
+}
+.raw-number {
+  color: #f3bf78;
+}
+.raw-boolean {
+  color: #d69bf3;
+}
+.raw-null {
+  color: #6f6f6f;
+}
+.raw-more {
+  padding: 2px 0 2px 16px;
 }
 .workspace-empty {
   display: flex;

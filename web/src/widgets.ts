@@ -23,7 +23,6 @@ export const legendPositions: Record<LegendPosition, string> = {
 };
 type WidgetBase = {
   id: string;
-  type: "time-series" | "state";
   title: string;
   series: Selected[];
   mode: DragMode;
@@ -78,6 +77,8 @@ export type WidgetSpec = {
   sameKind: boolean;
   /** At 1, adding a field replaces the current series. */
   maxSeries: number;
+  /** Whether selections stream through `/series`; generic viewers fetch on their own. */
+  loadsSeries: boolean;
 };
 export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   "time-series": {
@@ -89,6 +90,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     accepts: new Set(["numeric", "bool", "enum"]),
     sameKind: true,
     maxSeries: Infinity,
+    loadsSeries: true,
   },
   state: {
     label: "State Transition",
@@ -110,6 +112,29 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     accepts: new Set(["string", "enum", "bool"]),
     sameKind: false,
     maxSeries: Infinity,
+    loadsSeries: true,
+  },
+  table: {
+    label: "Table",
+    titlePrefix: "Table",
+    description: "トピック・フィールド配下の履歴をテーブルで表示",
+    help: "表示するトピックまたはフィールドを1つ指定します。配下すべてを列に展開します。",
+    emptyHint: "トピックまたはフィールドをドロップ",
+    accepts: new Set(["numeric", "bool", "enum", "string", "other"]),
+    sameKind: false,
+    maxSeries: 1,
+    loadsSeries: false,
+  },
+  raw: {
+    label: "Raw Message",
+    titlePrefix: "Raw",
+    description: "トピック・フィールドの中身を再生位置の時点で表示",
+    help: "表示するトピックまたはフィールドを1つ指定します。",
+    emptyHint: "トピックまたはフィールドをドロップ",
+    accepts: new Set(["numeric", "bool", "enum", "string", "other"]),
+    sameKind: false,
+    maxSeries: 1,
+    loadsSeries: false,
   },
 };
 export const widgetTypes = Object.keys(widgetSpecs) as Widget["type"][];
@@ -376,6 +401,7 @@ export function requestedSeries(widgets: Record<string, Widget>): Selected[] {
   return [
     ...new Map(
       Object.values(widgets)
+        .filter((w) => widgetSpecs[w.type].loadsSeries)
         .flatMap((w) => w.series)
         .map((s) => [s.key, s]),
     ).values(),

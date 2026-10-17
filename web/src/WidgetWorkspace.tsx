@@ -8,12 +8,19 @@ import {
   useState,
   type Dispatch,
   type DragEvent,
+  type ReactNode,
 } from "react";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
 import { Plot, defaultPlotView, type PlotView, type Series } from "./Plot";
 import { timeFormatter } from "./timeDisplay";
 import type { DropVerdict } from "./drop";
+import { stateLabel } from "./data";
+import { LogView } from "./LogView";
+import { TableView } from "./TableView";
+import type { MessageRecord } from "./useMessages";
+import type { FieldIndex } from "./fieldIndex";
+import { RawMessage } from "./RawMessage";
 import { SeriesName } from "./SeriesName";
 import { usePlayback } from "./playback";
 import { dragMime, type Info } from "./types";
@@ -432,17 +439,7 @@ function TimeSeriesWindow({
             onDrop={(event) => drop(event, widget.id)}
             aria-label={`${widget.title} へのドロップ領域`}
           >
-            {widget.type === "time-series" ? <Plot
-              series={widgetSeries(widget, data)}
-              fullEnd={fullEnd}
-              originNs={info?.start_ns ?? null}
-              timeDisplay={widget.timeDisplay}
-              revision={revision}
-              mode={widget.mode}
-              view={widget.view}
-              onViewChange={onViewChange}
-              onCanReset={setCanReset}
-            /> : <StatePlot widget={widget} series={widgetSeries(widget, data)} fullEnd={fullEnd} originNs={info?.start_ns ?? null} />}
+            {views[widget.type]()}
             {verdict && (
               <div className={`drop-overlay ${verdict.ok ? "" : "rejected"}`}>
                 {verdict.ok

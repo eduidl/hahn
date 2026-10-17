@@ -75,6 +75,15 @@ pub(crate) async fn message(
     .map(Json)
 }
 
+fn field_type<'a>(defs: &'a FieldDefs, index: &[usize]) -> &'a DataTypeDef {
+    let data_type = &defs[index[0]].element.data_type;
+    match (&index[1..], data_type) {
+        ([], _) => data_type,
+        (tail, DataTypeDef::Struct(children)) => field_type(&children.fields, tail),
+        _ => data_type,
+    }
+}
+
 fn select<'a>(value: &'a Value, index: &[usize]) -> Option<&'a Value> {
     index.iter().try_fold(value, |value, &i| match value {
         Value::Struct(values) => values.get(i),
