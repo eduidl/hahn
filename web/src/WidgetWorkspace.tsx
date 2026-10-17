@@ -346,9 +346,6 @@ function TimeSeriesWindow({
                   >
                     {widgetTypes.map((type) => {
                       const current = type === widget.type;
-                      const removed =
-                        widget.series.length -
-                        compatibleSeries(type, widget.series).length;
                       return (
                         <button
                           key={type}
@@ -362,11 +359,7 @@ function TimeSeriesWindow({
                         >
                           {widgetSpecs[type].label}
                           <small>
-                            {current
-                              ? "現在の種類"
-                              : removed > 0
-                                ? `表示できない ${removed} 系列を外します`
-                                : widgetSpecs[type].description}
+                            {current ? "現在の種類" : widgetSpecs[type].description}
                           </small>
                         </button>
                       );
