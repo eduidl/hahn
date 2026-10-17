@@ -8,3 +8,44 @@ import {
   type WidgetSpec,
 } from "./widgets";
 
+export type DropVerdict =
+  | { ok: true; entry: IndexedField; replaces: boolean }
+  | { ok: false; reason: string };
+
+function mismatchReason(current: ValueKind | null, added: ValueKind | null) {
+  if (current?.type === "enum" && added?.type === "enum")
+    return "定義の異なる enum は重ねられません。";
+  return `${kindLabel(current?.type)} の系列に ${kindLabel(added?.type)} は重ねられません。`;
+}
+
+/**
+ * Whether a dragged topic or field can be added to a widget. Used while
+ * dragging, to mark each widget, and on drop. Reasons are shown on the widget
+ * during the drag, so they omit the topic and field names.
+ */
+export function dropVerdict(
+  index: FieldIndex,
+  drag: TopicDrag,
+  widget: Widget,
+  spec: WidgetSpec = widgetSpecs[widget.type],
+): DropVerdict {
+  const topic = index.topics.get(drag.topic);
+  if (!topic) return { ok: false, reason: "トピックが見つかりません。" };
+  if (topic.error) return { ok: false, reason: "読み込めないトピックです。" };
+  const accepted = [...spec.accepts].map(kindLabel).join("・");
+  // A topic is its root message: treat it like a struct field.
+  if (!drag.path)
+    return { ok: false, reason: `struct は扱えません。${accepted} を指定してください。` };
+  const entry = index.byKey.get(keyOf(drag.topic, drag.path));
+  if (!entry) return { ok: false, reason: "フィールドが見つかりません。" };
+  if (!acceptsKind(spec, entry.kind))
+    return {
+      ok: false,
+      // The primitive name (`struct`, `uint32`, ...) keeps the reason short.
+      reason: `${displayType(entry.field.data_type, topic.schema_encoding)} は扱えません。${accepted} を指定してください。`,
+    };
+  const reason = widgetReason(entry, widget, spec);
+  if (reason) return { ok: false, reason };
+  return { ok: true, entry, replaces: spec.maxSeries === 1 && widget.series.length > 0 };
+}
+

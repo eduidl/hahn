@@ -1,3 +1,13 @@
+import { describe, expect, it } from "vitest";
+import {
+  appendPoints,
+  consumeStream,
+  nearest,
+  point,
+  secondsFrom,
+  type StreamEvent,
+} from "./data";
+
 describe("plot data", () => {
   it("subtracts nanoseconds before converting to a JS number", () => {
     expect(secondsFrom("1760000000123456790", "1760000000123456789")).toBe(
