@@ -488,6 +488,57 @@ fn parquet_fixture(name: &str, batch: arrow::array::RecordBatch) -> tempfile::Te
     dir
 }
 
+fn drive_parquet() -> arrow::array::RecordBatch {
+    use arrow::{
+        array::{
+            ArrayRef, DictionaryArray, Float64Array, Int64Array, ListArray, StructArray,
+            TimestampNanosecondArray,
+        },
+        datatypes::{DataType, Field, Float64Type, Int32Type},
+    };
+    use std::sync::Arc;
+    let pose = StructArray::from(vec![
+        (
+            Arc::new(Field::new("x", DataType::Float64, false)),
+            Arc::new(Float64Array::from(vec![3.0, 1.0, 2.0])) as ArrayRef,
+        ),
+        (
+            Arc::new(Field::new("y", DataType::Float64, false)),
+            Arc::new(Float64Array::from(vec![30.0, 10.0, 20.0])) as ArrayRef,
+        ),
+    ]);
+    let mode: DictionaryArray<Int32Type> = vec!["drive", "park", "drive"].into_iter().collect();
+    arrow::array::RecordBatch::try_from_iter([
+        (
+            "time",
+            Arc::new(TimestampNanosecondArray::from(vec![
+                1_760_000_000_000_000_300,
+                1_760_000_000_000_000_100,
+                1_760_000_000_000_000_200,
+            ])) as ArrayRef,
+        ),
+        (
+            "speed",
+            Arc::new(Float64Array::from(vec![Some(3.5), Some(1.5), None])) as ArrayRef,
+        ),
+        (
+            "count",
+            Arc::new(Int64Array::from(vec![3, 1, 2])) as ArrayRef,
+        ),
+        ("mode", Arc::new(mode) as ArrayRef),
+        ("pose", Arc::new(pose) as ArrayRef),
+        (
+            "ranges",
+            Arc::new(ListArray::from_iter_primitive::<Float64Type, _, _>(vec![
+                Some(vec![Some(3.0)]),
+                Some(vec![Some(1.0), Some(1.1)]),
+                None,
+            ])) as ArrayRef,
+        ),
+    ])
+    .unwrap()
+}
+
 #[tokio::test]
 async fn parquet_keeps_arrow_types_and_nesting() {
     let dir = parquet_fixture("drive.parquet", drive_parquet());

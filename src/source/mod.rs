@@ -4,6 +4,10 @@
 //! recognises its files and opens them. Schemas and values use the
 //! format-agnostic `mcapdecode_core` IR.
 
+mod csv;
+mod mcap;
+mod parquet;
+
 use mcapdecode::core::{FieldDefs, Value};
 use std::{path::Path, sync::Arc};
 
