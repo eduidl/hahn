@@ -70,6 +70,7 @@ describe("independent axis magnification", () => {
   it("derives the Y reference from all loaded samples, including offscreen peaks", () => {
     const series: Series = {
       key: "x",
+      source: 0,
       topic: "/t",
       path: ["x"],
       color: "#fff",
@@ -91,7 +92,7 @@ describe("independent axis magnification", () => {
   });
   it("builds ordered discrete Y categories from visible series", () => {
     const base: Series = {
-      key: "x", topic: "/t", path: ["x"], color: "#fff", lineWidth: 1, hidden: false,
+      key: "x", source: 0, topic: "/t", path: ["x"], color: "#fff", lineWidth: 1, hidden: false,
       points: [
         { x: 0, y: 3, raw: 3, ns: "0" },
         { x: 1, y: 1, raw: 1, ns: "1" },

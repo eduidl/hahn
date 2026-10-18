@@ -103,7 +103,7 @@ function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; seri
       {visible.map((s) => (
         <div className="state-row" key={s.key}>
           <div className="state-label">
-            <SeriesName topic={s.topic} path={s.path} />
+            <SeriesName source={s.source} topic={s.topic} path={s.path} />
           </div>
           <div className="state-track">
             {(segments.get(s.key) ?? []).map((segment, i) => {

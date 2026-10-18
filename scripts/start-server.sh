@@ -33,8 +33,9 @@ trap 'exit 143' TERM
 watch_pids+=("$!")
 
 # Override these environment variables to use another recording directory/port.
-cargo watch --ignore 'web/**' -- cargo run --release -- \
-  --data-dir "${MCAP_DATA_DIR:-$HOME/repos/eduidl/mcapdecode-rs/data}" \
+# Recordings are inputs, so changes under data/ do not restart the server.
+cargo watch --ignore 'web/**' --ignore 'data/**' -- cargo run --release -- \
+  --data-dir "${HAHN_DATA_DIR:-${MCAP_DATA_DIR:-$project_dir/data}}" \
   --listen "${HAHN_LISTEN:-127.0.0.1:3000}" \
   "$@" &
 watch_pids+=("$!")

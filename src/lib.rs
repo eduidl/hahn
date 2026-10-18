@@ -9,20 +9,13 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use mcapdecode::{
-    McapReader,
-    core::{DataTypeDef, FieldDefs},
-};
-use mcapdecode_ros2_common::{ResolvedSchema, ResolvedType};
-use prost::Message;
+use mcapdecode::core::{DataTypeDef, FieldDefs};
 use serde::Serialize;
+use source::{Format, Source};
 use std::{
-    collections::HashMap,
     path::{Path as FsPath, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
-
-pub use recording::recording_info;
 
 #[derive(Clone)]
 struct AppState {
@@ -34,24 +27,33 @@ struct FileEntry {
     id: usize,
     name: String,
     size_bytes: u64,
+    format: &'static str,
     #[serde(skip)]
     path: PathBuf,
+    #[serde(skip)]
+    opener: &'static dyn Format,
+    /// Opened on first use; failures are not cached so each request reports them.
+    #[serde(skip)]
+    source: OnceLock<Arc<dyn Source>>,
 }
 
 pub fn router(root: &FsPath) -> anyhow::Result<Router> {
     let root = root.canonicalize()?;
     let mut paths = Vec::new();
     discover(&root, &mut paths)?;
-    paths.sort();
+    paths.sort_by(|a, b| a.0.cmp(&b.0));
     let files = paths
         .into_iter()
         .enumerate()
-        .map(|(id, path)| {
+        .map(|(id, (path, opener))| {
             Ok(FileEntry {
                 id,
                 name: path.strip_prefix(&root)?.to_string_lossy().into_owned(),
                 size_bytes: path.metadata()?.len(),
+                format: opener.name(),
                 path,
+                opener,
+                source: OnceLock::new(),
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
@@ -74,18 +76,13 @@ fn discover(root: &FsPath, paths: &mut Vec<(PathBuf, &'static dyn Format)>) -> a
         // Do not traverse symlinks outside the configured directory.
         if kind.is_dir() {
             discover(&entry.path(), paths)?;
-        } else if kind.is_file() && entry.path().extension().is_some_and(|e| e == "mcap") {
-            paths.push(entry.path());
+        } else if kind.is_file()
+            && let Some(format) = source::formats().iter().find(|f| f.accepts(&entry.path()))
+        {
+            paths.push((entry.path(), *format));
         }
     }
     Ok(())
-}
-
-fn reader() -> McapReader {
-    McapReader::builder()
-        .with_default_decoders()
-        .with_parallel(false)
-        .build()
 }
 
 #[derive(Debug)]
@@ -101,24 +98,55 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 impl AppState {
-    fn file(&self, id: usize) -> Result<PathBuf, ApiError> {
-        self.files
-            .get(id)
-            .map(|f| f.path.clone())
-            .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "Recording not found".into()))
+    /// Opens the recording on first use. Blocks, so call it inside [`blocking`].
+    fn source(&self, id: usize) -> anyhow::Result<Arc<dyn Source>> {
+        let file = &self.files[id];
+        if let Some(source) = file.source.get() {
+            return Ok(source.clone());
+        }
+        let source = file.opener.open(&file.path)?;
+        Ok(file.source.get_or_init(|| source).clone())
+    }
+
+    fn check(&self, id: usize) -> Result<(), ApiError> {
+        if id < self.files.len() {
+            Ok(())
+        } else {
+            Err(ApiError(
+                StatusCode::NOT_FOUND,
+                "Recording not found".into(),
+            ))
+        }
     }
 }
 
-async fn files_list(State(state): State<AppState>) -> Json<Vec<FileEntry>> {
-    Json((*state.files).clone())
+async fn files_list(State(state): State<AppState>) -> Response {
+    Json(&*state.files).into_response()
 }
 
 async fn info(
     State(state): State<AppState>,
     Path(id): Path<usize>,
-) -> Result<Json<recording::RecordingInfo>, ApiError> {
-    let path = state.file(id)?;
-    blocking(move || recording_info(&path)).await.map(Json)
+) -> Result<Json<RecordingInfo>, ApiError> {
+    state.check(id)?;
+    blocking(move || {
+        let info = state.source(id)?.info()?;
+        Ok(RecordingInfo {
+            start_ns: info.start_ns.to_string(),
+            end_ns: info.end_ns.to_string(),
+            message_count: info.message_count,
+        })
+    })
+    .await
+    .map(Json)
+}
+
+#[derive(Serialize)]
+struct RecordingInfo {
+    start_ns: String,
+    /// Last message timestamp, inclusive.
+    end_ns: String,
+    message_count: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -369,68 +397,30 @@ async fn topics(
     State(state): State<AppState>,
     Path(id): Path<usize>,
 ) -> Result<Json<Vec<Topic>>, ApiError> {
-    let path = state.file(id)?;
+    state.check(id)?;
     blocking(move || {
-        let reader = reader();
-        let summary = recording::recording_summary(&path)?;
-        let mut schemas =
-            std::collections::HashMap::<(u16, String), Result<FieldDefs, String>>::new();
-        reader
-            .list_topics(&path)?
+        let topics = state.source(id)?.topics()?;
+        Ok(topics
             .into_iter()
-            .map(|info| {
+            .map(|meta| {
                 let mut fields = Vec::new();
-                let channels: Vec<_> = summary
-                    .channels
-                    .values()
-                    .filter(|c| c.topic == info.topic)
-                    .collect();
-                let cache_key = if channels.len() == 1 {
-                    channels[0]
-                        .schema
-                        .as_ref()
-                        .map(|s| (s.id, channels[0].message_encoding.clone()))
-                } else {
-                    None
-                };
-                let defs = if let Some(key) = cache_key {
-                    schemas
-                        .entry(key)
-                        .or_insert_with(|| {
-                            reader
-                                .topic_field_defs(&path, &info.topic)
-                                .map_err(|e| e.to_string())
-                        })
-                        .clone()
-                } else {
-                    reader
-                        .topic_field_defs(&path, &info.topic)
-                        .map_err(|e| e.to_string())
-                };
-                let schema = channels.iter().find_map(|channel| channel.schema.as_ref());
-                let type_names = schema
-                    .and_then(|schema| {
-                        schema_type_names(&schema.name, &schema.encoding, &schema.data).ok()
-                    })
-                    .unwrap_or_default();
-                let schema_encoding = schema.map(|schema| schema.encoding.clone());
-                let error = match defs {
+                let error = match meta.fields {
                     Ok(defs) => {
-                        schema_fields(&defs, &[], &type_names, &mut fields);
+                        schema_fields(&defs, &[], &mut fields);
                         None
                     }
                     Err(e) => Some(e),
                 };
-                Ok(Topic {
-                    topic: info.topic,
-                    schema_name: info.schema_name,
-                    schema_encoding,
-                    message_count: info.message_count,
+                Topic {
+                    topic: meta.topic,
+                    schema_name: meta.schema_name,
+                    schema_encoding: meta.schema_encoding,
+                    message_count: meta.message_count,
                     fields,
                     error,
-                })
+                }
             })
-            .collect::<anyhow::Result<Vec<_>>>()
+            .collect())
     })
     .await
     .map(Json)

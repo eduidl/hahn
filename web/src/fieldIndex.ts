@@ -23,6 +23,7 @@ export type IndexedField = {
  * loads. Only widget-dependent checks (current series) are left for later.
  */
 export type FieldIndex = {
+  /** By `topicKey`. */
   topics: Map<string, Topic>;
   byKey: Map<string, IndexedField>;
   /** Fields each widget type can display at all, in topic list order. */
@@ -68,7 +69,7 @@ export function buildFieldIndex(topics: Topic[]): FieldIndex {
     ]),
   ) as FieldIndex["candidates"];
   return {
-    topics: new Map(topics.map((topic) => [topic.topic, topic])),
+    topics: new Map(topics.map((topic) => [topicKey(topic.source, topic.topic), topic])),
     byKey,
     candidates,
   };

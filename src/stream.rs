@@ -1,4 +1,4 @@
-use crate::{ApiError, AppState, blocking, numeric_fields, reader, recording_info};
+use crate::{ApiError, AppState, blocking, series_fields, source::TimeRange};
 use axum::{
     Json,
     body::{Body, Bytes},
@@ -6,10 +6,7 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use mcapdecode::{
-    ReadOptions, TimeRange,
-    core::{FieldDefs, Value},
-};
+use mcapdecode::core::{FieldDefs, Value};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::Infallible,
@@ -30,9 +27,9 @@ pub(crate) struct SeriesRequest {
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum Event {
+enum Event<T> {
     Batch {
-        rows: Vec<Row>,
+        rows: Vec<T>,
         scanned_messages: usize,
     },
     Complete {
@@ -108,7 +105,7 @@ pub(crate) async fn series(
     Path(id): Path<usize>,
     Json(request): Json<SeriesRequest>,
 ) -> Result<Response, ApiError> {
-    let path = state.file(id)?;
+    state.check(id)?;
     if request.fields.is_empty() || request.fields.len() > 64 {
         return Err(ApiError(
             StatusCode::BAD_REQUEST,
@@ -135,12 +132,11 @@ pub(crate) async fn series(
             "Start must not exceed end".into(),
         ));
     }
-    let check_path = path.clone();
     let topic = request.topic.clone();
     let fields = request.fields.clone();
-    let paths = blocking(move || {
-        recording_info(&check_path)?;
-        let defs = reader().topic_field_defs(&check_path, &topic)?;
+    let (source, paths) = blocking(move || {
+        let source = state.source(id)?;
+        let defs = source.field_defs(&topic)?;
         let mut available = Vec::new();
         series_fields(&defs, &[], &mut available);
         fields
@@ -153,6 +149,7 @@ pub(crate) async fn series(
                 indexes(&defs, field).ok_or_else(|| anyhow::anyhow!("Invalid field"))
             })
             .collect::<anyhow::Result<Vec<_>>>()
+            .map(|paths| (source, paths))
     })
     .await?;
     Ok(stream_rows(
@@ -171,38 +168,26 @@ pub(crate) async fn series(
         let mut rows = Vec::with_capacity(1024);
         let mut scanned = 0;
         let mut last_flush = Instant::now();
-        let result = reader().for_each_decoded_message_with_options(
-            &path,
-            &request.topic,
-            &ReadOptions {
-                time_range: Some(TimeRange { start, end }),
-                parallel: Some(false),
-                ..Default::default()
-            },
-            |message| {
-                if tx.is_closed() {
-                    return Err(
-                        io::Error::new(io::ErrorKind::BrokenPipe, "Client disconnected").into(),
-                    );
-                }
-                scanned += 1;
-                rows.push(Row {
-                    time_ns: message.log_time.to_string(),
-                    values: paths.iter().map(|p| scalar(&message.value, p)).collect(),
-                });
-                if rows.len() >= 1024 || last_flush.elapsed() >= Duration::from_millis(100) {
-                    send(
-                        &tx,
-                        &Event::Batch {
-                            rows: std::mem::take(&mut rows),
-                            scanned_messages: scanned,
-                        },
-                    )?;
-                    last_flush = Instant::now();
-                }
-                Ok(())
-            },
-        );
+        let result = source.read(&topic, range, None, &mut |log_time, value| {
+            if tx.is_closed() {
+                return Err(
+                    io::Error::new(io::ErrorKind::BrokenPipe, "Client disconnected").into(),
+                );
+            }
+            scanned += 1;
+            rows.push(convert(log_time, value));
+            if rows.len() >= 1024 || last_flush.elapsed() >= Duration::from_millis(100) {
+                send(
+                    &tx,
+                    &Event::Batch {
+                        rows: std::mem::take(&mut rows),
+                        scanned_messages: scanned,
+                    },
+                )?;
+                last_flush = Instant::now();
+            }
+            Ok(())
+        });
         if tx.is_closed() {
             return;
         }
@@ -222,7 +207,7 @@ pub(crate) async fn series(
             Ok(()) => {
                 let _ = send(
                     &tx,
-                    &Event::Complete {
+                    &Event::<T>::Complete {
                         scanned_messages: scanned,
                     },
                 );
@@ -230,14 +215,14 @@ pub(crate) async fn series(
             Err(e) => {
                 let _ = send(
                     &tx,
-                    &Event::Error {
+                    &Event::<T>::Error {
                         message: e.to_string(),
                     },
                 );
             }
         }
     });
-    Ok((
+    (
         [
             (header::CONTENT_TYPE, "application/x-ndjson"),
             (header::CACHE_CONTROL, "no-store"),
@@ -245,5 +230,5 @@ pub(crate) async fn series(
         ],
         Body::from_stream(ReceiverStream::new(rx)),
     )
-        .into_response())
+        .into_response()
 }
