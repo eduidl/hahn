@@ -10,6 +10,7 @@ import {
   seriesKind,
   type Field,
   type Selected,
+  type Topic,
   type ValueKind,
 } from "./types";
 
@@ -60,7 +61,15 @@ export type WorkspaceAction =
   | { type: "view"; id: string; update: (view: PlotView) => PlotView }
   | { type: "mode"; id: string; mode: DragMode }
   | { type: "time-display"; id: string; value: TimeDisplay }
-  | { type: "recording" };
+  | { type: "legend"; id: string; value: Partial<LegendSettings> }
+  | { type: "table-column"; id: string; path: string[]; visible: boolean }
+  | { type: "table-columns"; id: string; paths: string[][]; visible: boolean }
+  | { type: "table-column-width"; id: string; path: string[] | null; width: number }
+  /**
+   * The open recordings changed: drop series of recordings that are no
+   * longer open and reset every view to the new full range.
+   */
+  | { type: "sources"; open: ReadonlySet<number> };
 
 export const widgetDragMime = "application/x-hahn-widget";
 /** What a widget type shows and which series it takes. */
@@ -146,15 +155,16 @@ export const acceptsKind = (spec: WidgetSpec, kind: ValueKind | null) =>
 /** Append a field as a new series, or replace the series of a single-series widget. */
 export function addSeries(
   list: Selected[],
-  topic: string,
+  { source, topic }: Pick<Topic, "source" | "topic">,
   field: Field,
   spec: WidgetSpec,
 ): Selected[] {
-  const key = keyOf(topic, field.path);
+  const key = keyOf(source, topic, field.path);
   if (list.some((s) => s.key === key)) return list;
   const base = spec.maxSeries === 1 ? [] : list;
   if (base.length >= spec.maxSeries) return list;
-  if (base.filter((s) => s.topic === topic).length >= maxFieldsPerTopic) return list;
+  if (base.filter((s) => s.source === source && s.topic === topic).length >= maxFieldsPerTopic)
+    return list;
   const color =
     colors.find((c) => !base.some((s) => s.color === c)) ??
     colors[base.length % colors.length];
@@ -162,6 +172,7 @@ export function addSeries(
     ...base,
     {
       key,
+      source,
       topic,
       path: field.path,
       color,
@@ -174,7 +185,7 @@ export function addSeries(
 }
 export const addFieldAction = (
   widget: Widget,
-  topic: string,
+  topic: Pick<Topic, "source" | "topic">,
   field: Field,
 ): WorkspaceAction => ({
   type: "series",
@@ -353,8 +364,9 @@ export function workspaceReducer(
     case "layout":
       return state.expandedId || hasTabs(action.layout)
         ? state
-        : { ...state, layout: action.layout };
-    case "recording":
+        : validLayoutChange(state, action.container, action.layout)
+          ? setContainerLayout(state, action.container, action.layout) : state;
+    case "sources":
       return {
         ...state,
         widgets: Object.fromEntries(
@@ -362,7 +374,9 @@ export function workspaceReducer(
             w.id,
             {
               ...w,
-              series: [],
+              series: w.series.filter((s) => action.open.has(s.source)),
+              hiddenColumns: w.series[0] && !action.open.has(w.series[0].source) ? [] : w.hiddenColumns,
+              columnWidths: w.series[0] && !action.open.has(w.series[0].source) ? {} : w.columnWidths,
               view: defaultPlotView(),
             },
           ]),

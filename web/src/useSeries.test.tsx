@@ -11,7 +11,8 @@ const info: Info = {
   message_count: 2,
 };
 const field = (name: string): Selected => ({
-  key: keyOf("/pose", [name]),
+  key: keyOf(0, "/pose", [name]),
+  source: 0,
   topic: "/pose",
   path: [name],
   color: "#91b8ff",
@@ -51,7 +52,7 @@ describe("full-recording series cache", () => {
   it("retains existing samples and requests only newly added fields", async () => {
     const fetch = mockFetch();
     const { result, rerender } = renderHook(
-      ({ selected }) => useSeries(0, info, selected),
+      ({ selected }) => useSeries(info.start_ns, selected),
       { initialProps: { selected: [field("x")] }, wrapper: StrictMode },
     );
     await waitFor(() =>
@@ -81,7 +82,7 @@ describe("full-recording series cache", () => {
     const { result, rerender } = renderHook(
       ({ selected, viewport }) => {
         void viewport;
-        return useSeries(0, info, selected);
+        return useSeries(info.start_ns, selected);
       },
       { initialProps: { selected: [field("x")], viewport: [0, 1] } },
     );
@@ -112,7 +113,7 @@ describe("full-recording series cache", () => {
   it("batches shared requests at the API field limit", async () => {
     const fetch = mockFetch();
     const selected = Array.from({ length: 70 }, (_, i) => field(`field${i}`));
-    const { result } = renderHook(() => useSeries(0, info, selected));
+    const { result } = renderHook(() => useSeries(info.start_ns, selected));
     await waitFor(() =>
       expect(
         result.current.records.filter((r) => r.status === "complete"),
@@ -126,18 +127,45 @@ describe("full-recording series cache", () => {
     ).toEqual([64, 6]);
   });
 
-  it("invalidates cached data on recording change", async () => {
+  it("invalidates cached data only when the time origin moves", async () => {
     const fetch = mockFetch();
     const { result, rerender } = renderHook(
-      ({ id }) => useSeries(id, info, [field("x")]),
-      { initialProps: { id: 0 } },
+      ({ origin, selected }) => useSeries(origin, selected),
+      { initialProps: { origin: info.start_ns, selected: [field("x")] } },
     );
     await waitFor(() =>
       expect(result.current.records[0]?.status).toBe("complete"),
     );
-    rerender({ id: 1 });
+    expect(result.current.plotted[0].points[0].x).toBe(0);
+    rerender({ origin: info.start_ns, selected: [field("x")] });
+    rerender({ origin: "0", selected: [field("x")] });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(fetch.mock.calls[1][0]).toBe("/api/files/1/series");
+    await waitFor(() =>
+      expect(result.current.plotted[0]?.points[0]?.x).toBe(1),
+    );
+  });
+
+  it("requests each field from its own recording", async () => {
+    const fetch = mockFetch();
+    const other: Selected = { ...field("x"), key: keyOf(1, "/pose", ["x"]), source: 1 };
+    const { result } = renderHook(() =>
+      useSeries(info.start_ns, [field("x"), field("y"), other]),
+    );
+    await waitFor(() =>
+      expect(result.current.records.map((r) => r.status)).toEqual([
+        "complete",
+        "complete",
+        "complete",
+      ]),
+    );
+    const calls = fetch.mock.calls.map(([url, options]) => [
+      url,
+      JSON.parse(options.body as string).fields,
+    ]);
+    expect(calls).toEqual([
+      ["/api/files/0/series", [["x"], ["y"]]],
+      ["/api/files/1/series", [["x"]]],
+    ]);
   });
 
   it("aborts active streams when stopped and retains partial data", async () => {
@@ -153,7 +181,7 @@ describe("full-recording series cache", () => {
         );
       }),
     );
-    const { result } = renderHook(() => useSeries(0, info, [field("x")]));
+    const { result } = renderHook(() => useSeries(info.start_ns, [field("x")]));
     await waitFor(() => expect(result.current.busy).toBe(true));
     act(() => result.current.stop());
     expect(signal?.aborted).toBe(true);
@@ -175,7 +203,7 @@ describe("full-recording series cache", () => {
       dataType: "enum",
       enumValues: [{ name: "IDLE", value: 0 }, { name: "RUN", value: 1 }],
     };
-    const { result } = renderHook(() => useSeries(0, info, [mode]));
+    const { result } = renderHook(() => useSeries(info.start_ns, [mode]));
     await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
     expect(result.current.plotted[0].points[0]).toMatchObject({ y: 1, raw: "RUN" });
   });

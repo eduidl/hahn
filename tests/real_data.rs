@@ -12,10 +12,7 @@ use tower::ServiceExt;
 fn data_dir() -> PathBuf {
     std::env::var_os("MCAP_TEST_DATA_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(std::env::var_os("HOME").expect("Set MCAP_TEST_DATA_DIR"))
-                .join("repos/eduidl/mcapdecode-rs/data")
-        })
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data"))
 }
 
 fn scalar(defs: &FieldDefs, value: &Value, path: &[&str]) -> serde_json::Value {
@@ -27,7 +24,7 @@ fn scalar(defs: &FieldDefs, value: &Value, path: &[&str]) -> serde_json::Value {
         let DataTypeDef::Struct(children) = &defs[index].element.data_type else {
             panic!("Expected struct");
         };
-        return scalar(children, &values[index], &path[1..]);
+        return scalar(&children.fields, &values[index], &path[1..]);
     }
     match &values[index] {
         Value::Null => serde_json::Value::Null,

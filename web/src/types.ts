@@ -1,4 +1,4 @@
-export type FileEntry = { id: number; name: string; size_bytes: number };
+export type FileEntry = { id: number; name: string; size_bytes: number; format: string };
 export type Info = {
   start_ns: string;
   end_ns: string;
@@ -74,6 +74,8 @@ export function kindsMatch(a: ValueKind | null, b: ValueKind | null) {
 export const isDiscreteKind = (kind: ValueKind | null) =>
   kind !== null && kind.type !== "numeric";
 export type Topic = {
+  /** The recording (file id) the topic belongs to; added by the client. */
+  source: number;
   topic: string;
   schema_name: string | null;
   schema_encoding?: string | null;
@@ -83,6 +85,7 @@ export type Topic = {
 };
 export type Selected = {
   key: string;
+  source: number;
   topic: string;
   path: string[];
   color: string;
@@ -99,19 +102,24 @@ export const colors = [
   "#7dd9e4",
   "#b8d88a",
 ];
-export const keyOf = (topic: string, path: string[]) =>
-  JSON.stringify([topic, path]);
+/** Topic names are only unique within one recording. */
+export const topicKey = (source: number, topic: string) =>
+  JSON.stringify([source, topic]);
+export const keyOf = (source: number, topic: string, path: string[]) =>
+  JSON.stringify([source, topic, path]);
 export const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-export type TopicDrag = { topic: string; path?: string[] };
+export type TopicDrag = { source: number; topic: string; path?: string[] };
 export const dragMime = "application/x-hahn-topic";
 
 /** Only accept known sources; a browser drop is untrusted input. */
 export function parseDrop(text: string, topics: Topic[]): TopicDrag | null {
   try {
     const payload = JSON.parse(text) as TopicDrag;
-    const topic = topics.find((t) => t.topic === payload.topic);
+    const topic = topics.find(
+      (t) => t.source === payload.source && t.topic === payload.topic,
+    );
     if (!topic) return null;
     if (
       payload.path !== undefined &&
@@ -121,7 +129,7 @@ export function parseDrop(text: string, topics: Topic[]): TopicDrag | null {
         ))
     )
       return null;
-    return { topic: topic.topic, path: payload.path };
+    return { source: topic.source, topic: topic.topic, path: payload.path };
   } catch {
     return null;
   }

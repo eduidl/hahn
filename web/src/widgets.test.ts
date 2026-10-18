@@ -12,7 +12,8 @@ import { keyOf, type Selected } from "./types";
 import { widgetSeries } from "./WidgetWorkspace";
 
 const series: Selected = {
-  key: keyOf("/pose", ["x"]),
+  key: keyOf(0, "/pose", ["x"]),
+  source: 0,
   topic: "/pose",
   path: ["x"],
   color: "#ff0000",
@@ -124,10 +125,26 @@ describe("widget workspace", () => {
       }),
     ).toBe(state);
     const layout = state.layout;
-    state = reduce(state, { type: "recording" });
+    state = reduce(state, { type: "sources", open: new Set() });
     expect(state.layout).toBe(layout);
     expect(state.widgets["widget-1"].view).toEqual(defaultPlotView());
     expect(requestedSeries(state.widgets)).toEqual([]);
+  });
+  it("keeps series of recordings that stay open and resets views", () => {
+    const other: Selected = { ...series, key: keyOf(1, "/pose", ["x"]), source: 1 };
+    let state = reduce(initialWorkspace(), {
+      type: "series",
+      id: "widget-1",
+      update: () => [series, other],
+    });
+    state = reduce(state, {
+      type: "view",
+      id: "widget-1",
+      update: (view) => ({ ...view, x: { center: 0.2, zoom: 4 } }),
+    });
+    state = reduce(state, { type: "sources", open: new Set([1, 2]) });
+    expect(state.widgets["widget-1"].series).toEqual([other]);
+    expect(state.widgets["widget-1"].view).toEqual(defaultPlotView());
   });
   it("temporarily expands without changing layout or widget state", () => {
     let state = reduce(initialWorkspace(), { type: "add" });
@@ -163,7 +180,7 @@ describe("widget workspace", () => {
       value: "absolute",
     });
     expect(state.widgets["widget-1"].timeDisplay).toBe("relative");
-    state = reduce(state, { type: "recording" });
+    state = reduce(state, { type: "sources", open: new Set() });
     expect(state.widgets["widget-1"].timeDisplay).toBe("relative");
   });
   it("maps a drop position to the nearest tile edge", () => {

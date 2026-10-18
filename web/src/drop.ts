@@ -38,7 +38,11 @@ function widgetReason(entry: IndexedField, widget: Widget, spec: WidgetSpec) {
   if (spec.sameKind && current !== null && !kindsMatch(current, entry.kind))
     return mismatchReason(current, entry.kind);
   if (widget.series.length >= spec.maxSeries) return `${spec.maxSeries}系列までです。`;
-  if (widget.series.filter((s) => s.topic === entry.topic.topic).length >= maxFieldsPerTopic)
+  const { source, topic } = entry.topic;
+  if (
+    widget.series.filter((s) => s.source === source && s.topic === topic).length >=
+    maxFieldsPerTopic
+  )
     return `1トピック${maxFieldsPerTopic}フィールドまでです。`;
   return null;
 }
@@ -54,7 +58,7 @@ export function dropVerdict(
   widget: Widget,
   spec: WidgetSpec = widgetSpecs[widget.type],
 ): DropVerdict {
-  const topic = index.topics.get(drag.topic);
+  const topic = index.topics.get(topicKey(drag.source, drag.topic));
   if (!topic) return { ok: false, reason: "トピックが見つかりません。" };
   if (topic.error) return { ok: false, reason: "読み込めないトピックです。" };
   if (topic.message_count === 0) return { ok: false, reason: "メッセージがありません。" };

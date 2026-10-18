@@ -72,7 +72,7 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
     return () => node?.removeEventListener("toggle", onToggle);
   }, []);
   const pick = (entry: IndexedField) => {
-    dispatch(addFieldAction(widget, entry.topic.topic, entry.field));
+    dispatch(addFieldAction(widget, entry.topic, entry.field));
     popover.current?.hidePopover();
   };
   return (
@@ -82,7 +82,7 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
         popoverTarget="field-picker"
         disabled={!candidates.length}
       >
-        ＋ フィールドを追加
+        {singleTarget ? label : `＋ ${label}`}
       </button>
       <div
         id="field-picker"
@@ -90,14 +90,14 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
         className="field-picker"
         popover="auto"
         role="dialog"
-        aria-label="フィールドを追加"
+        aria-label={label}
       >
         <input
           ref={input}
           className="search"
           type="search"
-          aria-label="追加するフィールドを検索"
-          placeholder={`フィールドを検索（${candidates.length.toLocaleString()} 件）`}
+          aria-label={singleTarget ? "指定するトピック・フィールドを検索" : "追加するフィールドを検索"}
+          placeholder={`${singleTarget ? "トピック・フィールド" : "フィールド"}を検索（${candidates.length.toLocaleString()} 件）`}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -122,6 +122,7 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
               onClick={() => pick(entry)}
             >
               <SeriesName
+                source={entry.topic.source}
                 topic={entry.topic.topic}
                 path={entry.field.path}
                 type={entry.typeLabel}
@@ -141,11 +142,12 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
 }
 
 function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
+  const label = widgetSpecs[widget.type].maxSeries === 1 ? "時刻表示" : "横軸の時刻表示";
   return (
     <label className="time-display-setting">
-      横軸の時刻表示
+      {label}
       <select
-        aria-label="横軸の時刻表示"
+        aria-label={label}
         value={widget.timeDisplay}
         onChange={(event) =>
           dispatch({
@@ -218,7 +220,7 @@ function SeriesRow({
         }
       >
         {marker}
-        <SeriesName topic={s.topic} path={s.path} />
+        <SeriesName source={s.source} topic={s.topic} path={s.path} />
       </button>
       {children}
       {showStatus && (

@@ -176,6 +176,39 @@ select {
   border-radius: 5px;
   font-size: 12px;
 }
+.recording-list {
+  max-height: min(360px, 50vh);
+  overflow: auto;
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+.recording-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.recording-option + .recording-option {
+  border-top: 1px solid #262626;
+}
+.recording-option:hover {
+  background: #222;
+}
+.recording-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recording-option small {
+  grid-column: 2;
+  font:
+    10px ui-monospace,
+    monospace;
+  color: #7c7c7c;
+}
 .file-detail {
   font:
     11px ui-monospace,
@@ -529,7 +562,7 @@ canvas {
 .field-option + .field-option {
   border-top: 1px solid #242424;
 }
-/* Shared notation for a series: topic over field path, optional type below. */
+/* Shared notation for a series: [recording,] topic over field path, optional type below. */
 .series-ref {
   display: flex;
   flex-direction: column;
@@ -540,6 +573,7 @@ canvas {
   /* Segments break at <wbr>; split a segment only when it alone overflows. */
   overflow-wrap: break-word;
 }
+.series-ref-source,
 .series-ref-type {
   color: #6f6f6f;
   font-size: 10px;

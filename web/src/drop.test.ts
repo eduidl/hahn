@@ -26,7 +26,8 @@ const broken: Topic = { ...topic, topic: "/broken", error: "bad schema" };
 const silent: Topic = { ...topic, topic: "/silent", message_count: 0 };
 const index = buildFieldIndex([topic, broken, silent]);
 const selected = (field: Field): Selected => ({
-  key: keyOf("/t", field.path),
+  key: keyOf(0, "/t", field.path),
+  source: 0,
   topic: "/t",
   path: field.path,
   color: "",
@@ -35,13 +36,13 @@ const selected = (field: Field): Selected => ({
   dataType: field.data_type,
   enumValues: field.enum_values,
 });
-const widget = (type: Widget["type"], series: Field[] = []): Widget => ({
+const widget = (type: Exclude<Widget["type"], "tabs">, series: Field[] = []): Widget => ({
   ...initialWorkspace().widgets["widget-1"],
   type,
   series: series.map(selected),
 });
 const verdict = (path: string[] | undefined, w: Widget) =>
-  dropVerdict(index, { topic: "/t", path }, w);
+  dropVerdict(index, { source: 0, topic: "/t", path }, w);
 
 describe("field index", () => {
   it("caches statically compatible fields per widget type, skipping unreadable topics", () => {

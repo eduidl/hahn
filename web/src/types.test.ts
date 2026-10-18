@@ -26,17 +26,24 @@ const topics: Topic[] = [
 
 describe("topic drops", () => {
   it("accepts known topics and fields independently of plot support", () => {
-    expect(parseDrop('{"topic":"/pose"}', topics)).toEqual({ topic: "/pose" });
+    expect(parseDrop('{"source":0,"topic":"/pose"}', topics)).toEqual({
+      source: 0,
+      topic: "/pose",
+    });
     expect(
-      parseDrop('{"topic":"/pose","path":["position","x"]}', topics),
-    ).toEqual({ topic: "/pose", path: ["position", "x"] });
-    expect(parseDrop('{"topic":"/unreadable"}', topics)).toEqual({
+      parseDrop('{"source":0,"topic":"/pose","path":["position","x"]}', topics),
+    ).toEqual({ source: 0, topic: "/pose", path: ["position", "x"] });
+    expect(parseDrop('{"source":0,"topic":"/unreadable"}', topics)).toEqual({
+      source: 0,
       topic: "/unreadable",
     });
     for (const field of topics[0].fields) {
       expect(
-        parseDrop(JSON.stringify({ topic: "/pose", path: field.path }), topics),
-      ).toEqual({ topic: "/pose", path: field.path });
+        parseDrop(
+          JSON.stringify({ source: 0, topic: "/pose", path: field.path }),
+          topics,
+        ),
+      ).toEqual({ source: 0, topic: "/pose", path: field.path });
       expect(isNumericField(field)).toBe(field.data_type === "f64");
     }
   });
@@ -50,6 +57,9 @@ describe("topic drops", () => {
       "{}",
       "hello",
       '{"topic":"/unknown"}',
+      // Topic names are only unique within their recording.
+      '{"source":1,"topic":"/pose"}',
+      '{"topic":"/pose"}',
       '{"topic":"/pose","path":"position.x"}',
       '{"topic":"/pose","path":["unknown"]}',
     ])
@@ -58,7 +68,7 @@ describe("topic drops", () => {
   it("derives the widget kind from its first series and treats an empty widget as unconstrained", () => {
     const idle = [{ name: "IDLE", value: 0 }];
     const selected = (dataType: string, enumValues?: typeof idle): Selected => ({
-      key: dataType, topic: "/t", path: [dataType], color: "", lineWidth: 1, hidden: false, dataType, enumValues,
+      key: dataType, source: 0, topic: "/t", path: [dataType], color: "", lineWidth: 1, hidden: false, dataType, enumValues,
     });
     expect(seriesKind([])).toBeNull();
     expect(seriesKind([selected("f64"), selected("bool")])).toEqual({ type: "numeric" });

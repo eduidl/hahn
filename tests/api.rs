@@ -367,3 +367,291 @@ async fn message_at_time_is_latest_at_or_before_with_named_fields() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+fn csv_fixture(name: &str, content: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(name), content).unwrap();
+    dir
+}
+
+const CSV: &str = "\
+time_ns,speed,count,ok,mode,pose.x,pose.y
+1760000000000000300,3.5,3,true,drive,1,2.5
+1760000000000000100,1.5,1,false,park,1,0.5
+1760000000000000200,,2,true,drive,1,1.5
+";
+
+#[tokio::test]
+async fn csv_is_one_topic_with_inferred_nested_fields() {
+    let dir = csv_fixture("drive.csv", CSV);
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, files) = get(app.clone(), "/api/files").await;
+    assert_eq!(files[0]["name"], "drive.csv");
+    assert_eq!(files[0]["format"], "csv");
+    let (_, info) = get(app.clone(), "/api/files/0").await;
+    assert_eq!(info["start_ns"], "1760000000000000100");
+    assert_eq!(info["end_ns"], "1760000000000000300");
+    assert_eq!(info["message_count"], 3);
+    let (_, topics) = get(app.clone(), "/api/files/0/topics").await;
+    assert_eq!(topics.as_array().unwrap().len(), 1);
+    let topic = &topics[0];
+    assert_eq!(topic["topic"], "/drive");
+    assert_eq!(topic["schema_encoding"], "csv");
+    assert_eq!(topic["message_count"], 3);
+    let types: Vec<(Value, Value)> = topic["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["path"].clone(), f["data_type"].clone()))
+        .collect();
+    assert_eq!(
+        types,
+        [
+            (json!(["speed"]), json!("float64")),
+            (json!(["count"]), json!("int64")),
+            (json!(["ok"]), json!("bool")),
+            (json!(["mode"]), json!("string")),
+            (json!(["pose"]), types[4].1.clone()),
+            (json!(["pose", "x"]), json!("int64")),
+            (json!(["pose", "y"]), json!("float64")),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn csv_series_and_message_follow_the_shared_range_rules() {
+    let dir = csv_fixture("drive.csv", CSV);
+    let app = hahn::router(dir.path()).unwrap();
+    let topic = "/drive";
+    // Rows are sorted by time; empty cells are null; end is exclusive.
+    let (status, events) = series(
+        app.clone(),
+        json!({"topic":topic,"fields":[["speed"],["pose","y"],["mode"]],
+               "start_ns":"1760000000000000100","end_ns":"1760000000000000300"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        events[0]["rows"],
+        json!([
+            {"time_ns":"1760000000000000100","values":[1.5,0.5,"park"]},
+            {"time_ns":"1760000000000000200","values":[null,1.5,"drive"]},
+        ])
+    );
+    assert_eq!(events.last().unwrap()["type"], "complete");
+    let (_, events) = series(
+        app.clone(),
+        json!({"topic":topic,"fields":[["count"]],
+               "start_ns":"1760000000000000150","end_ns":"1760000000000000150"}),
+    )
+    .await;
+    assert_eq!(events, [json!({"type":"complete","scanned_messages":0})]);
+
+    let at = |t: &str| format!("/api/files/0/message?topic=/drive&time_ns={t}");
+    let (_, body) = get(app.clone(), &at("1760000000000000250")).await;
+    assert_eq!(body["time_ns"], "1760000000000000200");
+    // Exact 64-bit integers are strings, as for MCAP.
+    assert_eq!(body["value"]["pose"], json!({"x": "1", "y": 1.5}));
+    let (_, body) = get(app.clone(), &at("1")).await;
+    assert_eq!(body["time_ns"], "1760000000000000100");
+    let (status, _) = series(app, json!({"topic":"/other","fields":[["count"]]})).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn csv_time_units_and_malformed_files() {
+    let dir = csv_fixture("a.csv", "t_ms,v\n1760000000000.5,1\n");
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    assert_eq!(info["start_ns"], "1760000000000500000");
+    let dir = csv_fixture("a.csv", "time,v\n1760000000.25,1\n");
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    assert_eq!(info["start_ns"], "1760000000250000000");
+    for content in [
+        "time_ns,v\nsoon,1\n",
+        "time_ns,v,v\n1,1,2\n",
+        "time_ns,a,a.b\n1,1,2\n",
+        "time_ns,v\n1,1,extra\n",
+        "time_ns,v\n",
+    ] {
+        let dir = csv_fixture("bad.csv", content);
+        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{content:?}");
+        assert!(body["error"].is_string());
+    }
+}
+
+fn parquet_fixture(name: &str, batch: arrow::array::RecordBatch) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let file = std::fs::File::create(dir.path().join(name)).unwrap();
+    let mut writer = parquet::arrow::ArrowWriter::try_new(file, batch.schema(), None).unwrap();
+    writer.write(&batch).unwrap();
+    writer.close().unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn parquet_keeps_arrow_types_and_nesting() {
+    let dir = parquet_fixture("drive.parquet", drive_parquet());
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, files) = get(app.clone(), "/api/files").await;
+    assert_eq!(files[0]["format"], "parquet");
+    let (_, info) = get(app.clone(), "/api/files/0").await;
+    assert_eq!(info["start_ns"], "1760000000000000100");
+    assert_eq!(info["end_ns"], "1760000000000000300");
+    assert_eq!(info["message_count"], 3);
+    let (_, topics) = get(app.clone(), "/api/files/0/topics").await;
+    assert_eq!(topics[0]["topic"], "/drive");
+    assert_eq!(topics[0]["schema_encoding"], "parquet");
+    let types: Vec<(Value, Value)> = topics[0]["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["path"].clone(), f["data_type"].clone()))
+        .collect();
+    let paths: Vec<_> = types.iter().map(|(p, _)| p.clone()).collect();
+    assert_eq!(
+        paths,
+        [
+            json!(["speed"]),
+            json!(["count"]),
+            json!(["mode"]),
+            json!(["pose"]),
+            json!(["pose", "x"]),
+            json!(["pose", "y"]),
+            json!(["ranges"]),
+        ]
+    );
+    // Dictionaries are decoded to their value type.
+    assert_eq!(types[2].1, "string");
+
+    let (status, events) = series(
+        app.clone(),
+        json!({"topic":"/drive","fields":[["speed"],["pose","x"],["mode"]],
+               "end_ns":"1760000000000000300"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        events[0]["rows"],
+        json!([
+            {"time_ns":"1760000000000000100","values":[1.5,1.0,"park"]},
+            {"time_ns":"1760000000000000200","values":[null,2.0,"drive"]},
+        ])
+    );
+    let at = |t: &str| format!("/api/files/0/message?topic=/drive&time_ns={t}");
+    let (_, body) = get(app.clone(), &at("1760000000000000150")).await;
+    assert_eq!(body["time_ns"], "1760000000000000100");
+    assert_eq!(body["value"]["ranges"], json!([1.0, 1.1]));
+    assert_eq!(body["value"]["pose"], json!({"x": 1.0, "y": 10.0}));
+    assert_eq!(body["value"]["count"], "1");
+}
+
+#[tokio::test]
+async fn parquet_time_units_and_malformed_files() {
+    use arrow::array::{ArrayRef, Float64Array, Int64Array, StringArray};
+    use std::sync::Arc;
+    let batch = |time: ArrayRef| {
+        arrow::array::RecordBatch::try_from_iter([
+            ("t_ms", time),
+            ("v", Arc::new(Int64Array::from(vec![1])) as ArrayRef),
+        ])
+        .unwrap()
+    };
+    let dir = parquet_fixture(
+        "a.parquet",
+        batch(Arc::new(Int64Array::from(vec![1_760_000_000_000]))),
+    );
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    assert_eq!(info["start_ns"], "1760000000000000000");
+    let dir = parquet_fixture(
+        "a.parquet",
+        batch(Arc::new(Float64Array::from(vec![1_760_000_000_000.5]))),
+    );
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    assert_eq!(info["start_ns"], "1760000000000500000");
+    for time in [
+        Arc::new(StringArray::from(vec!["soon"])) as ArrayRef,
+        Arc::new(Int64Array::from(vec![None])) as ArrayRef,
+        Arc::new(Int64Array::from(vec![-1])) as ArrayRef,
+    ] {
+        let dir = parquet_fixture("bad.parquet", batch(time));
+        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(body["error"].is_string());
+    }
+    let dir = csv_fixture("bad.parquet", "not parquet");
+    let (status, _) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn messages_history_keeps_full_rows_and_subtree_selection() {
+    let dir = fixture(2200, true);
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, events) = stream(
+        app.clone(),
+        "/api/files/0/messages",
+        json!({"topic":"/telemetry"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        events.last().unwrap(),
+        &json!({"type":"complete","scanned_messages":2200})
+    );
+    let rows: Vec<_> = events
+        .iter()
+        .filter_map(|e| e["rows"].as_array())
+        .flatten()
+        .collect();
+    assert_eq!(rows.len(), 2200);
+    let timestamp = (support::ORIGIN + 250_000_000).to_string();
+    let row = rows.iter().find(|r| r["time_ns"] == timestamp).unwrap();
+    assert_eq!(row["value"]["counter"], "9007199254741018");
+    assert!(row["value"]["position"]["x"].is_number());
+    assert_eq!(row["value"]["tags"], json!(["test"]));
+    for path in [json!(["position"]), json!(["counter"]), json!(["tags"])] {
+        let (status, events) = stream(
+            app.clone(),
+            "/api/files/0/messages",
+            json!({"topic":"/telemetry","path":path}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let subtree = events
+            .iter()
+            .filter_map(|e| e["rows"].as_array())
+            .flatten()
+            .find(|r| r["time_ns"] == row["time_ns"])
+            .unwrap();
+        assert_eq!(subtree["value"], row["value"][path[0].as_str().unwrap()]);
+    }
+    for body in [
+        json!({"topic":"/missing"}),
+        json!({"topic":"/telemetry","path":["missing"]}),
+    ] {
+        assert_eq!(
+            stream(app.clone(), "/api/files/0/messages", body).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+}
+
+#[tokio::test]
+async fn messages_history_retains_nulls_and_duplicate_timestamps() {
+    let dir = csv_fixture(
+        "drive.csv",
+        "time_ns,count,label\n1000000000,1,a\n1000000000,2,\n2000000000,3,b\n",
+    );
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, events) = stream(app, "/api/files/0/messages", json!({"topic":"/drive"})).await;
+    let rows: Vec<_> = events
+        .iter()
+        .filter_map(|e| e["rows"].as_array())
+        .flatten()
+        .collect();
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0]["time_ns"], rows[1]["time_ns"]);
+    assert_eq!(rows[0]["value"]["count"], "1");
+    assert_eq!(rows[1]["value"]["label"], Value::Null);
+}
+

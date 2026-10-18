@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useSourceLabel } from "./sources";
 
 /** Allow line breaks only after `/` and `.`, so names wrap between segments. */
 function breakable(text: string) {
@@ -10,18 +11,25 @@ function breakable(text: string) {
   ));
 }
 
-/** The one way a series is written: topic over field path, optionally its type below. */
+/**
+ * The one way a series is written: topic over field path, optionally its type
+ * below. The recording is named above when several are open.
+ */
 export function SeriesName({
+  source,
   topic,
   path,
   type,
 }: {
+  source: number;
   topic: string;
   path: string[];
   type?: string;
 }) {
+  const label = useSourceLabel(source);
   return (
     <span className="series-ref">
+      {label && <span className="series-ref-source">{breakable(label)}</span>}
       <span className="series-ref-topic">{breakable(topic)}</span>
       {path.length > 0 && (
         <span className="series-ref-path">{breakable(path.join("."))}</span>

@@ -1,29 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { appendPoints, consumeStream, point } from "./data";
 import type { Series } from "./Plot";
-import { errorMessage, type Info, type Selected } from "./types";
+import { errorMessage, topicKey, type Selected } from "./types";
 
 export type CachedSeries = Series & {
-  topic: string;
   status: "loading" | "complete" | "stopped" | "error";
   received: number;
   error?: string;
 };
 
-/** A full-recording cache. Viewport changes never enter the loading lifecycle. */
-export function useSeries(
-  fileId: number | null,
-  info: Info | null,
-  selected: Selected[],
-) {
+/**
+ * A full-recording cache. Viewport changes never enter the loading lifecycle.
+ * Points are seconds from `origin`, the start of the open recordings, so only
+ * a new origin invalidates them; opening another recording does not.
+ */
+export function useSeries(origin: string | null, selected: Selected[], sharedCache?: FieldCache) {
   const cache = useRef(new Map<string, CachedSeries>());
   const requests = useRef(new Map<AbortController, CachedSeries[]>());
   const dirty = useRef(false);
   const [revision, setRevision] = useState(0);
   // Fields are rebuilt from this key, so it must carry everything decoding needs.
   const selectionKey = JSON.stringify(
-    selected.map(({ key, topic, path, dataType, enumValues }) => ({
+    selected.map(({ key, source, topic, path, dataType, enumValues }) => ({
       key,
+      source,
       topic,
       path,
       dataType,
@@ -38,10 +38,10 @@ export function useSeries(
       for (const controller of requests.current.keys()) controller.abort();
       requests.current.clear();
     };
-  }, [fileId, info]);
+  }, [origin]);
 
   useEffect(() => {
-    if (fileId === null || !info) return;
+    if (origin === null) return;
     const fields = JSON.parse(selectionKey) as Selected[];
     const keys = new Set(fields.map((f) => f.key));
     for (const [controller, targets] of requests.current) {
@@ -62,17 +62,18 @@ export function useSeries(
           groups.set(field.topic, [...(groups.get(field.topic) ?? []), field]);
       }
       // Several widgets may request more than the API's 64-field batch limit.
-      const batches = [...groups].flatMap(([topic, fields]) =>
-        Array.from({ length: Math.ceil(fields.length / 64) }, (_, i) => ({
-          topic,
-          group: fields.slice(i * 64, (i + 1) * 64),
-        })),
+      const batches = [...groups.values()].flatMap((fields) =>
+        Array.from({ length: Math.ceil(fields.length / 64) }, (_, i) =>
+          fields.slice(i * 64, (i + 1) * 64),
+        ),
       );
-      for (const { topic, group } of batches) {
+      for (const group of batches) {
+        const { source, topic } = group[0];
         const controller = new AbortController();
         const targets = group.map((field) => {
           const target: CachedSeries = {
             key: field.key,
+            source,
             topic,
             path: field.path,
             color: "",
@@ -89,7 +90,7 @@ export function useSeries(
         });
         requests.current.set(controller, targets);
         dirty.current = true;
-        fetch(`/api/files/${fileId}/series`, {
+        fetch(`/api/files/${source}/series`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           // Always load all timestamps, including the final message.
@@ -104,7 +105,7 @@ export function useSeries(
                   target.points = appendPoints(
                     target.points,
                     event.rows.map((row) =>
-                      point(row, i, info.start_ns, targets[i].enumValues),
+                      point(row, i, origin, targets[i].enumValues),
                     ),
                   );
                   target.received = event.scanned_messages;
@@ -133,7 +134,7 @@ export function useSeries(
       }
     }, 120);
     return () => clearTimeout(timer);
-  }, [fileId, info, selectionKey]);
+  }, [origin, selectionKey]);
 
   useEffect(() => {
     const timer = setInterval(() => {

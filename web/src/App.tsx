@@ -46,9 +46,19 @@ async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
 
 export function App() {
   const [files, setFiles] = useState<FileEntry[]>([]);
-  const [fileId, setFileId] = useState<number | null>(null);
-  const [info, setInfo] = useState<Info | null>(null);
-  const [topics, setTopics] = useState<Topic[]>([]);
+  // Open recordings in the order they were opened.
+  const [sources, setSources] = useState<number[]>([]);
+  const [loaded, setLoaded] = useState<Record<number, LoadedSource>>({});
+  const requests = useRef(new Map<number, AbortController>());
+  const openSources = sources.map((id) => loaded[id]);
+  const topics = useMemo(
+    () => openSources.flatMap((s) => s?.topics ?? []),
+    [sources, loaded],
+  );
+  const merged = mergeInfo(openSources);
+  // Keep one object per range, so dependents only react to real changes.
+  const mergedKey = JSON.stringify(merged);
+  const info = useMemo(() => merged, [mergedKey]);
   const [workspace, dispatch] = useReducer(
     workspaceReducer,
     undefined,
@@ -61,9 +71,9 @@ export function App() {
   const [showErrorTopics, setShowErrorTopics] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<"panel" | "topics" | "errors">("topics");
+  const [tab, setTab] = useState<"panel" | "topics" | "errors">("panel");
   const [error, setError] = useState("");
-  const [loadingInfo, setLoadingInfo] = useState(false);
+  const loadingInfo = openSources.some((s) => !s || s.loading);
   const [drag, setDrag] = useState<TopicDrag | null>(null);
   // Field kinds and per-widget-type candidates, computed once per recording.
   const index = useMemo(() => buildFieldIndex(topics), [topics]);
@@ -90,12 +100,18 @@ export function App() {
     : 0;
   const runtimeErrors = [
     ...new Map(
-      records.filter((r) => r.error).map((r) => [`${r.topic}:${r.error}`, r]),
+      [...records, ...messages.records]
+        .filter((r) => r.error)
+        .map((r) => [`${topicKey(r.source, r.topic)}:${r.error}`, r]),
     ).values(),
   ];
   const unreadable = topics.filter((t) => t.error);
   const visibleTopics = topics.filter((t) => showErrorTopics || !t.error);
-  const errorCount = unreadable.length + runtimeErrors.length + (error ? 1 : 0);
+  const sourceErrors = openFiles.flatMap((f) =>
+    loaded[f.id]?.error ? [{ file: f, error: loaded[f.id].error }] : [],
+  );
+  const errorCount =
+    unreadable.length + runtimeErrors.length + sourceErrors.length + (error ? 1 : 0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -104,7 +120,7 @@ export function App() {
         if (controller.signal.aborted) return;
         setFiles(data);
         const recording = data.find((file) => file.name === "ros2.mcap");
-        if (recording) setFileId(recording.id);
+        if (recording) setSources([recording.id]);
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(errorMessage(e));
@@ -112,13 +128,56 @@ export function App() {
     return () => controller.abort();
   }, []);
 
+  // Load each newly opened recording once; closing one cancels its requests.
   useEffect(() => {
-    const controller = new AbortController();
-    setInfo(null);
-    setTopics([]);
-    dispatch({ type: "recording" });
-    setShowErrorTopics(false);
-    setError("");
+    for (const [id, controller] of requests.current)
+      if (!sources.includes(id)) {
+        controller.abort();
+        requests.current.delete(id);
+      }
+    for (const id of sources) {
+      if (requests.current.has(id)) continue;
+      const controller = new AbortController();
+      requests.current.set(id, controller);
+      const settle = (source: LoadedSource) => {
+        if (!controller.signal.aborted)
+          setLoaded((current) => ({ ...current, [id]: source }));
+      };
+      settle({ info: null, topics: [], error: "", loading: true });
+      Promise.all([
+        get<Info>(`/api/files/${id}`, controller.signal),
+        get<Omit<Topic, "source">[]>(`/api/files/${id}/topics`, controller.signal),
+      ])
+        .then(([info, topics]) =>
+          settle({
+            info,
+            topics: topics.map((topic) => ({ ...topic, source: id })),
+            error: "",
+            loading: false,
+          }),
+        )
+        .catch((e) =>
+          settle({ info: null, topics: [], error: errorMessage(e), loading: false }),
+        );
+    }
+  }, [sources]);
+  useEffect(() => {
+    const current = requests.current;
+    return () => current.forEach((controller) => controller.abort());
+  }, []);
+
+  /** Open or close a recording. Series of closed recordings are dropped. */
+  const toggleSource = (id: number, open: boolean) => {
+    const next = open
+      ? [...sources.filter((s) => s !== id), id]
+      : sources.filter((s) => s !== id);
+    setSources(next);
+    setLoaded((current) => {
+      const kept = { ...current };
+      if (!open) delete kept[id];
+      return kept;
+    });
+    dispatch({ type: "sources", open: new Set(next) });
     setSearch("");
     setExpandedTopics(new Set());
   };
@@ -149,7 +208,7 @@ export function App() {
     const verdict = dropVerdict(index, payload, widget);
     // Rejected drags never reach here: drop targets only accept fitting fields.
     if (verdict.ok)
-      dispatch(addFieldAction(widget, verdict.entry.topic.topic, verdict.entry.field));
+      dispatch(addFieldAction(widget, verdict.entry.topic, verdict.entry.field));
   };
   /** Verdict for the in-progress drag, so widgets can show it before the drop. */
   const dragVerdict = (widget: Widget) =>
@@ -166,11 +225,15 @@ export function App() {
   };
   const topicField = (topic: Topic, field: Field) => (
     <div
-      key={keyOf(topic.topic, field.path)}
+      key={keyOf(topic.source, topic.topic, field.path)}
       className="field topic-field"
       draggable
       onDragStart={(e) =>
-        startDrag(e, { topic: topic.topic, path: field.path })
+        startDrag(e, {
+          source: topic.source,
+          topic: topic.topic,
+          path: field.path,
+        })
       }
       onDragEnd={() => setDrag(null)}
     >
@@ -222,32 +285,41 @@ export function App() {
           aria-label="録画を開く"
         >
           <h2>録画を開く</h2>
-          <label className="sr-only" htmlFor="recording">
-            MCAPファイル
-          </label>
-          <select
-            id="recording"
-            value={fileId ?? ""}
-            onChange={(e) =>
-              setFileId(e.target.value === "" ? null : Number(e.target.value))
-            }
-          >
-            <option value="">MCAPファイルを選択</option>
+          <p className="help">
+            複数の録画を開くと、共通の時間軸に並べて表示します。
+          </p>
+          <div className="recording-list">
             {files.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
+              <label key={f.id} className="recording-option">
+                <input
+                  type="checkbox"
+                  checked={sources.includes(f.id)}
+                  onChange={(e) => toggleSource(f.id, e.target.checked)}
+                />
+                <span className="recording-name" title={f.name}>
+                  {f.name}
+                </span>
+                <small>
+                  {f.format.toUpperCase()} ·{" "}
+                  {(f.size_bytes / 1024 / 1024).toFixed(1)} MB
+                </small>
+              </label>
             ))}
-          </select>
+          </div>
           <div className="file-detail">
-            {file
-              ? `${(file.size_bytes / 1024 / 1024).toFixed(1)} MB · ${info?.message_count?.toLocaleString() ?? "—"} メッセージ`
+            {sources.length
+              ? `${sources.length} 件を表示中 · ${info?.message_count?.toLocaleString() ?? "—"} メッセージ`
               : `${files.length} 件の録画`}
           </div>
         </div>
 
-        <span className="header-file" title={file?.name}>
-          {file?.name ?? "録画未選択"}
+        <span
+          className="header-file"
+          title={openFiles.map((f) => f.name).join("\n")}
+        >
+          {openFiles.length
+            ? openFiles.map((f) => f.name).join(" ＋ ")
+            : "録画未選択"}
         </span>
         <button className="add-widget" popoverTarget="widget-catalog">
           ＋ ウィジェットを追加
@@ -347,7 +419,11 @@ export function App() {
                 onChange={(e) => {
                   setSearch(e.target.value);
                   setExpandedTopics(
-                    new Set(e.target.value ? topics.map((t) => t.topic) : []),
+                    new Set(
+                      e.target.value
+                        ? topics.map((t) => topicKey(t.source, t.topic))
+                        : [],
+                    ),
                   );
                 }}
               />
@@ -361,7 +437,15 @@ export function App() {
               </label>
               <div className="topics">
                 {loadingInfo && <p className="muted">録画情報を読み込み中…</p>}
-                {visibleTopics.map((t) => {
+                {visibleTopics.map((t, i) => {
+                  const id = topicKey(t.source, t.topic);
+                  // Several recordings: head each one's topics with its name.
+                  const heading = multiSource &&
+                    visibleTopics[i - 1]?.source !== t.source && (
+                      <div className="source-heading" key={`source-${t.source}`}>
+                        {sourceNames.get(t.source)}
+                      </div>
+                    );
                   const query = search.toLowerCase();
                   const topicMatch = t.topic.toLowerCase().includes(query);
                   const fields = t.fields.filter(
@@ -369,8 +453,9 @@ export function App() {
                       topicMatch ||
                       f.path.join(".").toLowerCase().includes(query),
                   );
-                  if (!fields.length && !topicMatch) return null;
-                  return (
+                  if (!fields.length && !topicMatch) return heading || null;
+                  return [
+                    heading,
                     <details
                       key={id}
                       open={expandedTopics.has(id)}
@@ -381,13 +466,15 @@ export function App() {
                           e.preventDefault();
                           setExpandedTopics((current) => {
                             const next = new Set(current);
-                            if (next.has(t.topic)) next.delete(t.topic);
-                            else next.add(t.topic);
+                            if (next.has(id)) next.delete(id);
+                            else next.add(id);
                             return next;
                           });
                         }}
                         draggable
-                        onDragStart={(e) => startDrag(e, { topic: t.topic })}
+                        onDragStart={(e) =>
+                          startDrag(e, { source: t.source, topic: t.topic })
+                        }
                         onDragEnd={() => setDrag(null)}
                       >
                         <span className="topic-label">
@@ -414,8 +501,8 @@ export function App() {
                       ) : (
                         <p className="muted">フィールドなし</p>
                       )}
-                    </details>
-                  );
+                    </details>,
+                  ];
                 })}
                 {!loadingInfo && info && !visibleTopics.length && (
                   <p className="muted">表示するトピックがありません。</p>
@@ -436,7 +523,7 @@ export function App() {
                 <PanelSettings
                   widget={activeWidget}
                   dispatch={dispatch}
-                  records={records}
+                  records={[...records, ...messages.records]}
                   pointCount={count}
                   index={index}
                 />
@@ -463,16 +550,29 @@ export function App() {
                   <p>{error}</p>
                 </div>
               )}
+              {sourceErrors.map(({ file, error }) => (
+                <div className="error-item" key={`source-${file.id}`}>
+                  <strong>{file.name}</strong>
+                  <span>録画の読み込み</span>
+                  <p>{error}</p>
+                </div>
+              ))}
               {runtimeErrors.map((r) => (
                 <div className="error-item" key={r.key}>
-                  <strong>{r.topic}</strong>
+                  <strong>
+                    {multiSource && <small>{sourceNames.get(r.source)} </small>}
+                    {r.topic}
+                  </strong>
                   <span>配信エラー</span>
                   <p>{r.error}</p>
                 </div>
               ))}
               {unreadable.map((t) => (
-                <div className="error-item" key={t.topic}>
-                  <strong>{t.topic}</strong>
+                <div className="error-item" key={topicKey(t.source, t.topic)}>
+                  <strong>
+                    {multiSource && <small>{sourceNames.get(t.source)} </small>}
+                    {t.topic}
+                  </strong>
                   <span>読み取り不可</span>
                   <p>{t.error}</p>
                 </div>
