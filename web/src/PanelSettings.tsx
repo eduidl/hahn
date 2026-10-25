@@ -1,9 +1,11 @@
+import { TabSettings } from "./TabControls";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { addableFields } from "./drop";
 import { SeriesName } from "./SeriesName";
 import type { FieldIndex, IndexedField } from "./fieldIndex";
 import type { CachedSeries } from "./useSeries";
 import type { Selected } from "./types";
+import { tableColumns } from "./table";
 import {
   addFieldAction,
   legendPositions,
@@ -435,6 +437,7 @@ function SingleTargetPanel(props: PanelProps) {
 }
 
 const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
+  tabs: (props) => props.widget.type === "tabs" ? <TabSettings widget={props.widget} dispatch={props.dispatch} /> : null,
   "time-series": TimeSeriesPanel,
   state: StatePanel,
   raw: SingleTargetPanel,
