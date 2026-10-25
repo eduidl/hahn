@@ -1113,6 +1113,19 @@ header .add-widget {
 .widget-drop-preview.right { inset: 0 0 0 50%; }
 .widget-drop-preview.top { inset: 0 0 50% 0; }
 .widget-drop-preview.bottom { inset: 50% 0 0 0; }
+/* Only the outer 16px intercepts drags; the centre belongs to the tab contents. */
+.tab-frame-drop { pointer-events: none; }
+.widget-drop-edge { position: absolute; pointer-events: auto; background: #91b8ff12; box-shadow: inset 0 0 0 1px #91b8ff44; }
+.widget-drop-edge:hover { background: #91b8ff33; }
+.widget-drop-edge.left { top: 16px; bottom: 16px; left: 0; width: 16px; }
+.widget-drop-edge.right { top: 16px; bottom: 16px; right: 0; width: 16px; }
+.widget-drop-edge.top { top: 0; left: 0; right: 0; height: 16px; }
+.widget-drop-edge.bottom { bottom: 0; left: 0; right: 0; height: 16px; }
+.widget-drop-label {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  padding: 6px 10px; border: 1px solid #738db8; border-radius: 4px;
+  background: #182337; color: #dfebff; font-size: 11px; white-space: nowrap;
+}
 .workspace-empty.drop-ready {
   outline: 1px dashed #91b8ff;
   outline-offset: -8px;
@@ -1889,3 +1902,4 @@ header .local {
 .tab-name-input:focus-visible { outline: 1px solid #91b8ff; outline-offset: 1px; }
 .widget-tab-bar .tab-name-input { height: 28px; margin: 2px 0; padding: 3px 8px; }
 
+.tab-name-placeholder, .tab-name-input::placeholder { color: #858585; }

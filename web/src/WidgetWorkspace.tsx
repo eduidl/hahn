@@ -186,20 +186,9 @@ function WidgetDropTarget({ onDrop, frameOnly = false }: { onDrop: (edge: DropEd
     <div
       className="widget-drop"
       aria-label="ウィジェットの配置先"
-      onDragOver={(event) => {
-        if (!event.dataTransfer.types.includes(widgetDragMime)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-        setEdge(edgeAt(event));
-      }}
+      onDragOver={(event) => accept(event, edgeAt(event))}
       onDragLeave={() => setEdge(null)}
-      onDrop={(event) => {
-        if (!event.dataTransfer.types.includes(widgetDragMime)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onDrop(edgeAt(event));
-        setEdge(null);
-      }}
+      onDrop={(event) => place(event, edgeAt(event))}
     >
       {edge && <div className={`widget-drop-preview ${edge}`} />}
     </div>
@@ -471,7 +460,7 @@ function TimeSeriesWindow({
                       if (event.key === "ArrowLeft") setChangingType(false);
                     }}
                   >
-                    {widgetTypes.map((type) => {
+                    {widgetTypes.filter((type) => canPlaceWidget(type, owner)).map((type) => {
                       const current = type === widget.type;
                       return (
                         <button
