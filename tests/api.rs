@@ -707,6 +707,75 @@ async fn messages_history_retains_nulls_and_duplicate_timestamps() {
 }
 
 #[tokio::test]
+async fn messages_history_uses_raw_message_preview_limits() {
+    use arrow::{
+        array::{
+            ArrayRef, BinaryArray, FixedSizeBinaryArray, Int64Array, ListArray, RecordBatch,
+            StringArray,
+        },
+        datatypes::Int64Type,
+    };
+    use std::sync::Arc;
+    let bytes = vec![7_u8; 50];
+    let batch = RecordBatch::try_from_iter([
+        ("time_ns", Arc::new(Int64Array::from(vec![1])) as ArrayRef),
+        (
+            "label",
+            Arc::new(StringArray::from(vec!["あ".repeat(10_001)])) as ArrayRef,
+        ),
+        (
+            "bytes",
+            Arc::new(BinaryArray::from(vec![bytes.as_slice()])) as ArrayRef,
+        ),
+        (
+            "fixed_bytes",
+            Arc::new(FixedSizeBinaryArray::try_from_iter([bytes.as_slice()].into_iter()).unwrap())
+                as ArrayRef,
+        ),
+        (
+            "items",
+            Arc::new(ListArray::from_iter_primitive::<Int64Type, _, _>([Some(
+                (0..101).map(Some).collect::<Vec<_>>(),
+            )])) as ArrayRef,
+        ),
+    ])
+    .unwrap();
+    let dir = parquet_fixture("preview.parquet", batch);
+    let (_, events) = stream(
+        hahn::router(dir.path()).unwrap(),
+        "/api/files/0/messages",
+        json!({"topic":"/preview"}),
+    )
+    .await;
+    let value = &events[0]["rows"][0]["value"];
+    assert_eq!(value["label"].as_str().unwrap().chars().count(), 10_001);
+    assert!(value["label"].as_str().unwrap().ends_with('…'));
+    assert_eq!(value["bytes"]["$bytes"], 50);
+    assert_eq!(value["bytes"]["head"].as_array().unwrap().len(), 32);
+    assert_eq!(value["fixed_bytes"], value["bytes"]);
+    assert_eq!(value["items"]["$truncated"], true);
+    assert_eq!(value["items"]["length"], 101);
+    assert_eq!(value["items"]["items"].as_array().unwrap().len(), 100);
+}
+
+#[tokio::test]
+async fn messages_history_reports_decode_errors_after_partial_data() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_fixture_with_options(&dir.path().join("broken.mcap"), 2200, true, Some(1500))
+        .unwrap();
+    let (status, events) = stream(
+        hahn::router(dir.path()).unwrap(),
+        "/api/files/0/messages",
+        json!({"topic":"/telemetry"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(events[0]["type"], "batch");
+    assert_eq!(events.last().unwrap()["type"], "error");
+    assert!(events.iter().all(|e| e["type"] != "complete"));
+}
+
+#[tokio::test]
 async fn message_windows_keep_timestamp_ties_and_validate_bounds() {
     let dir = csv_fixture(
         "window.csv",
@@ -746,3 +815,66 @@ async fn message_windows_keep_timestamp_ties_and_validate_bounds() {
     }
 }
 
+#[tokio::test]
+async fn ros_uint8_sequences_use_list_previews() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut writer =
+        mcap::Writer::new(std::fs::File::create(dir.path().join("bytes.mcap")).unwrap()).unwrap();
+    let schema = writer
+        .add_schema(
+            "example/msg/Bytes",
+            "ros2msg",
+            b"uint8[] data\nuint8[<=128] bounded\n",
+        )
+        .unwrap();
+    let channel = writer
+        .add_channel(schema, "/bytes", "cdr", &Default::default())
+        .unwrap();
+    for (sequence, len) in [0_u32, 3, 101].into_iter().enumerate() {
+        let mut cdr = vec![0, 1, 0, 0];
+        for _ in 0..2 {
+            while !cdr.len().is_multiple_of(4) {
+                cdr.push(0);
+            }
+            cdr.extend_from_slice(&len.to_le_bytes());
+            cdr.extend((0..len).map(|value| value as u8));
+        }
+        writer
+            .write_to_known_channel(
+                &mcap::records::MessageHeader {
+                    channel_id: channel,
+                    sequence: sequence as u32,
+                    log_time: sequence as u64 + 1,
+                    publish_time: sequence as u64 + 1,
+                },
+                &cdr,
+            )
+            .unwrap();
+    }
+    writer.finish().unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, topics) = get(app.clone(), "/api/files/0/topics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(topics[0]["fields"][0]["data_type"], "list");
+    assert_eq!(topics[0]["fields"][0]["type_name"], "uint8[]");
+    assert_eq!(topics[0]["fields"][1]["type_name"], "uint8[<=128]");
+    let (status, events) = stream(app, "/api/files/0/messages", json!({"topic":"/bytes"})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(events.iter().all(|event| event["type"] != "error"));
+    let rows: Vec<_> = events
+        .iter()
+        .filter_map(|event| event["rows"].as_array())
+        .flatten()
+        .collect();
+    assert_eq!(rows.len(), 3);
+    for field in ["data", "bounded"] {
+        assert_eq!(rows[0]["value"][field], json!([]));
+        assert_eq!(rows[1]["value"][field], json!([0, 1, 2]));
+        assert_eq!(
+            rows[2]["value"][field],
+            json!({
+                "$truncated": true, "length": 101, "items": (0..100).collect::<Vec<_>>()
+            })
+        );
+    }
+}

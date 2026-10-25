@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { displayType, enumDefinitionsMatch, isNumericField, isStateField, kindsMatch, parseDrop, seriesKind, valueKind, type Selected, type Topic } from "./types";
+import { displayType, enumDefinitionsMatch, isNumericField, kindsMatch, parseDrop, seriesKind, valueKind, type Selected, type Topic } from "./types";
 
 const topics: Topic[] = [
   {
+    source: 0,
     topic: "/pose",
     schema_name: "Pose",
     fields: [
@@ -16,6 +17,7 @@ const topics: Topic[] = [
     error: null,
   },
   {
+    source: 0,
     topic: "/unreadable",
     schema_name: null,
     fields: [],
@@ -25,6 +27,12 @@ const topics: Topic[] = [
 ];
 
 describe("topic drops", () => {
+  it("recognizes numeric kinds returned by mcapdecode", () => {
+    for (const kind of ["int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "float32", "float64"])
+      expect(valueKind(kind)).toEqual({ type: "numeric" });
+    expect(valueKind("float64[]")).toEqual({ type: "other" });
+    expect(displayType("float64", "protobuf")).toBe("double");
+  });
   it("accepts known topics and fields independently of plot support", () => {
     expect(parseDrop('{"source":0,"topic":"/pose"}', topics)).toEqual({
       source: 0,

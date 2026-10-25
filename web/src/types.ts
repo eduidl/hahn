@@ -15,7 +15,7 @@ const rosTypes: Record<string, string> = {
 };
 const protobufTypes: Record<string, string> = {
   i32: "int32", i64: "int64", u32: "uint32", u64: "uint64",
-  f32: "float", f64: "double",
+  f32: "float", f64: "double", float32: "float", float64: "double",
 };
 /** Type name in the schema's own language; decoder names for unknown encodings. */
 export function displayType(type: string, encoding?: string | null): string {
@@ -30,9 +30,7 @@ export function displayType(type: string, encoding?: string | null): string {
     .replace(/\b\w+\b/g, (word) => names[word] ?? word);
 }
 export const isNumericField = (field: Field): boolean =>
-  /^(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64)$/.test(field.data_type);
-export const isStateField = (field: Field): boolean =>
-  field.data_type === "bool" || field.data_type === "enum";
+  /^(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|u?int(?:8|16|32|64)|float(?:32|64))$/.test(field.data_type);
 export function enumDefinitionsMatch(a: EnumValue[] = [], b: EnumValue[] = []) {
   const canonical = (values: EnumValue[]) =>
     values.map(({ name, value }) => [name, value] as const).sort((x, y) =>
