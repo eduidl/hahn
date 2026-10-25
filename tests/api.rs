@@ -706,3 +706,43 @@ async fn messages_history_retains_nulls_and_duplicate_timestamps() {
     assert_eq!(rows[1]["value"]["label"], Value::Null);
 }
 
+#[tokio::test]
+async fn message_windows_keep_timestamp_ties_and_validate_bounds() {
+    let dir = csv_fixture(
+        "window.csv",
+        "time_ns,count\n1000000000,1\n2000000000,2\n2000000000,3\n3000000000,4\n",
+    );
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, events) = stream(
+        app.clone(),
+        "/api/files/0/messages",
+        json!({
+            "topic":"/window", "start_ns":"2000000000", "end_ns":"3000000000"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let rows: Vec<_> = events
+        .iter()
+        .filter_map(|e| e["rows"].as_array())
+        .flatten()
+        .collect();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["value"]["count"], "2");
+    assert_eq!(rows[1]["value"]["count"], "3");
+    for (start, end) in [("bad", "3"), ("-1", "3"), ("3", "2")] {
+        assert_eq!(
+            stream(
+                app.clone(),
+                "/api/files/0/messages",
+                json!({
+                    "topic":"/window", "start_ns":start, "end_ns":end
+                })
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+}
+

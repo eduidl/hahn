@@ -171,3 +171,60 @@ pub(crate) struct MessagesRequest {
     end_ns: Option<String>,
 }
 
+/// Messages in the requested range and subtree, retaining message boundaries and ties.
+pub(crate) async fn messages(
+    State(state): State<AppState>,
+    Path(id): Path<usize>,
+    Json(request): Json<MessagesRequest>,
+) -> Result<axum::response::Response, ApiError> {
+    state.check(id)?;
+    let parse = |value: &Option<String>| -> Result<Option<u64>, ApiError> {
+        value
+            .as_ref()
+            .map(|value| {
+                value.parse().map_err(|_| {
+                    ApiError(
+                        StatusCode::BAD_REQUEST,
+                        "Timestamps must be unsigned nanosecond strings".into(),
+                    )
+                })
+            })
+            .transpose()
+    };
+    let start = parse(&request.start_ns)?;
+    let end = parse(&request.end_ns)?;
+    if matches!((start, end), (Some(start), Some(end)) if start > end) {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Start must not exceed end".into(),
+        ));
+    }
+    let topic = request.topic.clone();
+    let (source, index, data_type) = blocking(move || {
+        let source = state.source(id)?;
+        let defs = source.field_defs(&topic)?;
+        let index = if request.path.is_empty() {
+            Vec::new()
+        } else {
+            indexes(&defs, &request.path)
+                .ok_or_else(|| anyhow::anyhow!("Unknown field: {:?}", request.path))?
+        };
+        let data_type = if index.is_empty() {
+            DataTypeDef::Struct(defs.into())
+        } else {
+            field_type(&defs, &index).clone()
+        };
+        Ok((source, index, data_type))
+    })
+    .await?;
+    Ok(crate::stream::stream_rows(
+        source,
+        request.topic,
+        crate::source::TimeRange { start, end },
+        move |time, value| MessageResponse {
+            time_ns: time.to_string(),
+            value: select(&value, &index)
+                .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
+        },
+    ))
+}

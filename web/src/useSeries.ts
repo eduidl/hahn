@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { FieldCache } from "./fieldCache";
 import { appendPoints, consumeStream, point } from "./data";
 import type { Series } from "./Plot";
 import { errorMessage, topicKey, type Selected } from "./types";
@@ -58,8 +59,29 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
     const timer = setTimeout(() => {
       const groups = new Map<string, Selected[]>();
       for (const field of fields) {
-        if (!cache.current.has(field.key))
-          groups.set(field.topic, [...(groups.get(field.topic) ?? []), field]);
+        const key = topicKey(field.source, field.topic);
+        if (!cache.current.has(field.key)) {
+          const hit = sharedCache?.readScalar(field, field.dataType);
+          if (hit) {
+            cache.current.set(field.key, { ...field, points: hit.map((row) => point({ time_ns: row.time_ns, values: [row.value as number | string | boolean | null] }, 0, origin, field.enumValues)), status: "complete", received: hit.length });
+            dirty.current = true;
+          } else if (sharedCache?.hasPendingScalar(field, field.dataType)) {
+            const controller = new AbortController();
+            const target: CachedSeries = { ...field, points: [], status: "loading", received: 0 };
+            cache.current.set(field.key, target);
+            requests.current.set(controller, [target]);
+            dirty.current = true;
+            sharedCache.load(field, controller.signal, (event) => {
+              if (controller.signal.aborted) return;
+              if (event.type === "batch") target.points = appendPoints(target.points, event.rows.map((row) => point({ time_ns: row.time_ns, values: [row.value as number | string | boolean | null] }, 0, origin, field.enumValues)));
+              if (event.type === "complete") target.status = "complete";
+              if (event.type !== "error") target.received = event.scanned_messages;
+              dirty.current = true;
+            }).catch((error) => {
+              if (!controller.signal.aborted) { target.status = "error"; target.error = errorMessage(error); dirty.current = true; }
+            }).finally(() => requests.current.delete(controller));
+          } else groups.set(key, [...(groups.get(key) ?? []), field]);
+        }
       }
       // Several widgets may request more than the API's 64-field batch limit.
       const batches = [...groups.values()].flatMap((fields) =>
@@ -115,6 +137,7 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                 targets.forEach((target) => {
                   target.status = "complete";
                   target.received = event.scanned_messages;
+                  sharedCache?.putScalar(target, target.points.map((p) => ({ time_ns: p.ns, value: p.raw })));
                 });
               dirty.current = true;
             }),

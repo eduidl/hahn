@@ -2,6 +2,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
   type DragEvent,
 } from "react";
@@ -20,6 +21,8 @@ import {
 import { secondsFrom } from "./data";
 import { dropVerdict } from "./drop";
 import { buildFieldIndex, typeLabel } from "./fieldIndex";
+import { FieldCache, FieldCacheContext } from "./fieldCache";
+import { useMessages } from "./useMessages";
 import { useSeries } from "./useSeries";
 import { PlaybackBar } from "./PlaybackBar";
 import { PlaybackContext, createPlaybackStore } from "./playback";
@@ -78,10 +81,14 @@ export function App() {
   // Field kinds and per-widget-type candidates, computed once per recording.
   const index = useMemo(() => buildFieldIndex(topics), [topics]);
   const [widgetDrag, setWidgetDrag] = useState<Widget["type"] | null>(null);
+  const fieldCache = useMemo(() => new FieldCache(), [info?.start_ns]);
+  useEffect(() => () => fieldCache.clear(), [fieldCache]);
   const { plotted, records, revision, stop, busy } = useSeries(
     info?.start_ns ?? null,
     demand,
+    fieldCache,
   );
+  const messages = useMessages(info?.start_ns ?? null, workspace.widgets, fieldCache);
   const fullEnd = info
     ? Math.max(1e-9, secondsFrom(info.end_ns, info.start_ns))
     : 1;
