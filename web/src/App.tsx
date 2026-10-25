@@ -600,6 +600,8 @@ export function App() {
             state={workspace}
             dispatch={dispatch}
             data={plotted}
+            messageRecords={messages.records}
+            fieldIndex={index}
             info={info}
             fullEnd={fullEnd}
             revision={revision}

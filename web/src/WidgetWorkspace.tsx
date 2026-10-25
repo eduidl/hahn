@@ -10,6 +10,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react";
+import { TabBar } from "./TabControls";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
 import { Plot, defaultPlotView, type PlotView, type Series } from "./Plot";
@@ -26,7 +27,12 @@ import { usePlayback } from "./playback";
 import { dragMime, type Info } from "./types";
 import {
   addAt,
-  compatibleSeries,
+  canMove,
+  canPlaceWidget,
+  ownerOf,
+  containerLayout,
+  widgetMoveMime,
+  type Container,
   widgetSpecs,
   widgetTypes,
   dropEdge,
@@ -37,10 +43,14 @@ import {
   type WorkspaceState,
 } from "./widgets";
 
+const MoveContext = createContext<{ id: string | null; setId: (id: string | null) => void }>({ id: null, setId: () => {} });
+
 type Props = {
   state: WorkspaceState;
   dispatch: Dispatch<WorkspaceAction>;
   data: Series[];
+  messageRecords: MessageRecord[];
+  fieldIndex: FieldIndex;
   info: Info | null;
   fullEnd: number;
   revision: number;
@@ -133,7 +143,7 @@ function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; seri
   );
 }
 
-function WidgetDropTarget({ onDrop }: { onDrop: (edge: DropEdge) => void }) {
+function WidgetDropTarget({ onDrop, frameOnly = false }: { onDrop: (edge: DropEdge) => void; frameOnly?: boolean }) {
   const [edge, setEdge] = useState<DropEdge | null>(null);
   const edgeAt = (event: DragEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -144,6 +154,34 @@ function WidgetDropTarget({ onDrop }: { onDrop: (edge: DropEdge) => void }) {
       rect.height,
     );
   };
+  const isWidgetDrag = (event: DragEvent) =>
+    [widgetDragMime, widgetMoveMime].some((type) => event.dataTransfer.types.includes(type));
+  const accept = (event: DragEvent, side: DropEdge) => {
+    if (!isWidgetDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = event.dataTransfer.types.includes(widgetMoveMime) ? "move" : "copy";
+    setEdge(side);
+  };
+  const place = (event: DragEvent, side: DropEdge) => {
+    if (!isWidgetDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onDrop(side);
+    setEdge(null);
+  };
+  if (frameOnly) {
+    const sides: Record<DropEdge, string> = { left: "左", right: "右", top: "上", bottom: "下" };
+    return <div className="widget-drop tab-frame-drop" aria-label="Tab全体の配置先">
+      {(Object.keys(sides) as DropEdge[]).map((side) => <div key={side}
+        className={`widget-drop-edge ${side}`} aria-label={`Tab全体の${sides[side]}に配置`}
+        onDragOver={(event) => accept(event, side)} onDragLeave={() => setEdge(null)}
+        onDrop={(event) => place(event, side)} />)}
+      {edge && <div className={`widget-drop-preview ${edge}`}>
+        <span className="widget-drop-label">Tab全体の{sides[edge]}に配置</span>
+      </div>}
+    </div>;
+  }
   return (
     <div
       className="widget-drop"
@@ -184,8 +222,11 @@ function TimeSeriesWindow({
     drop,
     openSettings,
   } = props;
+  const moving = useContext(MoveContext);
+  const owner = ownerOf(state, widget.id);
+  const canDrop = (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, owner)) || (!!moving.id && canMove(state, moving.id, owner, widget.id));
   const [canReset, setCanReset] = useState(false);
-  const verdict = dragVerdict(widget);
+  const verdict = widget.type === "tabs" ? null : dragVerdict(widget);
   const onViewChange = useCallback(
     (update: (view: PlotView) => PlotView) =>
       dispatch({ type: "view", id: widget.id, update }),
@@ -218,6 +259,58 @@ function TimeSeriesWindow({
         duplicate: true,
       });
   };
+  const tabBar = widget.type === "tabs" ? <TabBar widget={widget} dispatch={dispatch}
+        acceptWidget={(event) => (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, { widgetId: widget.id, tabId: widget.activeTabId }) && event.dataTransfer.types.includes(widgetDragMime)) ||
+          (!!moving.id && event.dataTransfer.types.includes(widgetMoveMime) && canMove(state, moving.id, { widgetId: widget.id, tabId: widget.activeTabId }))}
+        dropWidget={(event, tabId) => {
+          event.preventDefault(); event.stopPropagation();
+          const container = { widgetId: widget.id, tabId };
+          if (moving.id) dispatch({ type: "move", id: moving.id, container });
+          else if (props.widgetDrag) dispatch({ type: "add", widgetType: props.widgetDrag, container });
+          moving.setId(null);
+        }} /> : null;
+  // Each widget type draws its own content; the frame, drop target and empty state are shared.
+  const views: Record<Widget["type"], () => ReactNode> = {
+    tabs: () => widget.type === "tabs" ? <>
+      {widget.tabs.map((tab) => <div key={tab.id} className="widget-tab-panel" role="tabpanel"
+        id={`${widget.id}-${tab.id}-panel`} aria-labelledby={`${widget.id}-${tab.id}`} hidden={widget.activeTabId !== tab.id}>
+        <WorkspaceLayout {...props} container={{ widgetId: widget.id, tabId: tab.id }} />
+      </div>)}
+    </> : null,
+    "time-series": () => (
+      <Plot
+        series={widgetSeries(widget, data)}
+        fullEnd={fullEnd}
+        originNs={info?.start_ns ?? null}
+        timeDisplay={widget.timeDisplay}
+        revision={revision}
+        mode={widget.mode}
+        legend={widget.legend}
+        selectedCount={widget.series.length}
+        view={widget.view}
+        onViewChange={onViewChange}
+        onCanReset={setCanReset}
+      />
+    ),
+    state: () => (
+      <StatePlot
+        widget={widget}
+        series={widgetSeries(widget, data)}
+        fullEnd={fullEnd}
+        originNs={info?.start_ns ?? null}
+      />
+    ),
+    table: () => <TableView dispatch={dispatch} widget={widget} record={props.messageRecords.find((r) => r.key === widget.series[0]?.key)} index={props.fieldIndex} originNs={info?.start_ns ?? null} />,
+    raw: () => <RawMessage widget={widget} info={info} />,
+    log: () => (
+      <LogView
+        widget={widget}
+        series={widgetSeries(widget, data)}
+        originNs={info?.start_ns ?? null}
+        revision={revision}
+      />
+    ),
+  };
   return (
     <section
       className="widget-shell"
@@ -226,15 +319,40 @@ function TimeSeriesWindow({
       onPointerDownCapture={() => dispatch({ type: "select", id: widget.id })}
       onFocusCapture={() => dispatch({ type: "select", id: widget.id })}
     >
-      {props.widgetDrag && (
-        <WidgetDropTarget
-          onDrop={(edge) => dispatch(addAt(props.widgetDrag!, widget.id, edge))}
+      {canDrop && (
+        <WidgetDropTarget frameOnly={widget.type === "tabs"}
+          onDrop={(edge) => {
+            if (moving.id) dispatch({ type: "move", id: moving.id, target: widget.id, edge });
+            else if (props.widgetDrag) dispatch(addAt(props.widgetDrag, widget.id, edge));
+            moving.setId(null);
+          }}
         />
       )}
       <MosaicWindow<string>
         path={path}
         title={widget.title}
-        draggable={!state.expandedId}
+        draggable={false}
+        renderToolbar={(windowProps) => <div className={`widget-toolbar ${widget.type === "tabs" ? "widget-tabs-toolbar" : ""}`}>
+          <div className="mosaic-window-title" draggable={!state.expandedId}
+            aria-label={widget.type === "tabs" ? "Tab全体を移動" : undefined}
+            title={widget.type === "tabs" ? "Tab全体を移動" : widget.title}
+            onDragStart={(event) => {
+              event.stopPropagation();
+              event.dataTransfer.setData(widgetMoveMime, widget.id);
+              event.dataTransfer.setData("text/plain", widget.title);
+              event.dataTransfer.effectAllowed = "move";
+              moving.setId(widget.id);
+              dispatch({ type: "select", id: widget.id });
+            }} onDragEnd={() => moving.setId(null)}>
+            {widget.type === "tabs" ? <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true">
+              <circle cx="4" cy="4" r="1" /><circle cx="8" cy="4" r="1" />
+              <circle cx="4" cy="8" r="1" /><circle cx="8" cy="8" r="1" />
+              <circle cx="4" cy="12" r="1" /><circle cx="8" cy="12" r="1" />
+            </svg> : widget.title}
+          </div>
+          {tabBar}
+          <div className="mosaic-window-controls">{windowProps.toolbarControls}</div>
+        </div>}
         className={state.activeId === widget.id ? "widget-active" : ""}
         onDragStart={() => dispatch({ type: "select", id: widget.id })}
         toolbarControls={
@@ -378,7 +496,7 @@ function TimeSeriesWindow({
               </div>
               <button
                 role="menuitem"
-                disabled={!widget.series.length}
+                disabled={widget.type === "tabs" ? !widget.tabs.some((tab) => tab.layout !== null) : !widget.series.length}
                 onClick={() => action("clear")}
               >
                 クリア
@@ -394,7 +512,8 @@ function TimeSeriesWindow({
           </>
         }
       >
-        <div className="widget-content">
+        <div className={`widget-content ${widget.type === "tabs" ? "tab-widget-content" : ""}`}>
+          {widget.type === "tabs" ? views.tabs() : <>
           <div className="widget-plot-toolbar">
             <span>{widget.series.length} 系列</span>
             <div className="toolbar">
@@ -462,9 +581,50 @@ function TimeSeriesWindow({
   );
 }
 
+function WorkspaceLayout(props: Props & { container?: Container; expanded?: string | null }) {
+  const { container, expanded, ...workspaceProps } = props;
+  const { state, dispatch } = workspaceProps;
+  const moving = useContext(MoveContext);
+  const canDrop = (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, container)) || (!!moving.id && canMove(state, moving.id, container));
+  return <div className="mosaic-host">
+    <Mosaic<string>
+      value={expanded ?? containerLayout(state, container)}
+      onChange={(layout) => dispatch({ type: "layout", layout, container })}
+      className="hahn-mosaic"
+      resize={{ minimumPaneSizePx: { row: 320, column: 260 } }}
+      zeroStateView={<div className={`workspace-empty ${canDrop ? "drop-ready" : ""}`}
+        onDragOver={(event) => {
+          if (!canDrop || ![widgetDragMime, widgetMoveMime].some((type) => event.dataTransfer.types.includes(type))) return;
+          event.preventDefault(); event.stopPropagation();
+          event.dataTransfer.dropEffect = moving.id ? "move" : "copy";
+        }}
+        onDrop={(event) => {
+          if (!canDrop) return;
+          event.preventDefault(); event.stopPropagation();
+          if (moving.id) dispatch({ type: "move", id: moving.id, container });
+          else if (props.widgetDrag) dispatch({ type: "add", widgetType: props.widgetDrag, container });
+          moving.setId(null);
+        }}>
+        <div className="empty-widget-catalog" aria-label="追加するウィジェット">
+          <p>ウィジェットを追加</p>
+          <div className="empty-widget-options">
+            {widgetTypes.filter((type) => canPlaceWidget(type, container)).map((type) => <button key={type} aria-label={`${widgetSpecs[type].label} を追加`}
+              aria-description={widgetSpecs[type].description}
+              onClick={() => dispatch({ type: "add", widgetType: type, container })}>
+              <strong>{widgetSpecs[type].label}</strong>
+              <span>{widgetSpecs[type].description}</span>
+            </button>)}
+          </div>
+        </div>
+      </div>}
+      renderTile={(id, path) => <TimeSeriesWindow key={id} {...workspaceProps} widget={state.widgets[id]} path={path} />}
+    />
+  </div>;
+}
+
 export function WidgetWorkspace(props: Props) {
   const { state, dispatch } = props;
-  const displayedLayout = state.expandedId ?? state.layout;
+  const [movingId, setMovingId] = useState<string | null>(null);
   useEffect(() => {
     if (!state.expandedId) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -474,43 +634,7 @@ export function WidgetWorkspace(props: Props) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [state.expandedId, dispatch]);
-  return (
-    <div className="workspace-stage">
-      <div className="mosaic-host">
-        <Mosaic<string>
-          value={displayedLayout}
-          onChange={(layout) => dispatch({ type: "layout", layout })}
-          className="hahn-mosaic"
-          dropBehavior="split"
-          resize={{ minimumPaneSizePx: { row: 320, column: 260 } }}
-          zeroStateView={
-            <div
-              className={`workspace-empty ${props.widgetDrag ? "drop-ready" : ""}`}
-              onDragOver={(event) => {
-                if (!event.dataTransfer.types.includes(widgetDragMime)) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "copy";
-              }}
-              onDrop={(event) => {
-                if (!props.widgetDrag) return;
-                event.preventDefault();
-                dispatch({ type: "add", widgetType: props.widgetDrag });
-              }}
-            >
-              <p>ウィジェットがありません</p>
-              <p>「ウィジェットを追加」からここへドラッグしてください。</p>
-            </div>
-          }
-          renderTile={(id, path) => (
-            <TimeSeriesWindow
-              key={id}
-              {...props}
-              widget={state.widgets[id]}
-              path={path}
-            />
-          )}
-        />
-      </div>
-    </div>
-  );
+  return <MoveContext.Provider value={{ id: movingId, setId: setMovingId }}>
+    <div className="workspace-stage"><WorkspaceLayout {...props} expanded={state.expandedId} /></div>
+  </MoveContext.Provider>;
 }

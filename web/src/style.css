@@ -1796,3 +1796,96 @@ header .local {
 .table-column-resize:focus-visible { background: #41618a; outline: none; }
 @media (hover: none) { .table-column-hide { opacity: 1; } }
 
+/* A Tab contains the same layout surface as the root workspace. */
+.tab-widget-content {
+  overflow: hidden;
+}
+.widget-tab-bar {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  min-height: 32px;
+  overflow-x: auto;
+  background: #151515;
+  border-bottom: 1px solid #303030;
+  gap: 2px;
+  padding: 0 4px;
+}
+.widget-tab-item { display: flex; flex: 0 0 auto; min-width: 0; }
+.widget-tab-bar button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #999;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-bottom: 2px solid transparent;
+}
+.widget-tab-bar button[aria-selected="true"] {
+  color: #e3e8f0;
+  background: #20242b;
+  border-bottom-color: #738db8;
+}
+.widget-tab-bar button:hover:not(:disabled) { background: #282828; color: #eee; }
+.widget-tab-bar input { width: 120px; }
+.widget-tab-panel { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.widget-tab-panel > .mosaic-host { margin: 3px; }
+.mosaic-window-title[draggable="true"] { cursor: grab; }
+.mosaic-window-title[draggable="true"]:active { cursor: grabbing; }
+.tab-settings { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.tab-settings-row { display: flex; align-items: center; gap: 4px; }
+.tab-settings-row input { min-width: 0; width: 100%; flex: 1; }
+.tab-settings-row button { padding: 4px 6px; }
+.tab-settings-row button[aria-pressed="true"] { border-color: #738db8; color: #c9daf5; }
+.widget-tab-panel[hidden] { display: none; }
+.widget-tab-item[data-active="true"] {
+  background: #20242b;
+  border-bottom: 2px solid #738db8;
+}
+.widget-tab-item[data-active="true"] > button {
+  background: transparent;
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+.widget-tab-item > .widget-tab-close { padding: 6px; font-size: 13px; }
+.empty-widget-catalog { width: min(680px, 100%); padding: 20px; text-align: left; }
+.empty-widget-catalog > p { margin: 0 0 14px; font-size: 12px; color: #bbb; }
+.empty-widget-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 6px; }
+.empty-widget-options button { text-align: left; padding: 12px; background: #181818; border: 1px solid #303030; }
+.empty-widget-options button:hover { background: #222; border-color: #738db8; }
+.empty-widget-options strong { display: block; font-size: 12px; font-weight: 500; color: #ddd; }
+.empty-widget-options span { display: block; margin-top: 6px; color: #888; font-size: 11px; line-height: 1.5; }
+.workspace-empty:has(.empty-widget-catalog) { overflow: auto; justify-content: safe center; }
+/* Mosaic wraps custom toolbar content; let our row occupy that full wrapper. */
+.widget-toolbar {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+.widget-toolbar > .mosaic-window-title { min-width: 0; }
+.widget-toolbar > .mosaic-window-controls { flex: 0 0 auto; margin-left: auto; }
+.widget-tabs-toolbar > .mosaic-window-title { flex: 0 0 24px; justify-content: center; padding: 0; color: #777; }
+.widget-tabs-toolbar > .widget-tab-bar {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.tab-name-input {
+  padding: 6px 8px;
+  background: #181818;
+  color: #e4e4e4;
+  border: 1px solid #3b3b3b;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.tab-name-input:focus-visible { outline: 1px solid #91b8ff; outline-offset: 1px; }
+.widget-tab-bar .tab-name-input { height: 28px; margin: 2px 0; padding: 3px 8px; }
+
