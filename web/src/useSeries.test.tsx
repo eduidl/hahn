@@ -208,3 +208,17 @@ describe("full-recording series cache", () => {
     expect(result.current.plotted[0].points[0]).toMatchObject({ y: 1, raw: "RUN" });
   });
 });
+
+it("uses a shared parent history instead of decoding a numerical field again", async () => {
+  const { FieldCache } = await import("./fieldCache");
+  const shared = new FieldCache();
+  const fetch = vi.fn(async () => new Response(
+    '{"type":"batch","rows":[{"time_ns":"1000000000","value":{"x":42}}],"scanned_messages":1}\n{"type":"complete","scanned_messages":1}\n',
+  ));
+  vi.stubGlobal("fetch", fetch);
+  await shared.load({ source: 0, topic: "/pose", path: [] }, new AbortController().signal, () => {});
+  const { result } = renderHook(() => useSeries(info.start_ns, [field("x")], shared));
+  await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
+  expect(result.current.plotted[0].points[0].raw).toBe(42);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
