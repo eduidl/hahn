@@ -37,21 +37,12 @@ pub(crate) struct MessageResponse {
 /// first one after it when the topic has not published yet.
 pub(crate) async fn message(
     State(state): State<AppState>,
-    Path(id): Path<usize>,
+    Path((run, group)): Path<(String, String)>,
     Query(query): Query<MessageQuery>,
 ) -> Result<Json<Option<MessageResponse>>, ApiError> {
-    state.check(id)?;
-    let time: u64 = query.time_ns.parse().map_err(|_| {
-        ApiError(
-            StatusCode::BAD_REQUEST,
-            "Timestamps must be unsigned nanosecond strings".into(),
-        )
-    })?;
-    let field: Vec<String> = match &query.path {
-        Some(path) => serde_json::from_str(path)
-            .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Invalid field path".into()))?,
-        None => Vec::new(),
-    };
+    let group = state.group(&run, &group)?;
+    let time = parse_time(&query.time_ns)?;
+    let field = parse_field(&query.path, &query.meta)?;
     blocking(move || {
         let source = state.source(id)?;
         let defs = source.field_defs(&query.topic)?;
@@ -190,32 +181,16 @@ pub(crate) struct MessagesRequest {
 /// Messages in the requested range and subtree, retaining message boundaries and ties.
 pub(crate) async fn messages(
     State(state): State<AppState>,
-    Path(id): Path<usize>,
-    Json(request): Json<MessagesRequest>,
+    Path((run, group)): Path<(String, String)>,
+    Query(query): Query<MessagesQuery>,
 ) -> Result<axum::response::Response, ApiError> {
-    state.check(id)?;
-    let parse = |value: &Option<String>| -> Result<Option<u64>, ApiError> {
-        value
-            .as_ref()
-            .map(|value| {
-                value.parse().map_err(|_| {
-                    ApiError(
-                        StatusCode::BAD_REQUEST,
-                        "Timestamps must be unsigned nanosecond strings".into(),
-                    )
-                })
-            })
-            .transpose()
-    };
-    let start = parse(&request.start_ns)?;
-    let end = parse(&request.end_ns)?;
-    if matches!((start, end), (Some(start), Some(end)) if start > end) {
-        return Err(ApiError(
-            StatusCode::BAD_REQUEST,
-            "Start must not exceed end".into(),
-        ));
-    }
-    let topic = request.topic.clone();
+    let group = state.group(&run, &group)?;
+    let range = parse_range(&query.start_ns, &query.end_ns)?;
+    let field = parse_field(&query.path, &query.meta)?;
+    let meta = query.meta;
+    let preview = query.preview.unwrap_or(true) || meta.is_some();
+    let topic = query.topic.clone();
+    let checked = meta.clone();
     let (source, index, data_type) = blocking(move || {
         let source = state.source(id)?;
         let defs = source.field_defs(&topic)?;

@@ -5,7 +5,10 @@
 //! CSV. Other columns become fields with their Arrow types, so nested
 //! structs, lists and maps keep their shape.
 
-use super::{Format, Source, SourceInfo, TimeRange, TopicMeta, Visit, has_extension, time_scale};
+use super::{
+    Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit, check_field_names,
+    has_extension, time_scale,
+};
 use ::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use anyhow::{Context, bail, ensure};
 use arrow::{

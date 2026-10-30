@@ -15,8 +15,9 @@ fn fixture(count: usize, stats: bool) -> tempfile::TempDir {
     dir
 }
 
-async fn get(app: axum::Router, url: &str) -> (StatusCode, Value) {
+async fn raw_get(app: &axum::Router, url: &str) -> (StatusCode, Value) {
     let response = app
+        .clone()
         .oneshot(Request::get(url).body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -24,10 +25,70 @@ async fn get(app: axum::Router, url: &str) -> (StatusCode, Value) {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     (status, serde_json::from_slice(&body).unwrap())
 }
+/// Expands `/g`, which stands for the first group of the first run, and `/r`, its run.
+async fn resolve(app: &axum::Router, url: &str) -> String {
+    let (_, runs) = raw_get(app, "/api/runs").await;
+    let run = runs["items"][0]["id"].as_str().unwrap_or_default();
+    if let Some(tail) = url.strip_prefix("/r/") {
+        return format!("/api/runs/{run}/{tail}");
+    }
+    let Some(tail) = url.strip_prefix("/g") else {
+        return url.to_owned();
+    };
+    let (_, detail) = raw_get(app, &format!("/api/runs/{run}")).await;
+    let group = detail["groups"][0]["id"].as_str().unwrap();
+    format!("/api/runs/{run}/groups/{group}{tail}")
+}
+async fn get(app: axum::Router, url: &str) -> (StatusCode, Value) {
+    let url = resolve(&app, url).await;
+    raw_get(&app, &url).await
+}
+/// Every field of a schema tree by path, like a client walking it.
+fn flat(fields: &Value, prefix: &[Value], out: &mut Vec<(Value, Value)>) {
+    for field in fields.as_array().unwrap() {
+        let mut path = prefix.to_vec();
+        path.push(field["name"].clone());
+        out.push((Value::Array(path.clone()), field.clone()));
+        if field.get("fields").is_some() {
+            flat(&field["fields"], &path, out);
+        }
+    }
+}
+fn flattened(fields: &Value) -> Vec<(Value, Value)> {
+    let mut out = Vec::new();
+    flat(fields, &[], &mut out);
+    out
+}
+/// Percent-encodes everything but unreserved characters.
+fn encode(value: &str) -> String {
+    value
+        .bytes()
+        .map(|b| match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+/// Reads each field exactly with its own request, as a client does, and zips the rows.
 async fn series(app: axum::Router, body: Value) -> (StatusCode, Vec<Value>) {
     stream(app, "/api/files/0/series", body).await
 }
-async fn stream(app: axum::Router, url: &str, body: Value) -> (StatusCode, Vec<Value>) {
+async fn stream(app: axum::Router, url: &str, query: Value) -> (StatusCode, Vec<Value>) {
+    let url = resolve(&app, url).await;
+    let params: Vec<String> = query
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(key, value)| {
+            let text = match value {
+                Value::String(text) => text.clone(),
+                other => other.to_string(),
+            };
+            format!("{key}={}", encode(&text))
+        })
+        .collect();
     let response = app
         .oneshot(
             Request::get(format!("{url}?{}", params.join("&")))
@@ -63,7 +124,7 @@ async fn metadata_includes_all_field_types() {
         (support::ORIGIN + 2199 * 10_000_000).to_string()
     );
     assert_eq!(info["message_count"], 4400);
-    let (_, topics) = get(app.clone(), "/api/files/0/topics").await;
+    let (_, topics) = get(app.clone(), "/g/topics").await;
     let telemetry = topics
         .as_array()
         .unwrap()
@@ -201,7 +262,7 @@ async fn state_stream_preserves_enum_labels() {
 async fn inclusive_start_exclusive_end_and_empty_ranges() {
     let dir = fixture(2200, false);
     let app = hahn::router(dir.path()).unwrap();
-    let (_, info) = get(app.clone(), "/api/files/0").await;
+    let (_, info) = get(app.clone(), "/g").await;
     assert_eq!(info["start_ns"], support::ORIGIN.to_string());
     assert!(info["message_count"].is_null());
     let (_, events) = series(app.clone(), json!({"topic":"/telemetry","fields":[["counter"]],"start_ns":(support::ORIGIN+10_000_000).to_string(),"end_ns":(support::ORIGIN+30_000_000).to_string()})).await;
@@ -243,9 +304,9 @@ async fn malformed_recording_and_symlink_escape() {
     #[cfg(unix)]
     std::os::unix::fs::symlink("/", dir.path().join("outside")).unwrap();
     let app = hahn::router(dir.path()).unwrap();
-    let (_, files) = get(app.clone(), "/api/files").await;
-    assert_eq!(files.as_array().unwrap().len(), 1);
-    let (status, body) = get(app, "/api/files/0").await;
+    let (_, runs) = get(app.clone(), "/api/runs").await;
+    assert_eq!(runs["items"].as_array().unwrap().len(), 1);
+    let (status, body) = get(app, "/g").await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(body["error"].is_string());
 }
@@ -317,7 +378,7 @@ async fn unindexed_recordings_are_rejected_instead_of_silently_empty() {
             )
             .unwrap();
         writer.finish().unwrap();
-        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert!(body["error"].is_string());
     }
@@ -327,7 +388,7 @@ async fn unindexed_recordings_are_rejected_instead_of_silently_empty() {
 async fn message_at_time_is_latest_at_or_before_with_named_fields() {
     let dir = fixture(300, true);
     let app = hahn::router(dir.path()).unwrap();
-    let at = |t: u64| format!("/api/files/0/message?topic=/telemetry&time_ns={t}");
+    let at = |t: u64| format!("/g/messages/latest?topic=/telemetry&time_ns={t}");
     // Between samples 25 and 26: the latest at or before wins.
     let (status, body) = get(app.clone(), &at(support::ORIGIN + 25 * 10_000_000 + 3)).await;
     assert_eq!(status, StatusCode::OK);
@@ -395,24 +456,21 @@ time_ns,speed,count,ok,mode,pose.x,pose.y
 async fn csv_is_one_topic_with_inferred_nested_fields() {
     let dir = csv_fixture("drive.csv", CSV);
     let app = hahn::router(dir.path()).unwrap();
-    let (_, files) = get(app.clone(), "/api/files").await;
-    assert_eq!(files[0]["name"], "drive.csv");
-    assert_eq!(files[0]["format"], "csv");
-    let (_, info) = get(app.clone(), "/api/files/0").await;
+    let (_, runs) = get(app.clone(), "/api/runs").await;
+    assert_eq!(runs["items"][0]["name"], "drive.csv");
+    let (_, info) = get(app.clone(), "/g").await;
     assert_eq!(info["start_ns"], "1760000000000000100");
     assert_eq!(info["end_ns"], "1760000000000000300");
     assert_eq!(info["message_count"], 3);
-    let (_, topics) = get(app.clone(), "/api/files/0/topics").await;
+    let (_, topics) = get(app.clone(), "/g/topics").await;
     assert_eq!(topics.as_array().unwrap().len(), 1);
     let topic = &topics[0];
     assert_eq!(topic["topic"], "/drive");
     assert_eq!(topic["schema_encoding"], "csv");
     assert_eq!(topic["message_count"], 3);
-    let types: Vec<(Value, Value)> = topic["fields"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|f| (f["path"].clone(), f["data_type"].clone()))
+    let types: Vec<(Value, Value)> = flattened(&topic["fields"])
+        .into_iter()
+        .map(|(path, f)| (path, f["data_type"].clone()))
         .collect();
     assert_eq!(
         types,
@@ -444,8 +502,8 @@ async fn csv_series_and_message_follow_the_shared_range_rules() {
     assert_eq!(
         events[0]["rows"],
         json!([
-            {"time_ns":"1760000000000000100","values":[1.5,0.5,"park"]},
-            {"time_ns":"1760000000000000200","values":[null,1.5,"drive"]},
+            {"time_ns": "1760000000000000100", "values": [1.5, 0.5, "park"]},
+            {"time_ns": "1760000000000000200", "values": [null, 1.5, "drive"]},
         ])
     );
     assert_eq!(events.last().unwrap()["type"], "complete");
@@ -457,7 +515,7 @@ async fn csv_series_and_message_follow_the_shared_range_rules() {
     .await;
     assert_eq!(events, [json!({"type":"complete","scanned_messages":0})]);
 
-    let at = |t: &str| format!("/api/files/0/message?topic=/drive&time_ns={t}");
+    let at = |t: &str| format!("/g/messages/latest?topic=/drive&time_ns={t}");
     let (_, body) = get(app.clone(), &at("1760000000000000250")).await;
     assert_eq!(body["time_ns"], "1760000000000000200");
     // Exact 64-bit integers are strings, as for MCAP.
@@ -484,7 +542,7 @@ async fn csv_time_units_and_malformed_files() {
         "time_ns,v\n",
     ] {
         let dir = csv_fixture("bad.csv", content);
-        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{content:?}");
         assert!(body["error"].is_string());
     }
@@ -554,20 +612,18 @@ fn drive_parquet() -> arrow::array::RecordBatch {
 async fn parquet_keeps_arrow_types_and_nesting() {
     let dir = parquet_fixture("drive.parquet", drive_parquet());
     let app = hahn::router(dir.path()).unwrap();
-    let (_, files) = get(app.clone(), "/api/files").await;
-    assert_eq!(files[0]["format"], "parquet");
-    let (_, info) = get(app.clone(), "/api/files/0").await;
+    let (_, runs) = get(app.clone(), "/api/runs").await;
+    assert_eq!(runs["items"][0]["name"], "drive.parquet");
+    let (_, info) = get(app.clone(), "/g").await;
     assert_eq!(info["start_ns"], "1760000000000000100");
     assert_eq!(info["end_ns"], "1760000000000000300");
     assert_eq!(info["message_count"], 3);
-    let (_, topics) = get(app.clone(), "/api/files/0/topics").await;
+    let (_, topics) = get(app.clone(), "/g/topics").await;
     assert_eq!(topics[0]["topic"], "/drive");
     assert_eq!(topics[0]["schema_encoding"], "parquet");
-    let types: Vec<(Value, Value)> = topics[0]["fields"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|f| (f["path"].clone(), f["data_type"].clone()))
+    let types: Vec<(Value, Value)> = flattened(&topics[0]["fields"])
+        .into_iter()
+        .map(|(path, f)| (path, f["data_type"].clone()))
         .collect();
     let paths: Vec<_> = types.iter().map(|(p, _)| p.clone()).collect();
     assert_eq!(
@@ -595,11 +651,11 @@ async fn parquet_keeps_arrow_types_and_nesting() {
     assert_eq!(
         events[0]["rows"],
         json!([
-            {"time_ns":"1760000000000000100","values":[1.5,1.0,"park"]},
-            {"time_ns":"1760000000000000200","values":[null,2.0,"drive"]},
+            {"time_ns": "1760000000000000100", "values": [1.5, 1.0, "park"]},
+            {"time_ns": "1760000000000000200", "values": [null, 2.0, "drive"]},
         ])
     );
-    let at = |t: &str| format!("/api/files/0/message?topic=/drive&time_ns={t}");
+    let at = |t: &str| format!("/g/messages/latest?topic=/drive&time_ns={t}");
     let (_, body) = get(app.clone(), &at("1760000000000000150")).await;
     assert_eq!(body["time_ns"], "1760000000000000100");
     assert_eq!(body["value"]["ranges"], json!([1.0, 1.1]));
@@ -622,13 +678,13 @@ async fn parquet_time_units_and_malformed_files() {
         "a.parquet",
         batch(Arc::new(Int64Array::from(vec![1_760_000_000_000]))),
     );
-    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/g").await;
     assert_eq!(info["start_ns"], "1760000000000000000");
     let dir = parquet_fixture(
         "a.parquet",
         batch(Arc::new(Float64Array::from(vec![1_760_000_000_000.5]))),
     );
-    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/g").await;
     assert_eq!(info["start_ns"], "1760000000000500000");
     for time in [
         Arc::new(StringArray::from(vec!["soon"])) as ArrayRef,
@@ -636,12 +692,12 @@ async fn parquet_time_units_and_malformed_files() {
         Arc::new(Int64Array::from(vec![-1])) as ArrayRef,
     ] {
         let dir = parquet_fixture("bad.parquet", batch(time));
-        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert!(body["error"].is_string());
     }
     let dir = csv_fixture("bad.parquet", "not parquet");
-    let (status, _) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    let (status, _) = get(hahn::router(dir.path()).unwrap(), "/g").await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -649,12 +705,7 @@ async fn parquet_time_units_and_malformed_files() {
 async fn messages_history_keeps_full_rows_and_subtree_selection() {
     let dir = fixture(2200, true);
     let app = hahn::router(dir.path()).unwrap();
-    let (status, events) = stream(
-        app.clone(),
-        "/api/files/0/messages",
-        json!({"topic":"/telemetry"}),
-    )
-    .await;
+    let (status, events) = stream(app.clone(), "/g/messages", json!({"topic":"/telemetry"})).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         events.last().unwrap(),
@@ -919,6 +970,239 @@ async fn extractor_rejections_are_json_errors() {
     }
 }
 
+fn segment_fixture(dir: &std::path::Path, name: &str, count: usize, offset_ns: u64) {
+    support::write_fixture_at(&dir.join(name), count, true, None, offset_ns).unwrap();
+}
+
+async fn run_names(app: &axum::Router) -> Vec<(String, Vec<String>)> {
+    let (_, runs) = raw_get(app, "/api/runs").await;
+    let mut names = Vec::new();
+    for run in runs["items"].as_array().unwrap() {
+        let (_, detail) = raw_get(app, &format!("/api/runs/{}", run["id"].as_str().unwrap())).await;
+        let groups = detail["groups"].as_array().unwrap();
+        assert!(groups.iter().all(|g| g["default_open"] == true));
+        names.push((
+            detail["name"].as_str().unwrap().to_owned(),
+            groups
+                .iter()
+                .map(|g| g["name"].as_str().unwrap().to_owned())
+                .collect(),
+        ));
+    }
+    names
+}
+
+#[tokio::test]
+async fn data_directory_maps_onto_runs_and_groups() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let csv = "t_ns,v\n1,1\n";
+    std::fs::write(root.join("single.csv"), csv).unwrap();
+    std::fs::write(root.join("ignored.txt"), "x").unwrap();
+    std::fs::create_dir_all(root.join("empty")).unwrap();
+    // A plain run: numbered files stay separate without a bag's metadata.
+    std::fs::create_dir_all(root.join("drive/nested")).unwrap();
+    std::fs::write(root.join("drive/cam_0.csv"), csv).unwrap();
+    std::fs::write(root.join("drive/cam_1.csv"), csv).unwrap();
+    std::fs::write(root.join("drive/nested/imu.csv"), csv).unwrap();
+    // A bag inside a run is one group.
+    std::fs::create_dir_all(root.join("drive/bag")).unwrap();
+    std::fs::write(root.join("drive/bag/metadata.yaml"), "").unwrap();
+    std::fs::write(root.join("drive/bag/bag_0.csv"), csv).unwrap();
+    std::fs::write(root.join("drive/bag/bag_1.csv"), "t_ns,v\n2,1\n").unwrap();
+    // A bag at the top level is a run with one group.
+    std::fs::create_dir_all(root.join("alone")).unwrap();
+    std::fs::write(root.join("alone/metadata.yaml"), "").unwrap();
+    std::fs::write(root.join("alone/alone_0.csv"), csv).unwrap();
+    let app = hahn::router(root).unwrap();
+    let group = |name: &str| name.to_owned();
+    assert_eq!(
+        run_names(&app).await,
+        vec![
+            ("alone".to_owned(), vec![group("alone")]),
+            (
+                "drive".to_owned(),
+                vec![
+                    group("bag"),
+                    group("cam_0.csv"),
+                    group("cam_1.csv"),
+                    group("nested/imu.csv"),
+                ],
+            ),
+            ("single.csv".to_owned(), vec![group("single.csv")]),
+        ]
+    );
+    let (_, runs) = raw_get(&app, "/api/runs").await;
+    let run = runs["items"][0]["id"].as_str().unwrap();
+    assert_eq!(
+        raw_get(&app, &format!("/api/runs/{run}/groups/none"))
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    // Ids survive a restart, unlike list positions.
+    let again = hahn::router(root).unwrap();
+    assert_eq!(raw_get(&again, "/api/runs").await.1, runs);
+}
+
+#[tokio::test]
+async fn numbered_files_of_a_bag_read_as_one_recording() {
+    const COUNT: usize = 100;
+    let dir = tempfile::tempdir().unwrap();
+    let bag = dir.path().join("bag");
+    std::fs::create_dir_all(&bag).unwrap();
+    std::fs::write(bag.join("metadata.yaml"), "").unwrap();
+    // Numbered out of lexical order: segment 10 comes after segment 2.
+    let span = COUNT as u64 * 10_000_000;
+    segment_fixture(&bag, "bag_2.mcap", COUNT, 0);
+    segment_fixture(&bag, "bag_10.mcap", COUNT, span);
+    let app = hahn::router(dir.path()).unwrap();
+    assert_eq!(
+        run_names(&app).await,
+        vec![("bag".to_owned(), vec!["bag".to_owned()])]
+    );
+
+    let (_, info) = get(app.clone(), "/g").await;
+    assert_eq!(info["start_ns"], support::ORIGIN.to_string());
+    assert_eq!(info["message_count"], 4 * COUNT);
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    assert_eq!(topics.as_array().unwrap().len(), 2);
+    assert!(
+        topics
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| t["message_count"] == 2 * COUNT)
+    );
+
+    let (status, events) = series(
+        app.clone(),
+        json!({"topic":"/telemetry","fields":[["counter"]]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let rows: Vec<_> = events
+        .iter()
+        .flat_map(|e| e["rows"].as_array().cloned().unwrap_or_default())
+        .collect();
+    assert_eq!(rows.len(), 2 * COUNT);
+    assert_eq!(events.last().unwrap()["type"], "complete");
+    let times: Vec<u64> = rows
+        .iter()
+        .map(|r| r["time_ns"].as_str().unwrap().parse().unwrap())
+        .collect();
+    assert!(times[COUNT - 1] < times[COUNT], "segments in numeric order");
+
+    // Lookups cross the boundary: a time in the gap finds the first segment's last
+    // message, and one past the end of the first segment finds the second's.
+    let boundary = support::ORIGIN + span;
+    let at =
+        |t: u64| format!("/g/messages/latest?topic=/telemetry&path=%5B%22signal%22%5D&time_ns={t}");
+    let (_, before) = get(app.clone(), &at(boundary - 1)).await;
+    assert_eq!(before["time_ns"], (boundary - 10_000_000).to_string());
+    let (_, after) = get(app.clone(), &at(boundary)).await;
+    assert_eq!(after["time_ns"], boundary.to_string());
+    let (_, early) = get(app, &at(support::ORIGIN - 1)).await;
+    assert!(early.is_null());
+}
+
+#[tokio::test]
+async fn a_topic_missing_from_one_segment_is_still_readable() {
+    let dir = tempfile::tempdir().unwrap();
+    let bag = dir.path().join("bag");
+    std::fs::create_dir_all(&bag).unwrap();
+    std::fs::write(bag.join("metadata.yaml"), "").unwrap();
+    // A CSV's topic is its file name, so these segments share no topic.
+    std::fs::write(bag.join("bag_0.csv"), "t_ns,v\n1,1\n").unwrap();
+    std::fs::write(bag.join("bag_1.csv"), "t_ns,v\n2,2\n").unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, events) = series(app.clone(), json!({"topic":"/bag_1","fields":[["v"]]})).await;
+    assert_eq!(events[0]["rows"][0]["time_ns"], "2");
+    assert_eq!(events.last().unwrap()["type"], "complete");
+    let (status, _) = series(app, json!({"topic":"/nope","fields":[["v"]]})).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn overlapping_segments_are_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let bag = dir.path().join("bag");
+    std::fs::create_dir_all(&bag).unwrap();
+    std::fs::write(bag.join("metadata.yaml"), "").unwrap();
+    segment_fixture(&bag, "bag_0.mcap", 100, 0);
+    segment_fixture(&bag, "bag_1.mcap", 100, 10_000_000);
+    let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        body["error"].as_str().unwrap().contains("overlap"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn exact_values_do_not_shorten_strings_and_require_a_scalar() {
+    let long = "x".repeat(10_050);
+    let dir = csv_fixture("drive.csv", &format!("t_ns,label\n1,{long}\n"));
+    let app = hahn::router(dir.path()).unwrap();
+    let read = |preview: bool| {
+        stream(
+            app.clone(),
+            "/g/messages",
+            json!({"topic":"/drive","path":["label"],"preview":preview}),
+        )
+    };
+    let (_, exact) = read(false).await;
+    assert_eq!(exact[0]["rows"][0]["value"], long);
+    let (_, shortened) = read(true).await;
+    assert_ne!(shortened[0]["rows"][0]["value"], long);
+    let (status, _) = stream(
+        app,
+        "/g/messages",
+        json!({"topic":"/drive","preview":false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn parquet_rejects_reserved_field_names() {
+    use arrow::{
+        array::{ArrayRef, Float64Array, RecordBatch, TimestampNanosecondArray},
+        datatypes::{DataType, Field, Schema, TimeUnit},
+    };
+    use std::sync::Arc;
+    let schema = Schema::new(vec![
+        Field::new(
+            "time",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            false,
+        ),
+        Field::new("$bytes", DataType::Float64, false),
+    ]);
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(TimestampNanosecondArray::from(vec![1])),
+        Arc::new(Float64Array::from(vec![1.0])),
+    ];
+    let batch = RecordBatch::try_new(Arc::new(schema), columns).unwrap();
+    let dir = parquet_fixture("bad.parquet", batch);
+    let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        body["error"].as_str().unwrap().contains("reserved"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn a_group_without_messages_has_no_time_range() {
+    for stats in [true, false] {
+        let dir = fixture(0, stats);
+        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "stats: {stats}");
+        assert!(body["error"].is_string());
+    }
+}
+
 fn visual_app() -> (tempfile::TempDir, axum::Router) {
     let dir = tempfile::tempdir().unwrap();
     support::write_visual_fixture(&dir.path().join("visual.mcap")).unwrap();
@@ -939,5 +1223,16 @@ async fn frames_are_merged_from_every_transform_topic() {
             {"id": "map", "parent": null},
         ])
     );
+}
+
+#[tokio::test]
+async fn a_run_without_transforms_has_no_frames() {
+    let dir = fixture(1, true);
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, body) = get(app.clone(), "/r/frames").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, json!({"frames": []}));
+    let (status, _) = get(app, "/r/transforms?target=map&time_ns=1").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 

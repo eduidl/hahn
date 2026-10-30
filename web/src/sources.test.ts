@@ -33,3 +33,10 @@ describe("merged time axis", () => {
     expect(mergeInfo([])).toBeNull();
   });
 });
+
+describe("sourceUrl", () => {
+  it("addresses a group of a run", () => {
+    expect(sourceUrl(sourceOf("r", "g"))).toBe("/api/runs/r/groups/g");
+  });
+});
+

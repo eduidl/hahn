@@ -78,7 +78,8 @@ export type Topic = {
   schema_encoding?: string | null;
   message_count: number | null;
   fields: Field[];
-  error: string | null;
+  /** The open group the topic belongs to (see `sourceOf`); added by the client. */
+  source: string;
 };
 export type Selected = {
   key: string;

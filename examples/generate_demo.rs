@@ -8,7 +8,9 @@ fn main() -> anyhow::Result<()> {
         .map(|s| s.parse())
         .transpose()?
         .unwrap_or(30_000);
-    support::write_fixture(std::path::Path::new(&path), count, true)?;
+    // Timestamps shifted later, to generate the segments of a split recording.
+    let offset_ns = args.next().map(|s| s.parse()).transpose()?.unwrap_or(0);
+    support::write_fixture_at(std::path::Path::new(&path), count, true, None, offset_ns)?;
     println!("Created {path}: {count} samples per topic");
     Ok(())
 }

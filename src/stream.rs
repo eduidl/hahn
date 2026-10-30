@@ -7,7 +7,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use mcapdecode::core::{FieldDefs, Value};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::{
     convert::Infallible,
     io,
