@@ -131,20 +131,17 @@ async fn metadata_includes_all_field_types() {
         .iter()
         .find(|t| t["topic"] == "/telemetry")
         .unwrap();
-    let fields = telemetry["fields"].as_array().unwrap();
+    let fields = flattened(&telemetry["fields"]);
     for (path, kind) in [
         (vec!["position"], "struct"),
         (vec!["position", "x"], "float64"),
         (vec!["label"], "string"),
         (vec!["active"], "bool"),
     ] {
-        let field = fields.iter().find(|f| f["path"] == json!(path)).unwrap();
+        let (_, field) = fields.iter().find(|(p, _)| *p == json!(path)).unwrap();
         assert_eq!(field["data_type"], kind);
     }
-    let mode = fields
-        .iter()
-        .find(|field| field["path"] == json!(["mode"]))
-        .unwrap();
+    let (_, mode) = fields.iter().find(|(p, _)| *p == json!(["mode"])).unwrap();
     assert_eq!(mode["data_type"], "enum");
     assert_eq!(mode["type_name"], "hahn.Mode");
     assert_eq!(
@@ -154,13 +151,13 @@ async fn metadata_includes_all_field_types() {
             {"name":"ACTIVE", "value":1}
         ])
     );
-    let position = fields
+    let (_, position) = fields
         .iter()
-        .find(|field| field["path"] == json!(["position"]))
+        .find(|(p, _)| *p == json!(["position"]))
         .unwrap();
     assert_eq!(position["data_type"], "struct");
     assert_eq!(position["type_name"], "hahn.Position");
-    assert!(fields.iter().any(|f| f["path"] == json!(["tags"])));
+    assert!(fields.iter().any(|(p, _)| *p == json!(["tags"])));
     // Strings stream like other scalars; lists do not.
     let (status, _) = series(
         app.clone(),
@@ -174,7 +171,7 @@ async fn metadata_includes_all_field_types() {
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(get(app, "/api/files/100").await.0, StatusCode::NOT_FOUND);
+    assert_eq!(get(app, "/api/runs/none").await.0, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -719,13 +716,14 @@ async fn messages_history_keeps_full_rows_and_subtree_selection() {
     assert_eq!(rows.len(), 2200);
     let timestamp = (support::ORIGIN + 250_000_000).to_string();
     let row = rows.iter().find(|r| r["time_ns"] == timestamp).unwrap();
-    assert_eq!(row["value"]["counter"], "9007199254741018");
-    assert!(row["value"]["position"]["x"].is_number());
-    assert_eq!(row["value"]["tags"], json!(["test"]));
+    let value = &row["value"];
+    assert_eq!(value["counter"], "9007199254741018");
+    assert!(value["position"]["x"].is_number());
+    assert_eq!(value["tags"], json!(["test"]));
     for path in [json!(["position"]), json!(["counter"]), json!(["tags"])] {
         let (status, events) = stream(
             app.clone(),
-            "/api/files/0/messages",
+            "/g/messages",
             json!({"topic":"/telemetry","path":path}),
         )
         .await;
@@ -743,7 +741,7 @@ async fn messages_history_keeps_full_rows_and_subtree_selection() {
         json!({"topic":"/telemetry","path":["missing"]}),
     ] {
         assert_eq!(
-            stream(app.clone(), "/api/files/0/messages", body).await.0,
+            stream(app.clone(), "/g/messages", body).await.0,
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
@@ -756,7 +754,7 @@ async fn messages_history_retains_nulls_and_duplicate_timestamps() {
         "time_ns,count,label\n1000000000,1,a\n1000000000,2,\n2000000000,3,b\n",
     );
     let app = hahn::router(dir.path()).unwrap();
-    let (_, events) = stream(app, "/api/files/0/messages", json!({"topic":"/drive"})).await;
+    let (_, events) = stream(app, "/g/messages", json!({"topic":"/drive"})).await;
     let rows: Vec<_> = events
         .iter()
         .filter_map(|e| e["rows"].as_array())
@@ -823,7 +821,7 @@ async fn messages_history_reports_decode_errors_after_partial_data() {
         .unwrap();
     let (status, events) = stream(
         hahn::router(dir.path()).unwrap(),
-        "/api/files/0/messages",
+        "/g/messages",
         json!({"topic":"/telemetry"}),
     )
     .await;
@@ -842,7 +840,7 @@ async fn message_windows_keep_timestamp_ties_and_validate_bounds() {
     let app = hahn::router(dir.path()).unwrap();
     let (status, events) = stream(
         app.clone(),
-        "/api/files/0/messages",
+        "/g/messages",
         json!({
             "topic":"/window", "start_ns":"2000000000", "end_ns":"3000000000"
         }),
@@ -861,7 +859,7 @@ async fn message_windows_keep_timestamp_ties_and_validate_bounds() {
         assert_eq!(
             stream(
                 app.clone(),
-                "/api/files/0/messages",
+                "/g/messages",
                 json!({
                     "topic":"/window", "start_ns":start, "end_ns":end
                 })
@@ -911,12 +909,13 @@ async fn ros_uint8_sequences_use_list_previews() {
     }
     writer.finish().unwrap();
     let app = hahn::router(dir.path()).unwrap();
-    let (status, topics) = get(app.clone(), "/api/files/0/topics").await;
+    let (status, topics) = get(app.clone(), "/g/topics").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(topics[0]["fields"][0]["data_type"], "list");
+    assert_eq!(topics[0]["fields"][0]["element"]["data_type"], "uint8");
     assert_eq!(topics[0]["fields"][0]["type_name"], "uint8[]");
     assert_eq!(topics[0]["fields"][1]["type_name"], "uint8[<=128]");
-    let (status, events) = stream(app, "/api/files/0/messages", json!({"topic":"/bytes"})).await;
+    let (status, events) = stream(app, "/g/messages", json!({"topic":"/bytes"})).await;
     assert_eq!(status, StatusCode::OK);
     assert!(events.iter().all(|event| event["type"] != "error"));
     let rows: Vec<_> = events
@@ -1171,6 +1170,27 @@ async fn runs_are_filtered_and_limited() {
         assert_eq!(status, StatusCode::BAD_REQUEST, "{limit}");
         assert!(body["error"].is_string());
     }
+}
+
+#[tokio::test]
+async fn gzip_applies_only_when_enabled_and_accepted() {
+    let dir = fixture(10, true);
+    let encoding = |app: axum::Router, accept: bool| async move {
+        let mut request = Request::get("/api/runs");
+        if accept {
+            request = request.header("accept-encoding", "gzip");
+        }
+        let response = app
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        response.headers().get("content-encoding").cloned()
+    };
+    let plain = hahn::router(dir.path()).unwrap();
+    assert_eq!(encoding(plain, true).await, None);
+    let gzip = hahn::gzip(hahn::router(dir.path()).unwrap());
+    assert_eq!(encoding(gzip.clone(), false).await, None);
+    assert_eq!(encoding(gzip, true).await.unwrap(), "gzip");
 }
 
 #[tokio::test]

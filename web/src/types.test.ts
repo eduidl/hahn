@@ -102,3 +102,13 @@ describe("topic drops", () => {
     expect(valueKind("string[]")).toEqual({ type: "other" });
   });
 });
+
+describe("flattenFields", () => {
+  it("flattens structs but not list elements", () => {
+    const fields = flattenFields([
+      { name: "pose", data_type: "struct", fields: [{ name: "x", data_type: "float64" }] },
+      { name: "points", data_type: "list", element: { data_type: "struct", fields: [{ name: "y", data_type: "float64" }] } },
+    ]);
+    expect(fields.map((field) => field.path)).toEqual([["pose"], ["pose", "x"], ["points"]]);
+  });
+});

@@ -56,15 +56,16 @@ pub(crate) async fn message(
         } else {
             field_type(&defs, &index).clone()
         };
-        let found = match source.latest_at(&query.topic, time)? {
-            Some(found) => Some(found),
-            None => source.first_after(&query.topic, time)?,
-        };
-        Ok(found.map(|(log_time, value)| MessageResponse {
-            time_ns: log_time.to_string(),
-            value: select(&value, &index)
-                .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
-        }))
+        Ok(source
+            .latest_at(&query.topic, time)?
+            .map(|(times, value)| MessageResponse {
+                time_ns: times.log_time.to_string(),
+                value: match &query.meta {
+                    Some(name) => meta_value(name, times),
+                    None => select(&value, &index)
+                        .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
+                },
+            }))
     })
     .await
     .map(Json)
@@ -95,17 +96,22 @@ fn select<'a>(value: &'a Value, index: &[usize]) -> Option<&'a Value> {
     })
 }
 
+/// Keeps the first items of a long list or map; the rest is summarized by its length.
+fn preview(length: usize, shown: Vec<serde_json::Value>) -> serde_json::Value {
+    if length > MAX_ITEMS {
+        json!({ "$truncated": true, "length": length, "items": shown })
+    } else {
+        shown.into()
+    }
+}
+
 fn items(values: &[Value], element: &DataTypeDef) -> serde_json::Value {
-    let shown: Vec<_> = values
+    let shown = values
         .iter()
         .take(MAX_ITEMS)
         .map(|v| to_json(v, element))
         .collect();
-    if values.len() > MAX_ITEMS {
-        json!({ "$truncated": true, "length": values.len(), "items": shown })
-    } else {
-        shown.into()
-    }
+    preview(values.len(), shown)
 }
 
 /// JSON for display: named struct fields, exact 64-bit integers as strings,
@@ -156,7 +162,7 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
                 DataTypeDef::Map { key, value } => (&key.data_type, &value.data_type),
                 _ => (&DataTypeDef::Null, &DataTypeDef::Null),
             };
-            entries
+            let shown = entries
                 .iter()
                 .take(MAX_ITEMS)
                 .map(|(k, v)| json!([to_json(k, key), to_json(v, value)]))
@@ -210,12 +216,54 @@ pub(crate) async fn messages(
     .await?;
     Ok(crate::stream::stream_rows(
         source,
-        request.topic,
-        crate::source::TimeRange { start, end },
-        move |time, value| MessageResponse {
-            time_ns: time.to_string(),
-            value: select(&value, &index)
-                .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
+        query.topic,
+        range,
+        move |times, value| MessageResponse {
+            time_ns: times.log_time.to_string(),
+            value: match &meta {
+                Some(name) => meta_value(name, times),
+                None if preview => select(&value, &index)
+                    .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
+                None => scalar(&value, &index),
+            },
         },
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mcapdecode::core::{ElementDef, FieldDef};
+
+    fn point() -> DataTypeDef {
+        DataTypeDef::Struct(vec![FieldDef::new("x", DataTypeDef::F64, false)].into())
+    }
+
+    fn point_value(x: f64) -> Value {
+        Value::Struct(vec![Value::F64(x)])
+    }
+
+    #[test]
+    fn structs_inside_lists_are_named() {
+        let data_type = DataTypeDef::List(Box::new(ElementDef::new(point(), false)));
+        let value = Value::List(vec![point_value(1.0)]);
+        assert_eq!(to_json(&value, &data_type), json!([{"x": 1.0}]));
+    }
+
+    #[test]
+    fn maps_are_pairs_with_a_truncation_marker() {
+        let data_type = DataTypeDef::Map {
+            key: Box::new(ElementDef::new(DataTypeDef::String, false)),
+            value: Box::new(ElementDef::new(point(), false)),
+        };
+        let pair = (Value::string("k"), point_value(1.0));
+        assert_eq!(
+            to_json(&Value::Map(vec![pair.clone()]), &data_type),
+            json!([["k", {"x": 1.0}]])
+        );
+        let long = to_json(&Value::Map(vec![pair; MAX_ITEMS + 1]), &data_type);
+        assert_eq!(long["$truncated"], true);
+        assert_eq!(long["length"], MAX_ITEMS + 1);
+        assert_eq!(long["items"].as_array().unwrap().len(), MAX_ITEMS);
+    }
 }

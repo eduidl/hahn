@@ -40,6 +40,8 @@ import {
   type Run,
   type Schemas,
   type Info,
+  flattenFields,
+  metaFields,
   type Topic,
   type TopicDrag,
 } from "./types";
@@ -166,7 +168,11 @@ export function App() {
         .then(([info, topics]) =>
           settle({
             info,
-            topics: topics.map((topic) => ({ ...topic, source: id })),
+            topics: topics.map((topic) => ({
+              ...topic,
+              source: id,
+              fields: [...flattenFields(topic.fields), ...metaFields(topic.meta_fields)],
+            })),
             error: "",
             loading: false,
           }),

@@ -92,6 +92,19 @@ export type Selected = {
   dataType?: string;
   enumValues?: EnumValue[];
 };
+/** The flat field list the UI browses; list elements are part of their list. */
+export function flattenFields(fields: Schemas["Field"][], prefix: string[] = []): Field[] {
+  return fields.flatMap(({ name, data_type, type_name, enum_values, fields: children }) => {
+    const path = [...prefix, name];
+    const field: Field = { path, data_type, type_name, enum_values };
+    return [field, ...flattenFields(children ?? [], path)];
+  });
+}
+/** Meta fields live beside the message, so their paths must not read as its fields. */
+export const metaPrefix = "$meta";
+export const isMetaPath = (path: string[]) => path[0] === metaPrefix;
+export const metaFields = (fields: Schemas["Field"][]): Field[] =>
+  flattenFields(fields, [metaPrefix]);
 export const colors = [
   "#91b8ff",
   "#f3bf78",
@@ -101,14 +114,14 @@ export const colors = [
   "#b8d88a",
 ];
 /** Topic names are only unique within one recording. */
-export const topicKey = (source: number, topic: string) =>
+export const topicKey = (source: string, topic: string) =>
   JSON.stringify([source, topic]);
-export const keyOf = (source: number, topic: string, path: string[]) =>
+export const keyOf = (source: string, topic: string, path: string[]) =>
   JSON.stringify([source, topic, path]);
 export const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-export type TopicDrag = { source: number; topic: string; path?: string[] };
+export type TopicDrag = { source: string; topic: string; path?: string[] };
 export const dragMime = "application/x-hahn-topic";
 
 /** Only accept known sources; a browser drop is untrusted input. */

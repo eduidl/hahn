@@ -148,12 +148,8 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                 target.status = "error";
                 target.error = errorMessage(error);
               });
-              dirty.current = true;
-            }
-          })
-          .finally(() => {
-            requests.current.delete(controller);
-          });
+          }
+        }
       }
     }, 120);
     return () => clearTimeout(timer);
