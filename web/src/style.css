@@ -1961,3 +1961,61 @@ header .add-widget {
   }
 }
 
+.view-image,
+.view-scene,
+.view-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #101317;
+}
+.view-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.view-scene canvas {
+  display: block;
+}
+.view-map {
+  /* Leaflet's panes use z-indexes that must not cover the workspace's overlays. */
+  isolation: isolate;
+}
+.view-map-canvas.leaflet-container {
+  position: absolute;
+  inset: 0;
+  background: #1a1e23;
+}
+.view-time,
+.view-status,
+.view-error {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #d6dbe1;
+  background: rgb(16 19 23 / 75%);
+}
+.view-error {
+  color: #ff9d9d;
+}
+.view-image .view-time,
+.view-image .view-status,
+.view-image .view-error {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.view-problems {
+  position: absolute;
+  top: 8px;
+  left: 56px;
+  right: 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}

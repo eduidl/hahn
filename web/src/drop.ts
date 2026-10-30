@@ -9,7 +9,7 @@ import {
   type ValueKind,
 } from "./types";
 import {
-  acceptsKind,
+  acceptsField,
   maxFieldsPerTopic,
   widgetSpecs,
   type Widget,
@@ -66,7 +66,14 @@ export function dropVerdict(
   // A dragged topic stands for its root message (empty path).
   const entry = index.byKey.get(keyOf(drag.source, drag.topic, drag.path ?? []));
   if (!entry) return { ok: false, reason: "フィールドが見つかりません。" };
-  if (!acceptsKind(spec, entry.kind))
+  if (spec.viewKinds && !acceptsField(spec, topic, entry.field.path, entry.kind))
+    return {
+      ok: false,
+      reason: entry.field.path.length
+        ? "フィールドではなくトピックを指定してください。"
+        : `${topic.schema_name ?? "この型"} は表示できません。`,
+    };
+  if (!spec.viewKinds && !acceptsField(spec, topic, entry.field.path, entry.kind))
     return {
       ok: false,
       // The primitive name (`struct`, `uint32`, ...) keeps the reason short.

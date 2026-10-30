@@ -24,6 +24,7 @@ import { TableView } from "./TableView";
 import type { MessageRecord } from "./useMessages";
 import type { FieldIndex } from "./fieldIndex";
 import { RawMessage } from "./RawMessage";
+import { ImageView } from "./ImageView";
 import { SeriesName } from "./SeriesName";
 import { usePlayback } from "./playback";
 import { dragMime, type Info } from "./types";
@@ -44,6 +45,10 @@ import {
   type WorkspaceAction,
   type WorkspaceState,
 } from "./widgets";
+
+// Three.js and Leaflet are large, and only needed once such a widget exists.
+const Scene3D = lazy(() => import("./Scene3D"));
+const MapView = lazy(() => import("./MapView"));
 
 const MoveContext = createContext<{ id: string | null; setId: (id: string | null) => void }>({ id: null, setId: () => {} });
 
@@ -293,6 +298,9 @@ function TimeSeriesWindow({
     ),
     table: () => <TableView dispatch={dispatch} widget={widget} record={props.messageRecords.find((r) => r.key === widget.series[0]?.key)} index={props.fieldIndex} originNs={info?.start_ns ?? null} />,
     raw: () => <RawMessage widget={widget} info={info} />,
+    image: () => <ImageView widget={widget} info={info} />,
+    scene: () => <Suspense fallback={null}><Scene3D widget={widget} info={info} /></Suspense>,
+    map: () => <Suspense fallback={null}><MapView widget={widget} info={info} /></Suspense>,
     log: () => (
       <LogView
         widget={widget}
@@ -560,7 +568,7 @@ function TimeSeriesWindow({
                 <p>
                   {info
                     ? widgetSpecs[widget.type].emptyHint
-                    : "ヘッダーから録画を開いてください"}
+                    : "ヘッダーから走行を開いてください"}
                 </p>
               </div>
             )}

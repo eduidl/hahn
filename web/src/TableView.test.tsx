@@ -9,8 +9,8 @@ import { createPlaybackStore, PlaybackContext } from "./playback";
 import { initialWorkspace, workspaceReducer } from "./widgets";
 import { keyOf, type Topic } from "./types";
 
-const topic: Topic = { source: 0, topic: "/t", schema_name: "T", message_count: 1000, error: null,
-  fields: [{ path: ["x"], data_type: "i64" }] };
+const topic: Topic = { source: "r/0", topic: "/t", schema_name: "T", schema_encoding: null, views: [], message_count: 1000, error: null,
+  fields: [{ path: ["x"], data_type: "int64" }] };
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("table playback", () => {
@@ -29,12 +29,12 @@ describe("table playback", () => {
     const state = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "table" });
     const widget = state.widgets["widget-2"];
     widget.timeDisplay = "relative";
-    widget.series = [{ key: keyOf(0, "/t", []), source: 0, topic: "/t", path: [], dataType: "struct", hidden: false, color: "#fff", lineWidth: 1 }];
+    widget.series = [{ key: keyOf("r/0", "/t", []), source: "r/0", topic: "/t", path: [], dataType: "struct", hidden: false, color: "#fff", lineWidth: 1 }];
     const store = createPlaybackStore(() => 1, () => {});
     store.reset(1000);
     const { container } = render(<PlaybackContext.Provider value={store}>
       <TableView widget={widget} dispatch={vi.fn()} index={buildFieldIndex([topic])} originNs="0" record={{
-        key: widget.series[0].key, source: 0, topic: "/t", received: 1000, status: "complete",
+        key: widget.series[0].key, source: "r/0", topic: "/t", received: 1000, status: "complete",
         rows: Array.from({ length: 1000 }, (_, i) => ({ time_ns: String(BigInt(i) * 1000000000n), value: { x: `value-${i}` } })),
       }} />
     </PlaybackContext.Provider>);
@@ -60,11 +60,11 @@ describe("table playback", () => {
     });
     const index = buildFieldIndex([{ ...topic, fields: [
       { path: ["pose"], data_type: "struct" },
-      { path: ["pose", "x"], data_type: "i64" },
+      { path: ["pose", "x"], data_type: "int64" },
       { path: ["label"], data_type: "string" },
     ] }]);
     const initial = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "table" });
-    initial.widgets["widget-2"].series = [{ key: keyOf(0, "/t", []), source: 0, topic: "/t", path: [], hidden: false, color: "#fff", lineWidth: 1 }];
+    initial.widgets["widget-2"].series = [{ key: keyOf("r/0", "/t", []), source: "r/0", topic: "/t", path: [], hidden: false, color: "#fff", lineWidth: 1 }];
     const store = createPlaybackStore(() => 1, () => {});
     function Harness() {
       const [state, dispatch] = useReducer(workspaceReducer, initial);
@@ -72,7 +72,7 @@ describe("table playback", () => {
       return <PlaybackContext.Provider value={store}>
         <PanelSettings widget={widget} dispatch={dispatch} index={index} records={[]} pointCount={0} />
         <TableView widget={widget} dispatch={dispatch} index={index} originNs="0" record={{
-          key: widget.series[0].key, source: 0, topic: "/t", received: 1, status: "complete",
+          key: widget.series[0].key, source: "r/0", topic: "/t", received: 1, status: "complete",
           rows: [{ time_ns: "0", value: { pose: { x: "9007199254740993" }, label: "sample" } }],
         }} />
       </PlaybackContext.Provider>;

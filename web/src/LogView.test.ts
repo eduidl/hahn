@@ -4,7 +4,7 @@ import type { Series } from "./Plot";
 
 const series = (key: string, values: [number, string | boolean | null][], hidden = false): Series => ({
   key,
-  source: 0,
+  source: "r/0",
   topic: "/t",
   path: [key],
   color: "#fff",

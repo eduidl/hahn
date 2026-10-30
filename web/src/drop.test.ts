@@ -4,20 +4,20 @@ import { buildFieldIndex } from "./fieldIndex";
 import { keyOf, type Field, type Selected, type Topic } from "./types";
 import { addSeries, initialWorkspace, requestedSeries, widgetSpecs, type Widget } from "./widgets";
 
-const idle = [{ name: "IDLE", value: 0 }];
+const idle = [{ name: "IDLE", value: "0" }];
 const fields: Field[] = [
-  { path: ["speed"], data_type: "f64" },
+  { path: ["speed"], data_type: "float64" },
   { path: ["flag"], data_type: "bool" },
   { path: ["mode"], data_type: "enum", enum_values: idle },
-  { path: ["other_mode"], data_type: "enum", enum_values: [{ name: "RUN", value: 0 }] },
+  { path: ["other_mode"], data_type: "enum", enum_values: [{ name: "RUN", value: "0" }] },
   { path: ["name"], data_type: "string" },
   { path: ["pose"], data_type: "struct", type_name: "geometry_msgs/msg/Pose" },
 ];
 const topic: Topic = {
-  source: 0,
+  source: "r/0",
   topic: "/t",
   schema_name: "pkg/msg/T",
-  schema_encoding: "ros2msg",
+  schema_encoding: "ros2msg", views: [],
   message_count: 1,
   fields,
   error: null,
@@ -26,8 +26,8 @@ const broken: Topic = { ...topic, topic: "/broken", error: "bad schema" };
 const silent: Topic = { ...topic, topic: "/silent", message_count: 0 };
 const index = buildFieldIndex([topic, broken, silent]);
 const selected = (field: Field): Selected => ({
-  key: keyOf(0, "/t", field.path),
-  source: 0,
+  key: keyOf("r/0", "/t", field.path),
+  source: "r/0",
   topic: "/t",
   path: field.path,
   color: "",
@@ -42,7 +42,7 @@ const widget = (type: Exclude<Widget["type"], "tabs">, series: Field[] = []): Wi
   series: series.map(selected),
 });
 const verdict = (path: string[] | undefined, w: Widget) =>
-  dropVerdict(index, { source: 0, topic: "/t", path }, w);
+  dropVerdict(index, { source: "r/0", topic: "/t", path }, w);
 
 describe("field index", () => {
   it("caches statically compatible fields per widget type, skipping unreadable topics", () => {
@@ -50,7 +50,7 @@ describe("field index", () => {
       index.candidates[type].map((entry) => entry.field.path.join("."));
     expect(paths("time-series")).toEqual(["speed", "flag", "mode", "other_mode"]);
     expect(paths("state")).toEqual(["flag", "mode", "other_mode", "name"]);
-    expect(index.byKey.get(keyOf(0, "/t", ["speed"]))).toMatchObject({
+    expect(index.byKey.get(keyOf("r/0", "/t", ["speed"]))).toMatchObject({
       kind: { type: "numeric" },
       typeLabel: "float64",
       label: "/t · speed",
@@ -90,8 +90,8 @@ describe("drop verdict", () => {
     expect(verdict(["speed"], widget("time-series", [fields[0]]))).toMatchObject({ reason: "追加済みです。" });
     expect(verdict(["pose"], widget("time-series"))).toMatchObject({ reason: expect.stringMatching(/^struct は扱えません/) });
     expect(verdict(undefined, widget("time-series"))).toMatchObject({ reason: expect.stringMatching(/^struct は扱えません/) });
-    expect(dropVerdict(index, { source: 0, topic: "/broken", path: ["speed"] }, widget("time-series")).ok).toBe(false);
-    expect(dropVerdict(index, { source: 0, topic: "/silent", path: ["speed"] }, widget("time-series"))).toEqual({
+    expect(dropVerdict(index, { source: "r/0", topic: "/broken", path: ["speed"] }, widget("time-series")).ok).toBe(false);
+    expect(dropVerdict(index, { source: "r/0", topic: "/silent", path: ["speed"] }, widget("time-series"))).toEqual({
       ok: false,
       reason: "メッセージがありません。",
     });
@@ -100,8 +100,8 @@ describe("drop verdict", () => {
   it("replaces the series of a single-series widget", () => {
     const single = { ...widgetSpecs["time-series"], maxSeries: 1 };
     const w = widget("time-series", [fields[0]]);
-    expect(dropVerdict(index, { source: 0, topic: "/t", path: ["flag"] }, w, single)).toMatchObject({ ok: true, replaces: true });
-    expect(addSeries(w.series, topic, fields[1], single).map((s) => s.key)).toEqual([keyOf(0, "/t", ["flag"])]);
+    expect(dropVerdict(index, { source: "r/0", topic: "/t", path: ["flag"] }, w, single)).toMatchObject({ ok: true, replaces: true });
+    expect(addSeries(w.series, topic, fields[1], single).map((s) => s.key)).toEqual([keyOf("r/0", "/t", ["flag"])]);
   });
 });
 
@@ -113,10 +113,10 @@ describe("raw message widget", () => {
     expect(addableFields(index, widget("raw")).map((entry) => entry.label)).toContain("/t");
   });
 
-  it("does not stream its selection through /series", () => {
+  it("does not load its selection as an exact series", () => {
     const raw = { ...widget("raw", [fields[5]]), id: "raw" };
     const plot = { ...widget("time-series", [fields[0]]), id: "plot" };
-    expect(requestedSeries({ raw, plot }).map((s) => s.key)).toEqual([keyOf(0, "/t", ["speed"])]);
+    expect(requestedSeries({ raw, plot }).map((s) => s.key)).toEqual([keyOf("r/0", "/t", ["speed"])]);
   });
 });
 
@@ -132,7 +132,7 @@ describe("addable fields", () => {
   it("appends series with distinct colors and ignores duplicates", () => {
     const spec = widgetSpecs["time-series"];
     const one = addSeries([], topic, fields[0], spec);
-    const two = addSeries(one, topic, { path: ["speed2"], data_type: "f64" }, spec);
+    const two = addSeries(one, topic, { path: ["speed2"], data_type: "float64" }, spec);
     expect(two).toHaveLength(2);
     expect(two[0].color).not.toBe(two[1].color);
     expect(addSeries(two, topic, fields[0], spec)).toBe(two);

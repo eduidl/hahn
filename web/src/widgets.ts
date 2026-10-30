@@ -33,11 +33,16 @@ type WidgetBase = {
   hiddenColumns: string[];
   columnWidths: Record<string, number>;
   view: PlotView;
+  /** The frame a 3D widget renders in; null follows the graph's root. */
+  fixedFrame: string | null;
+  /** Map tile URL template. Empty shows no background and requests no tiles. */
+  tileUrl: string;
 };
+export const osmTiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 export const defaultTabTitle = "";
 export type WidgetTab = { id: string; title: string; layout: MosaicNode<string> | null };
 export type Widget = WidgetBase & (
-  | { type: "time-series" | "state" | "raw" | "log" | "table" }
+  | { type: "time-series" | "state" | "raw" | "log" | "table" | "image" | "scene" | "map" }
   | { type: "tabs"; tabs: WidgetTab[]; activeTabId: string; nextTabNumber: number }
 );
 export type TabWidget = Extract<Widget, { type: "tabs" }>;
@@ -78,6 +83,8 @@ export type WorkspaceAction =
   | { type: "mode"; id: string; mode: DragMode }
   | { type: "time-display"; id: string; value: TimeDisplay }
   | { type: "legend"; id: string; value: Partial<LegendSettings> }
+  | { type: "fixed-frame"; id: string; value: string | null }
+  | { type: "tile-url"; id: string; value: string }
   | { type: "table-column"; id: string; path: string[]; visible: boolean }
   | { type: "table-columns"; id: string; paths: string[][]; visible: boolean }
   | { type: "table-column-width"; id: string; path: string[] | null; width: number }
@@ -85,7 +92,7 @@ export type WorkspaceAction =
    * The open recordings changed: drop series of recordings that are no
    * longer open and reset every view to the new full range.
    */
-  | { type: "sources"; open: ReadonlySet<number> };
+  | { type: "sources"; open: ReadonlySet<string> };
 
 export const widgetMoveMime = "application/x-hahn-widget-move";
 export const tabDragMime = "application/x-hahn-tab";
@@ -106,6 +113,8 @@ export type WidgetSpec = {
   maxSeries: number;
   /** Whether selections load as exact series; generic viewers fetch on their own. */
   loadsSeries: boolean;
+  /** Takes topics converted to these kinds, rather than fields by value kind. */
+  viewKinds?: ReadonlySet<string>;
 };
 export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   tabs: {
@@ -170,17 +179,64 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     maxSeries: 1,
     loadsSeries: false,
   },
+  image: {
+    label: "Image",
+    titlePrefix: "Image",
+    description: "画像トピックを再生位置の時点で表示",
+    help: "表示する画像トピックを1つ指定します。",
+    emptyHint: "画像トピックをドロップ",
+    accepts: new Set(),
+    sameKind: false,
+    maxSeries: 1,
+    loadsSeries: false,
+    viewKinds: new Set(["image"]),
+  },
+  scene: {
+    label: "3D",
+    titlePrefix: "3D",
+    description: "点群と座標系を再生位置の時点で3D表示",
+    help: "点群トピックを追加します。ドラッグで回転、右ドラッグで移動、ホイールで拡大縮小します。",
+    emptyHint: "点群トピックをドロップ",
+    accepts: new Set(),
+    sameKind: false,
+    maxSeries: Infinity,
+    loadsSeries: false,
+    viewKinds: new Set(["pointcloud"]),
+  },
+  map: {
+    label: "Map",
+    titlePrefix: "Map",
+    description: "位置トピックの軌跡と再生位置を地図に表示",
+    help: "位置トピックを追加します。背景の地図タイルはパネル設定で変更できます。",
+    emptyHint: "位置トピックをドロップ",
+    accepts: new Set(),
+    sameKind: false,
+    maxSeries: Infinity,
+    loadsSeries: false,
+    viewKinds: new Set(["geo"]),
+  },
 };
 export const widgetTypes = Object.keys(widgetSpecs) as Widget["type"][];
 /** Fields per topic and widget; mirrors the series API batch limit. */
 export const maxFieldsPerTopic = 64;
 export const acceptsKind = (spec: WidgetSpec, kind: ValueKind | null) =>
   kind !== null && spec.accepts.has(kind.type);
+/** The view of a topic that a widget type shows, if it takes views at all. */
+export const viewFor = (spec: WidgetSpec, topic: Pick<Topic, "views">) =>
+  topic.views.find((view) => spec.viewKinds?.has(view.kind));
+/** Whether a widget type can display a field at all. Views belong to whole topics. */
+export const acceptsField = (
+  spec: WidgetSpec,
+  topic: Pick<Topic, "views">,
+  path: string[],
+  kind: ValueKind | null,
+) =>
+  spec.viewKinds ? path.length === 0 && !!viewFor(spec, topic) : acceptsKind(spec, kind);
 
 /** Append a field as a new series, or replace the series of a single-series widget. */
 export function addSeries(
   list: Selected[],
-  { source, topic }: Pick<Topic, "source" | "topic">,
+  { source, topic, views }: Pick<Topic, "source" | "topic" | "views">,
   field: Field,
   spec: WidgetSpec,
 ): Selected[] {
@@ -205,12 +261,13 @@ export function addSeries(
       hidden: false,
       dataType: field.data_type,
       enumValues: field.enum_values,
+      view: viewFor(spec, { views })?.id,
     },
   ];
 }
 export const addFieldAction = (
   widget: Widget,
-  topic: Pick<Topic, "source" | "topic">,
+  topic: Pick<Topic, "source" | "topic" | "views">,
   field: Field,
 ): WorkspaceAction => ({
   type: "series",
@@ -253,6 +310,8 @@ const widget = (number: number, type: Widget["type"] = "time-series"): Widget =>
   hiddenColumns: [],
   columnWidths: {},
   view: defaultPlotView(),
+  fixedFrame: null,
+  tileUrl: osmTiles,
 });
 export function initialWorkspace(): WorkspaceState {
   const first = widget(1);
@@ -416,7 +475,7 @@ export function workspaceReducer(
         Object.assign(copy, {
           timeDisplay: original.timeDisplay, legend: { ...original.legend },
           hiddenColumns: [...original.hiddenColumns], columnWidths: { ...original.columnWidths },
-          mode: original.mode, series: original.series.map((series) => ({ ...series, path: [...series.path] })),
+          mode: original.mode, fixedFrame: original.fixedFrame, tileUrl: original.tileUrl, series: original.series.map((series) => ({ ...series, path: [...series.path] })),
         });
         if (copy.type === "tabs" && original.type === "tabs") {
           copy.tabs = original.tabs.map((tab) => ({ ...tab, layout: mapLeaves(tab.layout, (id) => makeCopy(state.widgets[id]).id) }));
@@ -545,6 +604,7 @@ export function workspaceReducer(
               hiddenColumns: w.series[0] && !action.open.has(w.series[0].source) ? [] : w.hiddenColumns,
               columnWidths: w.series[0] && !action.open.has(w.series[0].source) ? {} : w.columnWidths,
               view: defaultPlotView(),
+              fixedFrame: null,
             },
           ]),
         ),
@@ -600,6 +660,10 @@ export function workspaceReducer(
               ? { ...current, timeDisplay: action.value }
             : action.type === "legend"
               ? { ...current, legend: { ...current.legend, ...action.value } }
+            : action.type === "fixed-frame"
+              ? { ...current, fixedFrame: action.value }
+            : action.type === "tile-url"
+              ? { ...current, tileUrl: action.value }
               : { ...current, mode: action.mode };
       return { ...state, widgets: { ...state.widgets, [action.id]: updated } };
     }

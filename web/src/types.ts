@@ -85,6 +85,8 @@ export type Selected = {
   hidden: boolean;
   dataType?: string;
   enumValues?: EnumValue[];
+  /** The view of the topic to read, in widgets that show converted values. */
+  view?: string;
 };
 /** The flat field list the UI browses; list elements are part of their list. */
 export function flattenFields(fields: Schemas["Field"][], prefix: string[] = []): Field[] {

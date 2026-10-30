@@ -88,11 +88,11 @@ describe("Tab widget interactions", () => {
     const state = reduce(initialWorkspace(), { type: "remove", id: "widget-1" });
     render(<Harness initialState={state} />);
     const catalog = screen.getByLabelText("追加するウィジェット");
-    expect(within(catalog).getAllByRole("button")).toHaveLength(6);
+    expect(within(catalog).getAllByRole("button")).toHaveLength(9);
     fireEvent.click(within(catalog).getByRole("button", { name: "Tab を追加" }));
     const tabPanel = panel("widget-2");
     expect(within(tabPanel).queryByRole("button", { name: "Tab を追加" })).toBeNull();
-    expect(within(tabPanel).getByLabelText("追加するウィジェット").querySelectorAll("button")).toHaveLength(5);
+    expect(within(tabPanel).getByLabelText("追加するウィジェット").querySelectorAll("button")).toHaveLength(8);
     fireEvent.click(within(tabPanel).getByRole("button", { name: "Table を追加" }));
     expect(within(tabPanel).getByRole("region", { name: "Table" })).toBeDefined();
     expect(within(tabPanel).queryByLabelText("追加するウィジェット")).toBeNull();
@@ -137,7 +137,7 @@ describe("Tab widget interactions", () => {
     const child = container.querySelector<HTMLElement>('[data-widget-id="widget-2"]')!;
     fireEvent.click(child.querySelector(".submenu-host > button")!);
     const childTypes = within(child).getAllByRole("menuitemradio", { hidden: true });
-    expect(childTypes).toHaveLength(5);
+    expect(childTypes).toHaveLength(8);
     expect(childTypes.some((item) => item.firstChild?.textContent === "Tab")).toBe(false);
     const root = container.querySelector<HTMLElement>('[data-widget-id="widget-3"]')!;
     fireEvent.click(root.querySelector(".submenu-host > button")!);

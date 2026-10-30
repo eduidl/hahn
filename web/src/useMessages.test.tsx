@@ -6,7 +6,7 @@ import { useMessages } from "./useMessages";
 import { initialWorkspace, workspaceReducer, type Widget } from "./widgets";
 import { keyOf, type Selected } from "./types";
 
-const target = (path: string[] = []): Selected => ({ key: keyOf(0, "/t", path), source: 0, topic: "/t", path, color: "#fff", lineWidth: 1, hidden: false });
+const target = (path: string[] = []): Selected => ({ key: keyOf("r/0", "/t", path), source: "r/0", topic: "/t", path, color: "#fff", lineWidth: 1, hidden: false });
 function widgets(path: string[] = []): Record<string, Widget> {
   const state = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "table" });
   state.widgets["widget-2"].series = [target(path)];

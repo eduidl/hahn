@@ -5,17 +5,17 @@ import { keyOf, type Selected, type Topic } from "./types";
 import { addSeries, initialWorkspace, requestedSeries, widgetSpecs, workspaceReducer } from "./widgets";
 
 export const topic: Topic = {
-  source: 0, topic: "/t", schema_name: "T", message_count: 10, error: null,
+  source: "r/0", topic: "/t", schema_name: "T", schema_encoding: null, views: [], message_count: 10, error: null,
   fields: [
     { path: ["pose"], data_type: "struct" },
-    { path: ["pose", "x"], data_type: "f64" },
-    { path: ["tags"], data_type: "string[]" },
-    { path: ["count"], data_type: "i64" },
-    { path: ["mode"], data_type: "enum", enum_values: [{ name: "ON", value: 1 }] },
+    { path: ["pose", "x"], data_type: "float64" },
+    { path: ["tags"], data_type: "list" },
+    { path: ["count"], data_type: "int64" },
+    { path: ["mode"], data_type: "enum", enum_values: [{ name: "ON", value: "1" }] },
   ],
 };
 export const selected = (path: string[] = [], dataType = "struct"): Selected => ({
-  key: keyOf(0, "/t", path), source: 0, topic: "/t", path, dataType,
+  key: keyOf("r/0", "/t", path), source: "r/0", topic: "/t", path, dataType,
   color: "#fff", lineWidth: 1, hidden: false,
 });
 
@@ -23,20 +23,20 @@ describe("table data", () => {
   it("expands schema leaves in order, keeps arrays whole and supports scalar roots", () => {
     const index = buildFieldIndex([topic]);
     expect(tableColumns(index, selected()).map((c) => c.label)).toEqual(["pose.x", "tags", "count", "mode"]);
-    expect(tableColumns(index, selected(["pose"]))).toEqual([{ label: "x", path: ["x"], dataType: "f64", enumValues: undefined }]);
-    expect(tableColumns(index, selected(["count"], "i64"))[0].path).toEqual([]);
+    expect(tableColumns(index, selected(["pose"]))).toEqual([{ label: "x", path: ["x"], dataType: "float64", enumValues: undefined }]);
+    expect(tableColumns(index, selected(["count"], "int64"))[0].path).toEqual([]);
   });
   it.each([
-    ["bool", 72], ["i8", 80], ["u16", 88], ["i32", 104],
-    ["i64", 160], ["u64", 160], ["f32", 104], ["f64", 136],
+    ["bool", 72], ["int8", 80], ["uint16", 88], ["int32", 104],
+    ["int64", 160], ["uint64", 160], ["float32", 104], ["float64", 136],
     ["string", 160], ["wstring[<=32]", 160], ["f64[]", 180], ["bytes", 180],
   ])("uses a compact default width for %s", (dataType, width) => {
     expect(defaultColumnWidth({ dataType: String(dataType) })).toBe(width);
   });
   it("sizes enums from their labels and preserves scalar selection types", () => {
-    expect(defaultColumnWidth({ dataType: "enum", enumValues: [{ name: "ON", value: 1 }] })).toBe(96);
-    expect(defaultColumnWidth({ dataType: "enum", enumValues: [{ name: "A".repeat(100), value: 1 }] })).toBe(160);
-    const column = tableColumns(buildFieldIndex([topic]), selected(["count"], "i64"))[0];
+    expect(defaultColumnWidth({ dataType: "enum", enumValues: [{ name: "ON", value: "1" }] })).toBe(96);
+    expect(defaultColumnWidth({ dataType: "enum", enumValues: [{ name: "A".repeat(100), value: "1" }] })).toBe(160);
+    const column = tableColumns(buildFieldIndex([topic]), selected(["count"], "int64"))[0];
     expect(defaultColumnWidth(column)).toBe(160);
   });
   it("formats missing, empty, enum and composite values without rounding integers", () => {
@@ -44,7 +44,7 @@ describe("table data", () => {
     expect(cellValue("", { label: "値", path: [] })).toBe("（空文字列）");
     expect(cellValue("9007199254740993", { label: "値", path: [] })).toBe("9007199254740993");
     expect(cellValue([1, 2], { label: "値", path: [] })).toBe("[1,2]");
-    expect(cellValue(1, { label: "値", path: [], enumValues: [{ name: "ON", value: 1 }] })).toBe("ON");
+    expect(cellValue(1, { label: "値", path: [], enumValues: [{ name: "ON", value: "1" }] })).toBe("ON");
   });
   it("merges exact ns order and preserves stable duplicate messages across batches", () => {
     const rows = appendMessages([], [{ time_ns: "9007199254740994", value: "a" }]);
