@@ -72,9 +72,7 @@ cargo run --release
 
 `data/samples/` には境界条件用のデモMCAP（`demo.mcap`、下記の生成コマンドの出力）、時刻が `demo.mcap` と重なるCSV（`imu.csv`）とParquet（`wheels.parquet`。構造体・dictionary・リストの列を含む）を置いています。まとめて開くと、形式の違う録画を共通の時間軸で確認できます。
 
-- `protobuf.mcap`: `/chassis` の `speed`、`throttle` など。
-- `ros2.mcap`: `/pose` の `pose.position.x`、`pose.position.y` など。
-- `ros2msg_test.mcap`: `/example/sample` の `x`、`value`。
+`visual.mcap` は画像・点群・位置・座標変換の変換（View）を確認するための録画です。`cargo run --example generate_visual -- data/samples/visual.mcap` で生成します。
 
 ```bash
 cargo test --test real_data -- --ignored

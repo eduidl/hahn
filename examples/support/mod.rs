@@ -193,3 +193,370 @@ pub fn write_fixture_at(
     writer.finish()?;
     Ok(())
 }
+
+#[derive(Clone, PartialEq, Message)]
+pub struct CompressedImage {
+    #[prost(string, tag = "2")]
+    pub frame_id: String,
+    #[prost(bytes = "vec", tag = "3")]
+    pub data: Vec<u8>,
+    #[prost(string, tag = "4")]
+    pub format: String,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct Vector3 {
+    #[prost(double, tag = "1")]
+    pub x: f64,
+    #[prost(double, tag = "2")]
+    pub y: f64,
+    #[prost(double, tag = "3")]
+    pub z: f64,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct Quaternion {
+    #[prost(double, tag = "1")]
+    pub x: f64,
+    #[prost(double, tag = "2")]
+    pub y: f64,
+    #[prost(double, tag = "3")]
+    pub z: f64,
+    #[prost(double, tag = "4")]
+    pub w: f64,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct Pose {
+    #[prost(message, optional, tag = "1")]
+    pub position: Option<Vector3>,
+    #[prost(message, optional, tag = "2")]
+    pub orientation: Option<Quaternion>,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct PackedElementField {
+    #[prost(string, tag = "1")]
+    pub name: String,
+    #[prost(fixed32, tag = "2")]
+    pub offset: u32,
+    #[prost(int32, tag = "3")]
+    pub r#type: i32,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct PointCloud {
+    #[prost(string, tag = "2")]
+    pub frame_id: String,
+    #[prost(message, optional, tag = "3")]
+    pub pose: Option<Pose>,
+    #[prost(fixed32, tag = "4")]
+    pub point_stride: u32,
+    #[prost(message, repeated, tag = "5")]
+    pub fields: Vec<PackedElementField>,
+    #[prost(bytes = "vec", tag = "6")]
+    pub data: Vec<u8>,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct LocationFix {
+    #[prost(string, tag = "6")]
+    pub frame_id: String,
+    #[prost(double, tag = "2")]
+    pub latitude: f64,
+    #[prost(double, tag = "3")]
+    pub longitude: f64,
+    #[prost(double, tag = "4")]
+    pub altitude: f64,
+    #[prost(double, repeated, tag = "5")]
+    pub position_covariance: Vec<f64>,
+}
+#[derive(Clone, PartialEq, Message)]
+pub struct FrameTransform {
+    #[prost(string, tag = "2")]
+    pub parent_frame_id: String,
+    #[prost(string, tag = "3")]
+    pub child_frame_id: String,
+    #[prost(message, optional, tag = "4")]
+    pub translation: Option<Vector3>,
+    #[prost(message, optional, tag = "5")]
+    pub rotation: Option<Quaternion>,
+}
+
+/// A 1x1 PNG, so that an image taken from a response can be opened.
+pub const PNG: [u8; 70] = [
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
+    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 218, 99, 100, 96, 248, 95, 15, 0, 2,
+    135, 1, 128, 235, 71, 186, 146, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+];
+/// Messages per topic of the visual fixture, 100 ms apart from [`ORIGIN`].
+pub const VISUAL_COUNT: usize = 10;
+#[allow(dead_code)]
+pub const VISUAL_STEP_NS: u64 = 100_000_000;
+/// The image without a usable format, to exercise a conversion failing on one message.
+#[allow(dead_code)]
+pub const BAD_IMAGE: usize = 5;
+/// Fields per point of the visual fixture: x, y and z as f32, then an intensity byte.
+pub const POINT_STRIDE: u32 = 16;
+
+fn message(name: &str, field: Vec<FieldDescriptorProto>) -> DescriptorProto {
+    DescriptorProto {
+        name: Some(name.into()),
+        field,
+        ..Default::default()
+    }
+}
+
+fn repeated(field: FieldDescriptorProto) -> FieldDescriptorProto {
+    FieldDescriptorProto {
+        label: Some(Label::Repeated as i32),
+        ..field
+    }
+}
+
+/// Foxglove's schemas, reduced to the fields views read.
+fn foxglove_descriptor() -> Vec<u8> {
+    let vector = |tag, name| field(name, tag, Type::Double, None);
+    let vector3 = vec![vector(1, "x"), vector(2, "y"), vector(3, "z")];
+    let quaternion = vec![
+        vector(1, "x"),
+        vector(2, "y"),
+        vector(3, "z"),
+        vector(4, "w"),
+    ];
+    FileDescriptorSet {
+        file: vec![FileDescriptorProto {
+            name: Some("foxglove.proto".into()),
+            package: Some("foxglove".into()),
+            syntax: Some("proto3".into()),
+            message_type: vec![
+                message("Vector3", vector3),
+                message("Quaternion", quaternion),
+                message(
+                    "Pose",
+                    vec![
+                        field("position", 1, Type::Message, Some(".foxglove.Vector3")),
+                        field(
+                            "orientation",
+                            2,
+                            Type::Message,
+                            Some(".foxglove.Quaternion"),
+                        ),
+                    ],
+                ),
+                message(
+                    "CompressedImage",
+                    vec![
+                        field("frame_id", 2, Type::String, None),
+                        field("data", 3, Type::Bytes, None),
+                        field("format", 4, Type::String, None),
+                    ],
+                ),
+                message(
+                    "PackedElementField",
+                    vec![
+                        field("name", 1, Type::String, None),
+                        field("offset", 2, Type::Fixed32, None),
+                        field("type", 3, Type::Enum, Some(".foxglove.NumericType")),
+                    ],
+                ),
+                message(
+                    "PointCloud",
+                    vec![
+                        field("frame_id", 2, Type::String, None),
+                        field("pose", 3, Type::Message, Some(".foxglove.Pose")),
+                        field("point_stride", 4, Type::Fixed32, None),
+                        repeated(field(
+                            "fields",
+                            5,
+                            Type::Message,
+                            Some(".foxglove.PackedElementField"),
+                        )),
+                        field("data", 6, Type::Bytes, None),
+                    ],
+                ),
+                message(
+                    "LocationFix",
+                    vec![
+                        field("frame_id", 6, Type::String, None),
+                        field("latitude", 2, Type::Double, None),
+                        field("longitude", 3, Type::Double, None),
+                        field("altitude", 4, Type::Double, None),
+                        repeated(field("position_covariance", 5, Type::Double, None)),
+                    ],
+                ),
+                message(
+                    "FrameTransform",
+                    vec![
+                        field("parent_frame_id", 2, Type::String, None),
+                        field("child_frame_id", 3, Type::String, None),
+                        field("translation", 4, Type::Message, Some(".foxglove.Vector3")),
+                        field("rotation", 5, Type::Message, Some(".foxglove.Quaternion")),
+                    ],
+                ),
+            ],
+            enum_type: vec![EnumDescriptorProto {
+                name: Some("NumericType".into()),
+                value: [
+                    ("UNKNOWN", 0),
+                    ("UINT8", 1),
+                    ("INT8", 2),
+                    ("UINT16", 3),
+                    ("INT16", 4),
+                    ("UINT32", 5),
+                    ("INT32", 6),
+                    ("FLOAT32", 7),
+                    ("FLOAT64", 8),
+                ]
+                .into_iter()
+                .map(|(name, number)| EnumValueDescriptorProto {
+                    name: Some(name.into()),
+                    number: Some(number),
+                    ..Default::default()
+                })
+                .collect(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+    }
+    .encode_to_vec()
+}
+
+/// A recording of one topic per kind of view, plus transforms: `map` to `base_link`
+/// moving 1 m along x per message, and a static `base_link` to `lidar`.
+#[allow(dead_code)]
+pub fn write_visual_fixture(path: &Path) -> anyhow::Result<()> {
+    let descriptor = foxglove_descriptor();
+    let mut writer = mcap::WriteOptions::new()
+        .chunk_size(Some(4096))
+        .emit_statistics(true)
+        .create(File::create(path)?)?;
+    let mut channel = |schema: &str, topic: &str| -> anyhow::Result<u16> {
+        let schema = writer.add_schema(schema, "protobuf", &descriptor)?;
+        Ok(writer.add_channel(schema, topic, "protobuf", &Default::default())?)
+    };
+    let camera = channel("foxglove.CompressedImage", "/camera")?;
+    let lidar = channel("foxglove.PointCloud", "/lidar")?;
+    let gps = channel("foxglove.LocationFix", "/gps")?;
+    let tf = channel("foxglove.FrameTransform", "/tf")?;
+    let tf_static = channel("foxglove.FrameTransform", "/tf_static")?;
+    let mut write = |channel_id, time: u64, payload: Vec<u8>| {
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id,
+                sequence: 0,
+                log_time: time,
+                publish_time: time,
+            },
+            &payload,
+        )
+    };
+    let identity = || {
+        Some(Quaternion {
+            w: 1.,
+            ..Default::default()
+        })
+    };
+    write(
+        tf_static,
+        ORIGIN,
+        FrameTransform {
+            parent_frame_id: "base_link".into(),
+            child_frame_id: "lidar".into(),
+            translation: Some(Vector3 {
+                z: 2.,
+                ..Default::default()
+            }),
+            rotation: identity(),
+        }
+        .encode_to_vec(),
+    )?;
+    // Unusable, so it must be ignored: no frame `broken` may appear.
+    write(
+        tf_static,
+        ORIGIN,
+        FrameTransform {
+            parent_frame_id: "base_link".into(),
+            child_frame_id: "broken".into(),
+            translation: Some(Vector3 {
+                x: f64::NAN,
+                ..Default::default()
+            }),
+            rotation: identity(),
+        }
+        .encode_to_vec(),
+    )?;
+    for i in 0..VISUAL_COUNT {
+        let time = ORIGIN + i as u64 * VISUAL_STEP_NS;
+        write(
+            camera,
+            time,
+            CompressedImage {
+                frame_id: "camera".into(),
+                data: PNG.to_vec(),
+                format: if i == BAD_IMAGE { "bmp" } else { "png" }.into(),
+            }
+            .encode_to_vec(),
+        )?;
+        let point = |x: f32, intensity: u8| {
+            let mut bytes = Vec::with_capacity(POINT_STRIDE as usize);
+            for value in [x, 0., 1.] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            bytes.extend_from_slice(&[intensity, 0, 0, 0]);
+            bytes
+        };
+        let packed = |name: &str, offset, r#type: NumericType| PackedElementField {
+            name: name.into(),
+            offset,
+            r#type: r#type as i32,
+        };
+        write(
+            lidar,
+            time,
+            PointCloud {
+                frame_id: "lidar".into(),
+                pose: None,
+                point_stride: POINT_STRIDE,
+                fields: vec![
+                    packed("x", 0, NumericType::Float32),
+                    packed("y", 4, NumericType::Float32),
+                    packed("z", 8, NumericType::Float32),
+                    packed("intensity", 12, NumericType::Uint8),
+                ],
+                data: [point(i as f32, 1), point(i as f32 + 1., 2)].concat(),
+            }
+            .encode_to_vec(),
+        )?;
+        write(
+            gps,
+            time,
+            LocationFix {
+                frame_id: "gps".into(),
+                latitude: 35.68 + i as f64 * 1e-5,
+                longitude: 139.76,
+                altitude: 40.,
+                position_covariance: vec![4., 0., 0., 0., 9., 0., 0., 0., 1.],
+            }
+            .encode_to_vec(),
+        )?;
+        write(
+            tf,
+            time,
+            FrameTransform {
+                parent_frame_id: "map".into(),
+                child_frame_id: "base_link".into(),
+                translation: Some(Vector3 {
+                    x: i as f64,
+                    ..Default::default()
+                }),
+                rotation: identity(),
+            }
+            .encode_to_vec(),
+        )?;
+    }
+    writer.finish()?;
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+enum NumericType {
+    Uint8 = 1,
+    Float32 = 7,
+}

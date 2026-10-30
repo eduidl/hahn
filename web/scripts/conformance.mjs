@@ -12,6 +12,30 @@ const failures = [];
 // Report on exit too, so failures explain a later crash on missing data.
 process.on("exit", () => failures.forEach((failure) => console.error(`FAIL ${failure}`)));
 
+const FRAMES = "application/vnd.hahn.frames";
+
+/** The JSON headers of a frames response, checking the framing and blob references. */
+const parseFrames = (bytes) => {
+  const headers = [];
+  const view = new DataView(bytes);
+  for (let at = 0; at < bytes.byteLength; ) {
+    const headerLength = view.getUint32(at, true);
+    const payloadLength = view.getUint32(at + 4, true);
+    const header = JSON.parse(new TextDecoder().decode(new Uint8Array(bytes, at + 8, headerLength)));
+    const padding = -(8 + headerLength) & 7;
+    // Only fields defined as binary refer to blobs: `geo` properties may hold any key, even `$blob`.
+    const value = header.value;
+    const blobs = [value?.data, value?.positions, ...(value?.fields ?? []).map((field) => field.data)];
+    for (const blob of blobs.flatMap((reference) => reference?.$blob ?? []))
+      if (blob.offset % 8 || blob.offset + blob.length > payloadLength)
+        throw new Error(`bad blob at ${blob.offset}+${blob.length} of ${payloadLength}`);
+    at += 8 + headerLength + padding + payloadLength;
+    if (at > bytes.byteLength) throw new Error("frame runs past the end of the response");
+    headers.push(header);
+  }
+  return headers;
+};
+
 const parse = (media, bytes) => {
   if (media === FRAMES) return parseFrames(bytes);
   const text = new TextDecoder().decode(bytes);
@@ -164,6 +188,22 @@ await check(latestViewPath, viewUrl("views/latest", { topic: viewedTopic, view: 
 await check(latestViewPath, viewUrl("views/latest", { topic: viewedTopic, view: viewId, time_ns: "1", known_time_ns: "x" }), 400);
 await check(latestViewPath, viewUrl("views/latest", { topic: viewedTopic, view: "no-such-view", time_ns: "1" }), 422);
 await check(latestViewPath, viewUrl("views/latest", { topic: viewedTopic, view: viewId, time_ns: "1" }, `${unknown}/groups/x`), 404);
+
+const framesPath = "/api/runs/{run}/frames";
+const transformsPath = "/api/runs/{run}/transforms";
+const visualRun = visual.slice(0, visual.indexOf("/groups/"));
+await check(framesPath, `${unknown}/frames`, 404);
+const [{ frames: graph }] = await check(framesPath, `${visualRun}/frames`, 200);
+if (!graph.length) failures.push(`${framesPath}: expected frames`);
+const transformsUrl = (params, at = visualRun) => `${at}/transforms?${new URLSearchParams(params)}`;
+const [{ start_ns: visualStart }] = await check(info, visual, 200);
+const [{ id: targetFrame }] = graph;
+const [resolved] = await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: visualStart }), 200);
+if (!resolved.frames[targetFrame]) failures.push(`${transformsPath}: the target must resolve to itself`);
+await check(transformsPath, transformsUrl({ target: "no-such-frame", time_ns: "1" }), 422);
+await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "x" }), 400);
+await check(transformsPath, transformsUrl({ target: targetFrame }), 400);
+await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "1" }, unknown), 404);
 
 // An operation added to the spec must be implemented and exercised here.
 for (const [path, item] of Object.entries(spec.paths))
