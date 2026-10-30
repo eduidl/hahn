@@ -5,7 +5,7 @@ use mcapdecode::{
     McapReader, ReadOptions,
     core::{DataTypeDef, FieldDefs, Value},
 };
-use serde_json::json;
+use serde_json::{Value as Json, json};
 use std::path::PathBuf;
 use tower::ServiceExt;
 
@@ -179,35 +179,30 @@ async fn compare(file_name: &str, topic: &str, fields: &[Vec<String>]) {
 
 #[tokio::test]
 #[ignore = "Requires real recordings in data/"]
-async fn protobuf_recording() {
-    compare(
-        "protobuf.mcap",
-        "/chassis",
-        &[
-            &["speed"],
-            &["throttle"],
-            &["header", "lidar_timestamp"],
-        ],
-    )
-    .await;
-}
-#[tokio::test]
-#[ignore = "Requires real recordings in data/"]
-async fn ros2_idl_recording() {
-    compare(
-        "ros2.mcap",
-        "/pose",
-        &[&["pose", "position", "x"], &["pose", "position", "y"]],
-    )
-    .await;
-}
-#[tokio::test]
-#[ignore = "Requires real recordings in data/"]
-async fn ros2_msg_recording() {
-    compare(
-        "ros2msg_test.mcap",
-        "/example/sample",
-        &[&["x"], &["value"]],
-    )
-    .await;
+async fn real_recordings_match_direct_decoding() {
+    let app = hahn::router(&data_dir()).unwrap();
+    let runs = get_json(&app, "/api/runs?limit=200").await;
+    let mut compared = 0;
+    for run in runs["items"].as_array().unwrap() {
+        let name = run["name"].as_str().unwrap();
+        if !name.ends_with(".mcap") {
+            continue;
+        }
+        let id = run["id"].as_str().unwrap();
+        let detail = get_json(&app, &format!("/api/runs/{id}")).await;
+        let group = detail["groups"][0]["id"].as_str().unwrap();
+        let topics = get_json(&app, &format!("/api/runs/{id}/groups/{group}/topics")).await;
+        for topic in topics.as_array().unwrap() {
+            let mut paths = Vec::new();
+            numeric_paths(&topic["fields"], &[], &mut paths);
+            paths.truncate(3);
+            if paths.is_empty() || topic["message_count"].as_u64().unwrap_or(0) == 0 {
+                continue;
+            }
+            compare(name, topic["topic"].as_str().unwrap(), &paths).await;
+            compared += 1;
+            break;
+        }
+    }
+    assert!(compared > 0, "No MCAP recording with numeric fields");
 }
