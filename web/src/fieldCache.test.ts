@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FieldCache, type FieldTarget } from "./fieldCache";
 import type { MessageRow } from "./table";
-const root: FieldTarget = { source: 0, topic: "/t", path: [] };
+const root: FieldTarget = { source: "r/0", topic: "/t", path: [] };
 const child = { ...root, path: ["pose", "x"] };
 const rows: MessageRow[] = [
   { time_ns: "1000000000", value: { pose: { x: 1 }, text: "a" } },
@@ -18,8 +18,8 @@ describe("shared field cache", () => {
     const cache = new FieldCache(); await load(cache); await load(cache, child);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(cache.read(child)).toEqual(rows.map((r, i) => ({ time_ns: r.time_ns, value: [1, 2, null][i] })));
-    expect(cache.readScalar(child, "f64")?.map((r) => r.value)).toEqual([1, 2, null]);
-    expect(cache.read({ ...child, source: 1 })).toBeUndefined();
+    expect(cache.readScalar(child, "float64")?.map((r) => r.value)).toEqual([1, 2, null]);
+    expect(cache.read({ ...child, source: "r/1" })).toBeUndefined();
     expect(cache.read({ ...child, topic: "/other" })).toBeUndefined();
   });
 
@@ -48,6 +48,12 @@ describe("shared field cache", () => {
     cache.putScalar(text, rows.map((r, i) => ({ time_ns: r.time_ns, value: `exact-${i}` })));
     expect(cache.read(root)?.map((r) => (r.value as { text: string }).text)).toEqual(["exact-0", "exact-1", "exact-2"]);
     expect(cache.readScalar(text, "string")?.map((r) => r.value)).toEqual(["exact-0", "exact-1", "exact-2"]);
+  });
+
+  it("does not read a meta field from the message's history", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => stream()));
+    const cache = new FieldCache(); await load(cache);
+    expect(cache.read({ ...root, path: ["$meta", "publish_time"] })).toBeUndefined();
   });
 
   it("selects a small playback range from a history with its predecessor", async () => {

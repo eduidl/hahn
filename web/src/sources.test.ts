@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeInfo, type LoadedSource } from "./sources";
+import { initialSources, mergeInfo, messagesUrl, sourceOf, sourceUrl, type LoadedSource } from "./sources";
 
 const source = (start: string, end: string, count: number | null = 1): LoadedSource => ({
   info: { start_ns: start, end_ns: end, message_count: count },
@@ -58,3 +58,20 @@ describe("initialSources", () => {
   });
 });
 
+describe("messagesUrl", () => {
+  const params = (path: string[], exact = false) =>
+    new URL(messagesUrl({ source: "r/g", topic: "/t", path }, { exact }), "http://x").searchParams;
+
+  it("selects a message field exactly", () => {
+    const query = params(["a", "b"], true);
+    expect(query.get("path")).toBe('["a","b"]');
+    expect(query.get("preview")).toBe("false");
+  });
+
+  it("reads a meta field instead of the message", () => {
+    const query = params(["$meta", "publish_time"], true);
+    expect(query.get("meta")).toBe("publish_time");
+    expect(query.has("path")).toBe(false);
+    expect(query.has("preview")).toBe(false);
+  });
+});

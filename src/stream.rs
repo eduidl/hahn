@@ -1,6 +1,5 @@
-use crate::{ApiError, AppState, blocking, series_fields, source::TimeRange};
+use crate::source::{MessageTimes, TimeRange};
 use axum::{
-    Json,
     body::{Body, Bytes},
     http::header,
     response::{IntoResponse, Response},
@@ -166,7 +165,7 @@ pub(crate) fn stream_rows<T: Serialize + Send + 'static>(
                 );
             }
             scanned += 1;
-            rows.push(convert(log_time, value));
+            rows.push(convert(times, value));
             if rows.len() >= 1024 || last_flush.elapsed() >= Duration::from_millis(100) {
                 send(
                     &tx,

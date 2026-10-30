@@ -70,13 +70,8 @@ export function kindsMatch(a: ValueKind | null, b: ValueKind | null) {
 }
 export const isDiscreteKind = (kind: ValueKind | null) =>
   kind !== null && kind.type !== "numeric";
-export type Topic = {
-  /** The recording (file id) the topic belongs to; added by the client. */
-  source: number;
-  topic: string;
-  schema_name: string | null;
-  schema_encoding?: string | null;
-  message_count: number | null;
+export type Topic = Omit<Schemas["Topic"], "fields" | "meta_fields"> & {
+  /** Message fields, then meta fields under `metaPrefix`. */
   fields: Field[];
   /** The open group the topic belongs to (see `sourceOf`); added by the client. */
   source: string;

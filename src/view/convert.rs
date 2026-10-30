@@ -1,3 +1,11 @@
+//! Converters from recorded message types to the protocol's fixed kinds.
+
+use super::frame::Payload;
+use anyhow::{Context, bail, ensure};
+use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
+use serde_json::json;
+use std::sync::Arc;
+
 /// Whether `defs` has a field `name` whose type passes `check`.
 pub(crate) fn has(defs: &FieldDefs, name: &str, check: fn(&DataTypeDef) -> bool) -> bool {
     defs.iter()

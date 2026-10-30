@@ -119,6 +119,12 @@ await check(messages, historyUrl({ topic: "/nope" }), 422);
 await check(messages, historyUrl({ topic: topic.topic, path: '["nope"]' }), 422);
 await check(messages, historyUrl({ topic: topic.topic, preview: "false" }), 422);
 
+for (const { name } of topic.meta_fields) {
+  endsComplete(`${messages} ${name}`, await check(messages, historyUrl({ topic: topic.topic, meta: name }), 200));
+}
+await check(messages, historyUrl({ topic: topic.topic, meta: "no-such-meta" }), 422);
+await check(messages, historyUrl({ topic: topic.topic, meta: "x", path: "[]" }), 400);
+
 const message = `${info}/messages/latest`;
 const query = (params) => `${root}/messages/latest?${new URLSearchParams(params)}`;
 await check(message, query({ topic: topic.topic, time_ns: "18446744073709551615" }), 200);

@@ -172,7 +172,7 @@ pub fn write_fixture_at(
                 channel_id: channel,
                 sequence: i as u32,
                 log_time: time,
-                publish_time: time,
+                publish_time: time + PUBLISH_DELAY_NS,
             },
             &payload,
         )?;
@@ -185,7 +185,7 @@ pub fn write_fixture_at(
                 channel_id: other,
                 sequence: i as u32,
                 log_time: time,
-                publish_time: time,
+                publish_time: time + PUBLISH_DELAY_NS,
             },
             &reference.encode_to_vec(),
         )?;

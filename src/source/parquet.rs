@@ -74,9 +74,11 @@ impl ParquetSource {
         }
         let mut rows: Vec<usize> = (0..times.len()).collect();
         rows.sort_by_key(|&row| times[row]);
+        let defs = FieldDefs::new(defs);
+        check_field_names(&defs)?;
         Ok(Self {
             topic,
-            defs: FieldDefs::new(defs),
+            defs,
             columns,
             times: rows.iter().map(|&row| times[row]).collect(),
             rows,
@@ -123,13 +125,7 @@ impl Source for ParquetSource {
         Ok(self.defs.clone())
     }
 
-    fn read(
-        &self,
-        topic: &str,
-        range: TimeRange,
-        limit: Option<usize>,
-        visit: &mut Visit,
-    ) -> anyhow::Result<()> {
+    fn read(&self, topic: &str, range: TimeRange, visit: &mut Visit) -> anyhow::Result<()> {
         self.check(topic)?;
         let from = range
             .start
@@ -143,10 +139,12 @@ impl Source for ParquetSource {
         Ok(())
     }
 
-    fn latest_at(&self, topic: &str, time: u64) -> anyhow::Result<Option<(u64, Value)>> {
+    fn latest_at(&self, topic: &str, time: u64) -> anyhow::Result<Option<(MessageTimes, Value)>> {
         self.check(topic)?;
         let after = self.times.partition_point(|&t| t <= time);
-        Ok(after.checked_sub(1).map(|i| (self.times[i], self.row(i))))
+        Ok(after
+            .checked_sub(1)
+            .map(|i| (self.times[i].into(), self.row(i))))
     }
 }
 
