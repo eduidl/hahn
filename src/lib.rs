@@ -11,7 +11,7 @@ use axum::{
     http::{StatusCode, header},
     middleware::map_response,
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
 };
 use catalog::{Group, Run};
 use mcapdecode::core::{DataTypeDef, FieldDefs};
@@ -295,13 +295,13 @@ fn field_type(data_type: &DataTypeDef) -> FieldType {
     }
 }
 
-/// Scalar fields the `/series` stream can return: numbers, bools, enums and strings.
-fn series_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>) {
+/// Paths of the fields exact `/messages` can return: numbers, bools, enums and strings.
+fn scalar_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<Vec<String>>) {
     for field in defs.iter() {
         let mut path = prefix.to_vec();
         path.push(field.name.clone());
         match &field.element.data_type {
-            DataTypeDef::Struct(children) => series_fields(&children.fields, &path, out),
+            DataTypeDef::Struct(children) => scalar_fields(&children.fields, &path, out),
             DataTypeDef::I8
             | DataTypeDef::I16
             | DataTypeDef::I32
@@ -329,7 +329,16 @@ async fn topics(
 ) -> Result<Json<Vec<Topic>>, ApiError> {
     let group = state.group(&run, &group)?;
     blocking(move || {
-        let topics = state.source(id)?.topics()?;
+        let source = group.source()?;
+        let meta_fields: Vec<_> = source
+            .meta_fields()
+            .iter()
+            .map(|name| FieldInfo {
+                name: (*name).into(),
+                field_type: field_type(&DataTypeDef::U64),
+            })
+            .collect();
+        let topics = source.topics()?;
         Ok(topics
             .into_iter()
             .map(|meta| {

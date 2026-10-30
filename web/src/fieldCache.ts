@@ -7,7 +7,7 @@ export type FieldTarget = Pick<Selected, "source" | "topic" | "path">;
 type Cell = { value: Json } | { children: string[] };
 type FieldRef = { cell: Cell; exact: boolean; users: number };
 type Block = {
-  source: number;
+  source: string;
   topic: string;
   path: string[];
   scope: string;

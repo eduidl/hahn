@@ -140,33 +140,47 @@ async fn compare(file_name: &str, topic: &str, fields: &[Vec<String>]) {
             .iter()
             .all(|field| field["type_name"].is_string())
     );
-    let response = app
-        .oneshot(
-            Request::post(format!("/api/files/{id}/series"))
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    json!({"topic":topic,"fields":fields}).to_string(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert!(response.status().is_success());
-    let mut body = response.into_body();
-    let mut actual = Vec::new();
-    while actual.len() < expected.len() {
-        let frame = tokio::time::timeout(std::time::Duration::from_secs(30), body.frame())
+    let mut columns = Vec::new();
+    for field in fields {
+        let path = serde_json::to_string(field).unwrap();
+        let query = format!(
+            "topic={}&path={}&preview=false",
+            encode(topic),
+            encode(&path)
+        );
+        let response = app
+            .clone()
+            .oneshot(
+                Request::get(format!("{base}/messages?{query}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
-            .unwrap()
-            .unwrap()
             .unwrap();
-        if let Ok(bytes) = frame.into_data() {
-            let event: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-            assert_ne!(event["type"], "error", "{event}");
-            if let Some(rows) = event["rows"].as_array() {
-                actual.extend(rows.iter().take(expected.len() - actual.len()).cloned());
+        assert!(response.status().is_success());
+        let mut body = response.into_body();
+        let mut rows = Vec::new();
+        let mut pending = Vec::new();
+        while rows.len() < expected.len() {
+            let frame = tokio::time::timeout(std::time::Duration::from_secs(30), body.frame())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            if let Ok(bytes) = frame.into_data() {
+                pending.extend_from_slice(&bytes);
+                while let Some(end) = pending.iter().position(|b| *b == b'\n') {
+                    let line: Vec<u8> = pending.drain(..=end).collect();
+                    let event: Json = serde_json::from_slice(&line).unwrap();
+                    assert_ne!(event["type"], "error", "{event}");
+                    if let Some(new) = event["rows"].as_array() {
+                        rows.extend(new.iter().cloned());
+                    }
+                }
             }
         }
+        rows.truncate(expected.len());
+        columns.push(rows);
     }
     let actual: Vec<Json> = (0..expected.len())
         .map(|i| {

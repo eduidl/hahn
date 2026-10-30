@@ -83,7 +83,7 @@ export type Topic = {
 };
 export type Selected = {
   key: string;
-  source: number;
+  source: string;
   topic: string;
   path: string[];
   color: string;

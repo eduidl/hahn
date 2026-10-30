@@ -6,7 +6,7 @@ import type { Widget } from "./widgets";
 
 export type MessageRecord = {
   key: string;
-  source: number;
+  source: string;
   topic: string;
   rows: MessageRow[];
   status: "loading" | "complete" | "stopped" | "error";

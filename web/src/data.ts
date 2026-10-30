@@ -1,8 +1,9 @@
 export type Row = { time_ns: string; values: (number | string | boolean | null)[] };
+type MessagesEvent = Schemas["MessagesEvent"];
+/** The schema's events, generic over the row type the reader decodes them into. */
 export type StreamEvent<T = Row> =
-  | { type: "batch"; rows: T[]; scanned_messages: number }
-  | { type: "complete"; scanned_messages: number }
-  | { type: "error"; message: string };
+  | Exclude<MessagesEvent, { type: "batch" }>
+  | (Omit<Extract<MessagesEvent, { type: "batch" }>, "rows"> & { rows: T[] });
 export type Point = {
   x: number;
   y: number | null;

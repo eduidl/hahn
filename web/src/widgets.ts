@@ -104,7 +104,7 @@ export type WidgetSpec = {
   sameKind: boolean;
   /** At 1, adding a field replaces the current series. */
   maxSeries: number;
-  /** Whether selections stream through `/series`; generic viewers fetch on their own. */
+  /** Whether selections load as exact series; generic viewers fetch on their own. */
   loadsSeries: boolean;
 };
 export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {

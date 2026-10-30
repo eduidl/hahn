@@ -21,7 +21,7 @@ export function SeriesName({
   path,
   type,
 }: {
-  source: number;
+  source: string;
   topic: string;
   path: string[];
   type?: string;
