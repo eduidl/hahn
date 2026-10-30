@@ -24,7 +24,7 @@ import { SeriesName } from "./SeriesName";
 import { linearTicks } from "./ticks";
 import type { LegendSettings } from "./widgets";
 import { usePlayback } from "./playback";
-import { isDiscreteKind, valueKind } from "./types";
+import { isDiscreteKind, valueKind, type EnumValue } from "./types";
 
 export type DragMode = "pan" | "zoom";
 
@@ -38,7 +38,7 @@ export type Series = {
   hidden: boolean;
   points: Point[];
   dataType?: string;
-  enumValues?: { name: string; value: number }[];
+  enumValues?: EnumValue[];
 };
 export type PlotView = {
   x: AxisView;
@@ -120,10 +120,7 @@ export function Plot({
   onCanReset,
 }: Props) {
   const bottom = timeDisplay === "absolute" ? 70 : 52;
-  const time = useMemo(
-    () => timeFormatter(originNs, timeDisplay),
-    [originNs, timeDisplay],
-  );
+  const time = useTimeFormatter(originNs, timeDisplay);
   const canvas = useRef<HTMLCanvasElement>(null);
   const { x: xView, y: yView, pinnedYBase } = view;
   const setXView = (action: SetStateAction<AxisView>) =>
@@ -152,7 +149,7 @@ export function Plot({
     if (kind?.type === "bool") return value ? "true" : "false";
     const labels = [...new Set(series.flatMap((item) =>
       item.hidden ? [] : (item.enumValues ?? [])
-        .filter((entry) => entry.value === value)
+        .filter((entry) => Number(entry.value) === value)
         .map((entry) => entry.name),
     ))];
     return labels.length ? labels.join(" / ") : format(value);

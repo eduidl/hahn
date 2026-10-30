@@ -7,8 +7,8 @@ const topics: Topic[] = [
     topic: "/pose",
     schema_name: "Pose",
     fields: [
-      { path: ["position", "x"], data_type: "f64" },
-      ...["string", "bool", "enum", "u8[]", "struct"].map((data_type) => ({
+      { path: ["position", "x"], data_type: "float64" },
+      ...(["string", "bool", "enum", "list", "struct"] as const).map((data_type) => ({
         path: [data_type],
         data_type,
       })),

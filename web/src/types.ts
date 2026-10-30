@@ -13,8 +13,7 @@ const rosTypes: Record<string, string> = {
   bytes: "uint8[]",
 };
 const protobufTypes: Record<string, string> = {
-  i32: "int32", i64: "int64", u32: "uint32", u64: "uint64",
-  f32: "float", f64: "double", float32: "float", float64: "double",
+  float32: "float", float64: "double",
 };
 /** Type name in the schema's own language; decoder names for unknown encodings. */
 export function displayType(type: string, encoding?: string | null): string {
@@ -28,12 +27,12 @@ export function displayType(type: string, encoding?: string | null): string {
     .replace(/\[<=\d+\]/g, "[]")
     .replace(/\b\w+\b/g, (word) => names[word] ?? word);
 }
-export const isNumericField = (field: Field): boolean =>
-  /^(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|u?int(?:8|16|32|64)|float(?:32|64))$/.test(field.data_type);
+export const isNumericField = (field: { data_type: string }): boolean =>
+  /^(u?int(?:8|16|32|64)|float(?:32|64))$/.test(field.data_type);
 export function enumDefinitionsMatch(a: EnumValue[] = [], b: EnumValue[] = []) {
   const canonical = (values: EnumValue[]) =>
     values.map(({ name, value }) => [name, value] as const).sort((x, y) =>
-      x[1] - y[1] || x[0].localeCompare(y[0]),
+      Number(x[1]) - Number(y[1]) || x[0].localeCompare(y[0]),
     );
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
@@ -54,7 +53,7 @@ export function valueKind(
   if (dataType !== undefined && /^w?string(\[<=\d+\])?$/.test(dataType))
     return { type: "string" };
   if (dataType === undefined) return null;
-  return isNumericField({ path: [], data_type: dataType })
+  return isNumericField({ data_type: dataType })
     ? { type: "numeric" }
     : { type: "other" };
 }
