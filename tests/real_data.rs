@@ -36,7 +36,38 @@ fn scalar(defs: &FieldDefs, value: &Value, path: &[&str]) -> serde_json::Value {
     }
 }
 
-async fn compare(file_name: &str, topic: &str, fields: &[&[&str]]) {
+fn encode(value: &str) -> String {
+    value.bytes().map(|b| format!("%{b:02X}")).collect()
+}
+
+async fn get_json(app: &axum::Router, url: &str) -> Json {
+    let response = app
+        .clone()
+        .oneshot(Request::get(url).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap()
+}
+
+/// Paths of the fields [`scalar`] can compare, struct fields included.
+fn numeric_paths(fields: &Json, prefix: &[String], out: &mut Vec<Vec<String>>) {
+    for field in fields.as_array().unwrap() {
+        let mut path = prefix.to_vec();
+        path.push(field["name"].as_str().unwrap().to_owned());
+        match field["data_type"].as_str().unwrap() {
+            "float32" | "float64" | "int32" | "uint64" => out.push(path),
+            "struct" => numeric_paths(&field["fields"], &path, out),
+            _ => {}
+        }
+    }
+}
+
+async fn compare(file_name: &str, topic: &str, fields: &[Vec<String>]) {
+    let fields: Vec<Vec<&str>> = fields
+        .iter()
+        .map(|path| path.iter().map(String::as_str).collect())
+        .collect();
+    let fields = &fields;
     let root = data_dir();
     let reader = McapReader::builder()
         .with_default_decoders()
@@ -53,23 +84,38 @@ async fn compare(file_name: &str, topic: &str, fields: &[&[&str]]) {
     let app = hahn::router(&root).unwrap();
     let response = app
         .clone()
-        .oneshot(Request::get("/api/files").body(Body::empty()).unwrap())
+        .oneshot(Request::get("/api/runs").body(Body::empty()).unwrap())
         .await
         .unwrap();
-    let files: serde_json::Value =
+    let runs: serde_json::Value =
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
     let id = files
         .as_array()
         .unwrap()
         .iter()
-        .find(|f| f["name"] == file_name)
+        .find(|r| r["name"] == file_name)
         .unwrap()["id"]
-        .as_u64()
+        .as_str()
         .unwrap();
     let response = app
         .clone()
         .oneshot(
-            Request::get(format!("/api/files/{id}/topics"))
+            Request::get(format!("/api/runs/{run}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let detail: serde_json::Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let base = format!(
+        "/api/runs/{run}/groups/{}",
+        detail["groups"][0]["id"].as_str().unwrap()
+    );
+    let response = app
+        .clone()
+        .oneshot(
+            Request::get(format!("{base}/topics"))
                 .body(Body::empty())
                 .unwrap(),
         )

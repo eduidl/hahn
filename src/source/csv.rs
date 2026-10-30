@@ -5,7 +5,10 @@
 //! times. Other columns become fields whose type is inferred from every cell,
 //! and dotted headers (`pose.x`) become nested structs.
 
-use super::{Format, Source, SourceInfo, TimeRange, TopicMeta, Visit, has_extension, time_scale};
+use super::{
+    Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit, check_field_names,
+    has_extension, time_scale,
+};
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::{DataTypeDef, FieldDef, FieldDefs, Value};
 use std::{path::Path, sync::Arc};

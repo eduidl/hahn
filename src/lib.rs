@@ -1,6 +1,8 @@
+mod catalog;
 mod message;
 mod source;
 mod stream;
+mod view;
 
 use axum::{
     Json, Router,
@@ -11,17 +13,18 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use catalog::{Group, Run};
 use mcapdecode::core::{DataTypeDef, FieldDefs};
-use serde::Serialize;
-use source::{Format, Source};
-use std::{
-    path::{Path as FsPath, PathBuf},
-    sync::{Arc, OnceLock},
+use serde::{Deserialize, Serialize};
+use std::{path::Path as FsPath, sync::Arc};
+use tower_http::compression::{
+    CompressionLayer, CompressionLevel,
+    predicate::{DefaultPredicate, NotForContentType, Predicate},
 };
 
 #[derive(Clone)]
 struct AppState {
-    files: Arc<Vec<FileEntry>>,
+    runs: Arc<Vec<Run>>,
 }
 
 #[derive(Serialize)]
@@ -60,31 +63,29 @@ pub fn router(root: &FsPath) -> anyhow::Result<Router> {
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     Ok(Router::new()
-        .route("/api/files", get(files_list))
-        .route("/api/files/{id}", get(info))
-        .route("/api/files/{id}/topics", get(topics))
-        .route("/api/files/{id}/series", post(stream::series))
-        .route("/api/files/{id}/messages", post(message::messages))
-        .route("/api/files/{id}/message", get(message::message))
+        .route("/api/runs", get(runs_list))
+        .route("/api/runs/{run}", get(run_detail))
+        .route("/api/runs/{run}/groups/{group}", get(info))
+        .route("/api/runs/{run}/groups/{group}/topics", get(topics))
+        .route(
+            "/api/runs/{run}/groups/{group}/messages",
+            get(message::messages),
+        )
+        .route(
+            "/api/runs/{run}/groups/{group}/messages/latest",
+            get(message::latest),
+        )
+        .route("/api/runs/{run}/groups/{group}/views", get(view::views))
+        .route(
+            "/api/runs/{run}/groups/{group}/views/latest",
+            get(view::latest),
+        )
+        .route("/api/runs/{run}/frames", get(view::frames))
+        .route("/api/runs/{run}/transforms", get(view::transforms))
+        .layer(map_response(json_errors))
         .with_state(AppState {
-            files: Arc::new(files),
+            runs: Arc::new(runs),
         }))
-}
-
-fn discover(root: &FsPath, paths: &mut Vec<(PathBuf, &'static dyn Format)>) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(root)? {
-        let entry = entry?;
-        let kind = entry.file_type()?;
-        // Do not traverse symlinks outside the configured directory.
-        if kind.is_dir() {
-            discover(&entry.path(), paths)?;
-        } else if kind.is_file()
-            && let Some(format) = source::formats().iter().find(|f| f.accepts(&entry.path()))
-        {
-            paths.push((entry.path(), *format));
-        }
-    }
-    Ok(())
 }
 
 #[derive(Debug)]
@@ -116,39 +117,68 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 impl AppState {
-    /// Opens the recording on first use. Blocks, so call it inside [`blocking`].
-    fn source(&self, id: usize) -> anyhow::Result<Arc<dyn Source>> {
-        let file = &self.files[id];
-        if let Some(source) = file.source.get() {
-            return Ok(source.clone());
-        }
-        let source = file.opener.open(&file.path)?;
-        Ok(file.source.get_or_init(|| source).clone())
+    fn run(&self, run: &str) -> Result<&Run, ApiError> {
+        self.runs
+            .iter()
+            .find(|r| r.id == run)
+            .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "Run not found".into()))
     }
 
-    fn check(&self, id: usize) -> Result<(), ApiError> {
-        if id < self.files.len() {
-            Ok(())
-        } else {
-            Err(ApiError(
-                StatusCode::NOT_FOUND,
-                "Recording not found".into(),
-            ))
-        }
+    fn group(&self, run: &str, group: &str) -> Result<Arc<Group>, ApiError> {
+        self.run(run)?
+            .groups
+            .iter()
+            .find(|g| g.id == group)
+            .cloned()
+            .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "Group not found".into()))
     }
 }
 
-async fn files_list(State(state): State<AppState>) -> Response {
-    Json(&*state.files).into_response()
+#[derive(Serialize)]
+struct RunSummary<'a> {
+    id: &'a str,
+    name: &'a str,
+}
+
+#[derive(Deserialize)]
+struct RunsQuery {
+    q: Option<String>,
+    limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct RunList<'a> {
+    items: Vec<RunSummary<'a>>,
+    truncated: bool,
+}
+
+async fn runs_list(
+    State(state): State<AppState>,
+    Query(query): Query<RunsQuery>,
+) -> Result<Response, ApiError> {
+    let limit = query.limit.unwrap_or(DEFAULT_RUNS);
+    if !(1..=MAX_RUNS).contains(&limit) {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            format!("Limit must be between 1 and {MAX_RUNS}"),
+        ));
+    }
+}
+
+async fn run_detail(
+    State(state): State<AppState>,
+    Path(run): Path<String>,
+) -> Result<Response, ApiError> {
+    Ok(Json(state.run(&run)?).into_response())
 }
 
 async fn info(
     State(state): State<AppState>,
-    Path(id): Path<usize>,
+    Path((run, group)): Path<(String, String)>,
 ) -> Result<Json<RecordingInfo>, ApiError> {
-    state.check(id)?;
+    let group = state.group(&run, &group)?;
     blocking(move || {
-        let info = state.source(id)?.info()?;
+        let info = group.source()?.info()?;
         Ok(RecordingInfo {
             start_ns: info.start_ns.to_string(),
             end_ns: info.end_ns.to_string(),
@@ -271,9 +301,9 @@ fn series_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>) 
 
 async fn topics(
     State(state): State<AppState>,
-    Path(id): Path<usize>,
+    Path((run, group)): Path<(String, String)>,
 ) -> Result<Json<Vec<Topic>>, ApiError> {
-    state.check(id)?;
+    let group = state.group(&run, &group)?;
     blocking(move || {
         let topics = state.source(id)?.topics()?;
         Ok(topics

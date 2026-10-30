@@ -26,7 +26,10 @@ import { useMessages } from "./useMessages";
 import { useSeries } from "./useSeries";
 import { PlaybackBar } from "./PlaybackBar";
 import { PlaybackContext, createPlaybackStore } from "./playback";
-import { SourceNames, mergeInfo, type LoadedSource } from "./sources";
+import { RunsDialog } from "./RunsDialog";
+import { TimeZoneSelect } from "./TimeZoneSelect";
+import { DisplayTimeZone, usableTimeZone, type TimeZoneSource } from "./timeDisplay";
+import { SourceNames, get, initialSources, mergeInfo, sourceOf, sourceUrl, type LoadedSource } from "./sources";
 import {
   dragMime,
   errorMessage,
@@ -41,19 +44,15 @@ import {
   type TopicDrag,
 } from "./types";
 
-async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Request failed");
-  return body;
-}
-
 export function App() {
-  const [files, setFiles] = useState<FileEntry[]>([]);
-  // Open recordings in the order they were opened.
-  const [sources, setSources] = useState<number[]>([]);
-  const [loaded, setLoaded] = useState<Record<number, LoadedSource>>({});
-  const requests = useRef(new Map<number, AbortController>());
+  const [runsOpen, setRunsOpen] = useState(true);
+  const [zoneSource, setZoneSource] = useState<TimeZoneSource>("browser");
+  const [runId, setRunId] = useState<string | null>(null);
+  const [run, setRun] = useState<Run | null>(null);
+  // Open groups of the run, in the order they were opened.
+  const [sources, setSources] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState<Record<string, LoadedSource>>({});
+  const requests = useRef(new Map<string, AbortController>());
   const openSources = sources.map((id) => loaded[id]);
   const topics = useMemo(
     () => openSources.flatMap((s) => s?.topics ?? []),
@@ -94,10 +93,14 @@ export function App() {
     ? Math.max(1e-9, secondsFrom(info.end_ns, info.start_ns))
     : 1;
   const [playback] = useState(createPlaybackStore);
-  const openFiles = sources.flatMap((id) => files.filter((f) => f.id === id));
+  const groups = (run?.groups ?? []).map((group) => ({
+    source: sourceOf(run!.id, group.id),
+    name: group.name,
+  }));
+  const openGroups = sources.flatMap((id) => groups.filter((g) => g.source === id));
   const sourceNames = useMemo(
-    () => new Map(openFiles.map((f) => [f.id, f.name])),
-    [JSON.stringify(openFiles.map((f) => [f.id, f.name]))],
+    () => new Map(openGroups.map((g) => [g.source, g.name])),
+    [JSON.stringify(openGroups)],
   );
   const multiSource = sources.length > 1;
   const count = activeWidget
@@ -115,28 +118,32 @@ export function App() {
   ];
   const unreadable = topics.filter((t) => t.error);
   const visibleTopics = topics.filter((t) => showErrorTopics || !t.error);
-  const sourceErrors = openFiles.flatMap((f) =>
-    loaded[f.id]?.error ? [{ file: f, error: loaded[f.id].error }] : [],
+  const sourceErrors = openGroups.flatMap((group) =>
+    loaded[group.source]?.error ? [{ group, error: loaded[group.source].error }] : [],
   );
   const errorCount =
     unreadable.length + runtimeErrors.length + sourceErrors.length + (error ? 1 : 0);
 
+  // Opening a run opens the groups its server marks as default.
   useEffect(() => {
+    if (runId === null) return;
     const controller = new AbortController();
-    get<FileEntry[]>("/api/files", controller.signal)
-      .then((data) => {
+    get<Run>(`/api/runs/${runId}`, controller.signal)
+      .then((detail) => {
         if (controller.signal.aborted) return;
-        setFiles(data);
-        const recording = data.find((file) => file.name === "ros2.mcap");
-        if (recording) setSources([recording.id]);
+        setRun(detail);
+        if (!detail.groups.length) setError("この走行にはグループがありません");
+        const open = initialSources(detail);
+        setSources(open);
+        dispatch({ type: "sources", open: new Set(open) });
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(errorMessage(e));
       });
     return () => controller.abort();
-  }, []);
+  }, [runId]);
 
-  // Load each newly opened recording once; closing one cancels its requests.
+  // Load each newly opened group once; closing one cancels its requests.
   useEffect(() => {
     for (const [id, controller] of requests.current)
       if (!sources.includes(id)) {
@@ -153,8 +160,8 @@ export function App() {
       };
       settle({ info: null, topics: [], error: "", loading: true });
       Promise.all([
-        get<Info>(`/api/files/${id}`, controller.signal),
-        get<Omit<Topic, "source">[]>(`/api/files/${id}/topics`, controller.signal),
+        get<Info>(sourceUrl(id), controller.signal),
+        get<Schemas["Topic"][]>(`${sourceUrl(id)}/topics`, controller.signal),
       ])
         .then(([info, topics]) =>
           settle({
@@ -174,8 +181,22 @@ export function App() {
     return () => current.forEach((controller) => controller.abort());
   }, []);
 
-  /** Open or close a recording. Series of closed recordings are dropped. */
-  const toggleSource = (id: number, open: boolean) => {
+  /** Switch runs: the layout and widget settings stay, the previous run's series do not. */
+  const selectRun = (id: string) => {
+    setRunsOpen(false);
+    if (id === runId) return;
+    setRun(null);
+    setError("");
+    setSources([]);
+    setLoaded({});
+    dispatch({ type: "sources", open: new Set() });
+    setSearch("");
+    setExpandedTopics(new Set());
+    setRunId(id);
+  };
+
+  /** Open or close a group. Series of closed groups are dropped. */
+  const toggleSource = (id: string, open: boolean) => {
     const next = open
       ? [...sources.filter((s) => s !== id), id]
       : sources.filter((s) => s !== id);
@@ -258,77 +279,76 @@ export function App() {
     <PlaybackContext.Provider value={playback}>
     <SourceNames.Provider value={sourceNames}>
     <div className="app">
+      <RunsDialog
+        open={runsOpen}
+        current={runId}
+        onSelect={selectRun}
+        onClose={() => setRunsOpen(false)}
+      />
       <header>
         <div className="header-start">
           <div className="brand">
             <span className="brand-mark">h</span>hahn
           </div>
-          <button
-            className="recording-trigger"
-            popoverTarget="recording-menu"
-            aria-label="録画を開く"
-            title="録画を開く"
-          >
-            <svg
-              width="19"
-              height="19"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v3" />
-              <path d="M4 20h15l3-10H7L4 20 2 8h5" />
-            </svg>
+          <button className="runs-trigger" onClick={() => setRunsOpen(true)}>
+            走行を選択
           </button>
+          {groups.length > 1 && (
+            <button
+              className="recording-trigger"
+              popoverTarget="recording-menu"
+              aria-label="グループを開く"
+              title="グループを開く"
+            >
+              <svg
+                width="19"
+                height="19"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v3" />
+                <path d="M4 20h15l3-10H7L4 20 2 8h5" />
+              </svg>
+            </button>
+          )}
         </div>
         <div
           id="recording-menu"
           className="recording-menu"
           popover="auto"
           role="dialog"
-          aria-label="録画を開く"
+          aria-label="グループを開く"
         >
-          <h2>録画を開く</h2>
+          <h2>グループを開く</h2>
           <p className="help">
-            複数の録画を開くと、共通の時間軸に並べて表示します。
+            開いたグループは共通の時間軸に並べて表示します。
           </p>
           <div className="recording-list">
-            {files.map((f) => (
-              <label key={f.id} className="recording-option">
+            {groups.map((g) => (
+              <label key={g.source} className="recording-option">
                 <input
                   type="checkbox"
-                  checked={sources.includes(f.id)}
-                  onChange={(e) => toggleSource(f.id, e.target.checked)}
+                  checked={sources.includes(g.source)}
+                  onChange={(e) => toggleSource(g.source, e.target.checked)}
                 />
-                <span className="recording-name" title={f.name}>
-                  {f.name}
+                <span className="recording-name" title={g.name}>
+                  {g.name}
                 </span>
-                <small>
-                  {f.format.toUpperCase()} ·{" "}
-                  {(f.size_bytes / 1024 / 1024).toFixed(1)} MB
-                </small>
               </label>
             ))}
           </div>
           <div className="file-detail">
             {sources.length
-              ? `${sources.length} 件を表示中 · ${info?.message_count?.toLocaleString() ?? "—"} メッセージ`
-              : `${files.length} 件の録画`}
+              ? `${sources.length} グループを表示中 · ${info?.message_count?.toLocaleString() ?? "—"} メッセージ`
+              : `${groups.length} グループ`}
           </div>
         </div>
 
-        <span
-          className="header-file"
-          title={openFiles.map((f) => f.name).join("\n")}
-        >
-          {openFiles.length
-            ? openFiles.map((f) => f.name).join(" ＋ ")
-            : "録画未選択"}
-        </span>
         <button className="add-widget" popoverTarget="widget-catalog">
           ＋ ウィジェットを追加
         </button>
@@ -554,14 +574,14 @@ export function App() {
               {!errorCount && <p className="muted">エラーはありません。</p>}
               {error && (
                 <div className="error-item">
-                  <strong>録画の読み込み</strong>
+                  <strong>走行の読み込み</strong>
                   <p>{error}</p>
                 </div>
               )}
-              {sourceErrors.map(({ file, error }) => (
-                <div className="error-item" key={`source-${file.id}`}>
-                  <strong>{file.name}</strong>
-                  <span>録画の読み込み</span>
+              {sourceErrors.map(({ group, error }) => (
+                <div className="error-item" key={`source-${group.source}`}>
+                  <strong>{group.name}</strong>
+                  <span>グループの読み込み</span>
                   <p>{error}</p>
                 </div>
               ))}

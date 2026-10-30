@@ -7,8 +7,11 @@
 mod csv;
 mod mcap;
 mod parquet;
+mod segmented;
 
-use mcapdecode::core::{FieldDefs, Value};
+pub use segmented::open_segments;
+
+use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
 use std::{path::Path, sync::Arc};
 
 /// First backwards search window of the default [`Source::latest_at`]; it
@@ -31,6 +34,7 @@ pub struct SourceInfo {
     pub message_count: Option<u64>,
 }
 
+#[derive(Clone)]
 pub struct TopicMeta {
     pub topic: String,
     pub schema_name: Option<String>,

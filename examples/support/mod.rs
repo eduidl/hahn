@@ -161,7 +161,7 @@ pub fn write_fixture_at(
             6 => 5,
             _ => i,
         };
-        let time = ORIGIN + index as u64 * 10_000_000;
+        let time = ORIGIN + offset_ns + index as u64 * 10_000_000;
         let payload = if corrupt_at == Some(i) {
             vec![0xff]
         } else {
