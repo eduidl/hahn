@@ -31,19 +31,16 @@ struct AppState {
     runs: Arc<Vec<Run>>,
 }
 
-#[derive(Serialize)]
-struct FileEntry {
-    id: usize,
-    name: String,
-    size_bytes: u64,
-    format: &'static str,
-    #[serde(skip)]
-    path: PathBuf,
-    #[serde(skip)]
-    opener: &'static dyn Format,
-    /// Opened on first use; failures are not cached so each request reports them.
-    #[serde(skip)]
-    source: OnceLock<Arc<dyn Source>>,
+/// Compresses API responses at the fastest level, which beats higher ones once their
+/// compression time counts; on a fast link, compressing at all costs more than it saves.
+/// View frames are left alone: they hold compressed images and dense binary.
+pub fn gzip(router: Router) -> Router {
+    let predicate = DefaultPredicate::new().and(NotForContentType::const_new(view::CONTENT_TYPE));
+    router.layer(
+        CompressionLayer::new()
+            .quality(CompressionLevel::Fastest)
+            .compress_when(predicate),
+    )
 }
 
 pub fn router(root: &FsPath) -> anyhow::Result<Router> {
@@ -237,8 +234,7 @@ struct FieldInfo {
 #[derive(Clone, Serialize)]
 struct FieldType {
     data_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    type_name: Option<String>,
+    type_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     enum_values: Option<Vec<EnumValue>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -269,19 +265,33 @@ fn enum_values(data_type: &DataTypeDef) -> Option<Vec<EnumValue>> {
     }
 }
 
-fn schema_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>) {
-    for field in defs.iter() {
-        let mut path = prefix.to_vec();
-        path.push(field.name.clone());
-        out.push(FieldInfo {
-            path: path.clone(),
-            data_type: field.element.data_type.type_name().into(),
-            type_name: Some(field.element.data_type.to_string()),
-            enum_values: enum_values(&field.element.data_type),
-        });
-        if let DataTypeDef::Struct(children) = &field.element.data_type {
-            schema_fields(&children.fields, &path, out);
-        }
+fn schema_fields(defs: &FieldDefs) -> Vec<FieldInfo> {
+    defs.iter()
+        .map(|field| FieldInfo {
+            name: field.name.clone(),
+            field_type: field_type(&field.element.data_type),
+        })
+        .collect()
+}
+
+fn field_type(data_type: &DataTypeDef) -> FieldType {
+    FieldType {
+        data_type: data_type.type_name().into(),
+        type_name: data_type.to_string(),
+        enum_values: enum_values(data_type),
+        fields: match data_type {
+            DataTypeDef::Struct(children) => Some(schema_fields(&children.fields)),
+            _ => None,
+        },
+        element: match data_type {
+            DataTypeDef::List(element)
+            | DataTypeDef::BoundedList(element, _)
+            | DataTypeDef::Array(element, _) => Some(Box::new(field_type(&element.data_type))),
+            DataTypeDef::Uint8List | DataTypeDef::BoundedUint8List(_) => {
+                Some(Box::new(field_type(&DataTypeDef::U8)))
+            }
+            _ => None,
+        },
     }
 }
 
@@ -307,12 +317,7 @@ fn series_fields(defs: &FieldDefs, prefix: &[String], out: &mut Vec<FieldInfo>) 
             | DataTypeDef::String
             | DataTypeDef::BoundedString(_)
             | DataTypeDef::WString
-            | DataTypeDef::BoundedWString(_) => out.push(FieldInfo {
-                path,
-                data_type: field.element.data_type.type_name().into(),
-                type_name: None,
-                enum_values: enum_values(&field.element.data_type),
-            }),
+            | DataTypeDef::BoundedWString(_) => out.push(path),
             _ => {}
         }
     }
@@ -328,13 +333,14 @@ async fn topics(
         Ok(topics
             .into_iter()
             .map(|meta| {
-                let mut fields = Vec::new();
-                let error = match meta.fields {
-                    Ok(defs) => {
-                        schema_fields(&defs, &[], &mut fields);
-                        None
-                    }
-                    Err(e) => Some(e),
+                let (fields, meta_fields, views, error) = match meta.fields {
+                    Ok(defs) => (
+                        schema_fields(&defs),
+                        meta_fields.clone(),
+                        view::declared(meta.schema_name.as_deref(), &defs),
+                        None,
+                    ),
+                    Err(e) => (Vec::new(), Vec::new(), Vec::new(), Some(e)),
                 };
                 Topic {
                     topic: meta.topic,
