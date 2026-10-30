@@ -75,15 +75,8 @@ async fn compare(file_name: &str, topic: &str, fields: &[&[&str]]) {
         )
         .await
         .unwrap();
-    let topics: serde_json::Value = serde_json::from_slice(
-        &response
-            .into_body()
-            .collect()
-            .await
-            .unwrap()
-            .to_bytes(),
-    )
-    .unwrap();
+    let topics: serde_json::Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
     let target = topics
         .as_array()
         .unwrap()
@@ -96,7 +89,11 @@ async fn compare(file_name: &str, topic: &str, fields: &[&[&str]]) {
         .iter()
         .filter(|field| field["data_type"] == "enum" || field["data_type"] == "struct")
         .collect();
-    assert!(typed_fields.iter().all(|field| field["type_name"].is_string()));
+    assert!(
+        typed_fields
+            .iter()
+            .all(|field| field["type_name"].is_string())
+    );
     let response = app
         .oneshot(
             Request::post(format!("/api/files/{id}/series"))
@@ -130,7 +127,7 @@ async fn compare(file_name: &str, topic: &str, fields: &[&[&str]]) {
 }
 
 #[tokio::test]
-#[ignore = "Requires mcapdecode-rs/data real recordings"]
+#[ignore = "Requires real recordings in data/"]
 async fn protobuf_recording() {
     compare(
         "protobuf.mcap",
@@ -144,7 +141,7 @@ async fn protobuf_recording() {
     .await;
 }
 #[tokio::test]
-#[ignore = "Requires mcapdecode-rs/data real recordings"]
+#[ignore = "Requires real recordings in data/"]
 async fn ros2_idl_recording() {
     compare(
         "ros2.mcap",
@@ -154,7 +151,7 @@ async fn ros2_idl_recording() {
     .await;
 }
 #[tokio::test]
-#[ignore = "Requires mcapdecode-rs/data real recordings"]
+#[ignore = "Requires real recordings in data/"]
 async fn ros2_msg_recording() {
     compare(
         "ros2msg_test.mcap",

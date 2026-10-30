@@ -163,6 +163,13 @@ pub(crate) async fn series(
     ))
 }
 
+/// Bounded, cancellable NDJSON delivery shared by scalar and message history.
+pub(crate) fn stream_rows<T: Serialize + Send + 'static>(
+    source: std::sync::Arc<dyn crate::source::Source>,
+    topic: String,
+    range: TimeRange,
+    convert: impl Fn(u64, Value) -> T + Send + 'static,
+) -> Response {
     let (tx, rx) = mpsc::channel(4);
     tokio::task::spawn_blocking(move || {
         let mut rows = Vec::with_capacity(1024);
