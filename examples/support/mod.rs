@@ -7,6 +7,9 @@ use prost_types::{
 use std::{fs::File, path::Path};
 
 pub const ORIGIN: u64 = 1_760_000_000_123_456_789;
+/// How long after its log time each message claims to have been published.
+#[allow(dead_code)]
+pub const PUBLISH_DELAY_NS: u64 = 5;
 
 #[derive(Clone, PartialEq, Message)]
 pub struct Sample {
@@ -48,15 +51,28 @@ fn field(name: &str, tag: i32, kind: Type, type_name: Option<&str>) -> FieldDesc
     }
 }
 
+#[allow(dead_code)]
 pub fn write_fixture(path: &Path, count: usize, stats: bool) -> anyhow::Result<()> {
     write_fixture_with_options(path, count, stats, None)
 }
 
+#[allow(dead_code)]
 pub fn write_fixture_with_options(
     path: &Path,
     count: usize,
     stats: bool,
     corrupt_at: Option<usize>,
+) -> anyhow::Result<()> {
+    write_fixture_at(path, count, stats, corrupt_at, 0)
+}
+
+/// Writes the fixture with its timestamps shifted later by `offset_ns`.
+pub fn write_fixture_at(
+    path: &Path,
+    count: usize,
+    stats: bool,
+    corrupt_at: Option<usize>,
+    offset_ns: u64,
 ) -> anyhow::Result<()> {
     let descriptor = FileDescriptorSet {
         file: vec![FileDescriptorProto {

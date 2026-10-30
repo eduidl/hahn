@@ -1,4 +1,8 @@
-use crate::{ApiError, AppState, blocking, stream::indexes};
+use crate::{
+    ApiError, AppState, blocking, scalar_fields,
+    source::{MessageTimes, Source, TimeRange},
+    stream::{indexes, scalar, stream_rows},
+};
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -156,8 +160,8 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
                 .iter()
                 .take(MAX_ITEMS)
                 .map(|(k, v)| json!([to_json(k, key), to_json(v, value)]))
-                .collect::<Vec<_>>()
-                .into()
+                .collect();
+            preview(entries.len(), shown)
         }
     }
 }
@@ -165,9 +169,12 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
 #[derive(Deserialize)]
 pub(crate) struct MessagesRequest {
     topic: String,
-    #[serde(default)]
-    path: Vec<String>,
+    /// JSON array of struct field names; omit for the whole message.
+    path: Option<String>,
+    /// A name from the topic's `meta_fields`, to read instead of the message.
+    meta: Option<String>,
     start_ns: Option<String>,
+    /// Exclusive upper bound. Omit to include the last timestamp of a recording.
     end_ns: Option<String>,
 }
 

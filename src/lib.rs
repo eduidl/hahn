@@ -162,13 +162,22 @@ struct Topic {
 
 #[derive(Clone, Serialize)]
 struct FieldInfo {
-    /// Field-name segments, rather than ambiguous dot-separated identifiers.
-    path: Vec<String>,
+    name: String,
+    #[serde(flatten)]
+    field_type: FieldType,
+}
+
+#[derive(Clone, Serialize)]
+struct FieldType {
     data_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     type_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     enum_values: Option<Vec<EnumValue>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fields: Option<Vec<FieldInfo>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    element: Option<Box<FieldType>>,
 }
 
 #[derive(Clone, Serialize)]

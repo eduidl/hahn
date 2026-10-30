@@ -122,7 +122,12 @@ async fn compare(file_name: &str, topic: &str, fields: &[&[&str]]) {
             }
         }
     }
-    drop(body);
+    let actual: Vec<Json> = (0..expected.len())
+        .map(|i| {
+            let values: Vec<_> = columns.iter().map(|c| c[i]["value"].clone()).collect();
+            json!({"time_ns": columns[0][i]["time_ns"], "values": values})
+        })
+        .collect();
     assert_eq!(actual, expected);
 }
 

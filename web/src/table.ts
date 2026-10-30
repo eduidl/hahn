@@ -2,7 +2,8 @@ import type { FieldIndex } from "./fieldIndex";
 import { topicKey, type EnumValue, type Selected } from "./types";
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-export type MessageRow = { time_ns: string; value: Json };
+/** The schema leaves `value` as any JSON; a recursive schema cannot be generated. */
+export type MessageRow = Omit<Schemas["MessageResponse"], "value"> & { value: Json };
 export type TableColumn = { label: string; path: string[]; dataType?: string; enumValues?: EnumValue[] };
 
 export const minColumnWidth = 64;

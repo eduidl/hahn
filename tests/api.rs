@@ -30,9 +30,8 @@ async fn series(app: axum::Router, body: Value) -> (StatusCode, Vec<Value>) {
 async fn stream(app: axum::Router, url: &str, body: Value) -> (StatusCode, Vec<Value>) {
     let response = app
         .oneshot(
-            Request::post(url)
-                .header("content-type", "application/json")
-                .body(Body::from(body.to_string()))
+            Request::get(format!("{url}?{}", params.join("&")))
+                .body(Body::empty())
                 .unwrap(),
         )
         .await
@@ -51,10 +50,12 @@ async fn stream(app: axum::Router, url: &str, body: Value) -> (StatusCode, Vec<V
 async fn metadata_includes_all_field_types() {
     let dir = fixture(2200, true);
     let app = hahn::router(dir.path()).unwrap();
-    let (_, files) = get(app.clone(), "/api/files").await;
-    assert_eq!(files[0]["name"], "test.mcap");
-    assert!(files[0].get("path").is_none());
-    let (status, info) = get(app.clone(), "/api/files/0").await;
+    let (_, runs) = get(app.clone(), "/api/runs").await;
+    assert_eq!(
+        runs,
+        json!({"items": [{"id": runs["items"][0]["id"], "name": "test.mcap"}], "truncated": false})
+    );
+    let (status, info) = get(app.clone(), "/g").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(info["start_ns"], support::ORIGIN.to_string());
     assert_eq!(
@@ -247,12 +248,11 @@ async fn first_batch_can_be_consumed_without_collecting_full_response() {
     let app = hahn::router(dir.path()).unwrap();
     let response = app
         .oneshot(
-            Request::post("/api/files/0/series")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    json!({"topic":"/telemetry","fields":[["signal"]]}).to_string(),
-                ))
-                .unwrap(),
+            Request::get(format!(
+                "{url}?topic=%2Ftelemetry&path=%5B%22signal%22%5D&preview=false"
+            ))
+            .body(Body::empty())
+            .unwrap(),
         )
         .await
         .unwrap();
@@ -744,12 +744,8 @@ async fn messages_history_uses_raw_message_preview_limits() {
     ])
     .unwrap();
     let dir = parquet_fixture("preview.parquet", batch);
-    let (_, events) = stream(
-        hahn::router(dir.path()).unwrap(),
-        "/api/files/0/messages",
-        json!({"topic":"/preview"}),
-    )
-    .await;
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, events) = stream(app.clone(), "/g/messages", json!({"topic":"/preview"})).await;
     let value = &events[0]["rows"][0]["value"];
     assert_eq!(value["label"].as_str().unwrap().chars().count(), 10_001);
     assert!(value["label"].as_str().unwrap().ends_with('…'));
@@ -881,3 +877,25 @@ async fn ros_uint8_sequences_use_list_previews() {
         );
     }
 }
+fn visual_app() -> (tempfile::TempDir, axum::Router) {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_visual_fixture(&dir.path().join("visual.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    (dir, app)
+}
+
+#[tokio::test]
+async fn frames_are_merged_from_every_transform_topic() {
+    let (_dir, app) = visual_app();
+    let (status, body) = get(app, "/r/frames").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["frames"],
+        json!([
+            {"id": "base_link", "parent": "map"},
+            {"id": "lidar", "parent": "base_link"},
+            {"id": "map", "parent": null},
+        ])
+    );
+}
+
