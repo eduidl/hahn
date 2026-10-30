@@ -137,8 +137,8 @@ impl Source for ParquetSource {
         let to = range.end.map_or(self.times.len(), |end| {
             self.times.partition_point(|&t| t < end)
         });
-        for i in (from..to.max(from)).take(limit.unwrap_or(usize::MAX)) {
-            visit(self.times[i], self.row(i))?;
+        for i in from..to.max(from) {
+            visit(self.times[i].into(), self.row(i))?;
         }
         Ok(())
     }

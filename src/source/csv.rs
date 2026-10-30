@@ -141,9 +141,8 @@ impl Source for CsvSource {
         let to = range.end.map_or(self.times.len(), |end| {
             self.times.partition_point(|&t| t < end)
         });
-        let selected = (from..to.max(from)).take(limit.unwrap_or(usize::MAX));
-        for i in selected {
-            visit(self.times[i], self.rows[i].clone())?;
+        for i in from..to.max(from) {
+            visit(self.times[i].into(), self.rows[i].clone())?;
         }
         Ok(())
     }

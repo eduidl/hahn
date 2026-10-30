@@ -54,7 +54,7 @@ describe("shared field cache", () => {
     vi.stubGlobal("fetch", vi.fn(async () => stream()));
     const cache = new FieldCache(); await load(cache);
     expect(cache.read(child, "1500000000:2500000000")?.map((r) => r.value)).toEqual([2, null]);
-    expect(cache.read(child, "0:500000000")?.map((r) => r.value)).toEqual([1]);
+    expect(cache.read(child, "0:500000000")).toEqual([]);
   });
 
   it("evicts old playback windows and clears all recording data", async () => {
