@@ -76,10 +76,20 @@ async fn compare(file_name: &str, topic: &str, fields: &[Vec<String>]) {
     let path = root.join(file_name);
     let defs = reader.topic_field_defs(&path, topic).unwrap();
     let mut expected = Vec::new();
-    reader.for_each_decoded_message_with_options(&path, topic, &ReadOptions { limit: Some(8), ..Default::default() }, |msg| {
-        expected.push(json!({"time_ns":msg.log_time.to_string(), "values":fields.iter().map(|f| scalar(&defs, &msg.value, f)).collect::<Vec<_>>()}));
-        Ok(())
-    }).unwrap();
+    reader
+        .for_each_decoded_message_with_options(
+            &path,
+            topic,
+            &ReadOptions {
+                limit: Some(8),
+                ..Default::default()
+            },
+            |msg| {
+                expected.push(json!({"time_ns":msg.log_time.to_string(), "values":fields.iter().map(|f| scalar(&defs, &msg.value, f)).collect::<Vec<_>>()}));
+                Ok(())
+            },
+        )
+        .unwrap();
     assert!(!expected.is_empty());
     let app = hahn::router(&root).unwrap();
     let response = app

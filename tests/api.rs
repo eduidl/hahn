@@ -1359,8 +1359,213 @@ fn visual_app() -> (tempfile::TempDir, axum::Router) {
     (dir, app)
 }
 
+/// The headers of a frames response, each with its payload.
+async fn frames(app: &axum::Router, url: &str) -> (StatusCode, Vec<(Value, Vec<u8>)>) {
+    let url = resolve(app, url).await;
+    let response = app
+        .clone()
+        .oneshot(Request::get(&url).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    if status != StatusCode::OK {
+        return (status, Vec::new());
+    }
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/vnd.hahn.frames"
+    );
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let mut rest = &body[..];
+    let mut out = Vec::new();
+    while !rest.is_empty() {
+        let header_len = u32::from_le_bytes(rest[..4].try_into().unwrap()) as usize;
+        let payload_len = u32::from_le_bytes(rest[4..8].try_into().unwrap()) as usize;
+        let header = serde_json::from_slice(&rest[8..8 + header_len]).unwrap();
+        let start = (8 + header_len).next_multiple_of(8);
+        out.push((header, rest[start..start + payload_len].to_vec()));
+        rest = &rest[start + payload_len..];
+    }
+    (status, out)
+}
+
 fn view_url(path: &str, topic: &str, view: &str, query: &str) -> String {
     format!("/g/{path}?topic={topic}&view={view}{query}")
+}
+
+#[tokio::test]
+async fn topics_declare_their_views_from_the_schema() {
+    let (_dir, app) = visual_app();
+    let (_, topics) = get(app, "/g/topics").await;
+    let views = |name: &str| {
+        topics
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["topic"] == name)
+            .unwrap()["views"]
+            .clone()
+    };
+    assert_eq!(views("/camera")[0]["kind"], "image");
+    assert_eq!(views("/lidar")[0]["kind"], "pointcloud");
+    assert_eq!(views("/gps")[0]["kind"], "geo");
+    // Transforms are the frame graph, not a view.
+    assert_eq!(views("/tf"), json!([]));
+
+    let (_dir, app) = {
+        let dir = fixture(1, true);
+        let app = hahn::router(dir.path()).unwrap();
+        (dir, app)
+    };
+    let (_, topics) = get(app, "/g/topics").await;
+    assert_eq!(topics[0]["views"], json!([]));
+}
+
+#[tokio::test]
+async fn image_frames_carry_the_recorded_bytes() {
+    let (_dir, app) = visual_app();
+    let time = support::ORIGIN + support::VISUAL_STEP_NS;
+    let url = view_url(
+        "views/latest",
+        "/camera",
+        "image",
+        &format!("&time_ns={time}"),
+    );
+    let (status, events) = frames(&app, &url).await;
+    assert_eq!(status, StatusCode::OK);
+    let (header, payload) = &events[0];
+    assert_eq!(header["type"], "frame");
+    assert_eq!(header["time_ns"], time.to_string());
+    let value = &header["value"];
+    assert_eq!(value["kind"], "image");
+    assert_eq!(value["format"], "png");
+    assert_eq!(value["frame_id"], "camera");
+    let (offset, length) = (
+        value["data"]["$blob"]["offset"].as_u64().unwrap() as usize,
+        value["data"]["$blob"]["length"].as_u64().unwrap() as usize,
+    );
+    assert_eq!(&payload[offset..offset + length], support::PNG);
+    assert_eq!(
+        events[1].0,
+        json!({"type": "complete", "scanned_messages": 1})
+    );
+}
+
+#[tokio::test]
+async fn a_message_failing_conversion_does_not_end_the_stream() {
+    let (_dir, app) = visual_app();
+    let (status, events) = frames(&app, &view_url("views", "/camera", "image", "")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(events.len(), support::VISUAL_COUNT + 1);
+    let bad = &events[support::BAD_IMAGE].0;
+    assert!(bad["error"].as_str().unwrap().contains("bmp"));
+    assert!(bad.get("value").is_none());
+    assert!(events[support::BAD_IMAGE + 1].0["value"].is_object());
+    assert_eq!(events.last().unwrap().0["type"], "complete");
+}
+
+#[tokio::test]
+async fn point_frames_hold_a_column_per_field() {
+    let (_dir, app) = visual_app();
+    let start = support::ORIGIN + support::VISUAL_STEP_NS;
+    let query = format!("&start_ns={start}&end_ns={}", start + 1);
+    let (_, events) = frames(&app, &view_url("views", "/lidar", "pointcloud", &query)).await;
+    assert_eq!(events.len(), 2);
+    let (header, payload) = &events[0];
+    let value = &header["value"];
+    assert_eq!(value["count"], 2);
+    assert_eq!(value["pose"]["orientation"], json!([0.0, 0.0, 0.0, 1.0]));
+    let blob = |reference: &Value| {
+        let (offset, length) = (
+            reference["$blob"]["offset"].as_u64().unwrap() as usize,
+            reference["$blob"]["length"].as_u64().unwrap() as usize,
+        );
+        assert_eq!(offset % 8, 0);
+        &payload[offset..offset + length]
+    };
+    let positions: Vec<f32> = blob(&value["positions"])
+        .chunks_exact(4)
+        .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+        .collect();
+    assert_eq!(positions, [1., 0., 1., 2., 0., 1.]);
+    let field = &value["fields"][0];
+    assert_eq!(field["name"], "intensity");
+    assert_eq!(field["type"], "u8");
+    assert_eq!(blob(&field["data"]), [1, 2]);
+    assert_eq!(value["fields"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn location_frames_are_geojson_in_longitude_order() {
+    let (_dir, app) = visual_app();
+    let query = format!("&time_ns={}", support::ORIGIN);
+    let (_, events) = frames(&app, &view_url("views/latest", "/gps", "geo", &query)).await;
+    let feature = &events[0].0["value"]["features"][0];
+    assert_eq!(
+        feature["geometry"],
+        json!({"type": "Point", "coordinates": [139.76, 35.68, 40.0]})
+    );
+    assert_eq!(feature["properties"]["accuracy_m"], 3.0);
+    assert!(events[0].1.is_empty());
+}
+
+#[tokio::test]
+async fn latest_view_reports_nothing_and_unchanged_frames() {
+    let (_dir, app) = visual_app();
+    let camera = |query: String| view_url("views/latest", "/camera", "image", &query);
+    let (status, events) = frames(&app, &camera("&time_ns=1".into())).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        events[0].0,
+        json!({"type": "complete", "scanned_messages": 0})
+    );
+
+    let time = support::ORIGIN + support::VISUAL_STEP_NS;
+    // Later than the held frame but before the next one: the same message is current.
+    let query = format!("&time_ns={}&known_time_ns={time}", time + 5);
+    let (_, events) = frames(&app, &camera(query)).await;
+    assert_eq!(events[0].0, json!({"type": "unchanged"}));
+    assert!(events[0].1.is_empty());
+    assert_eq!(events[1].0["type"], "complete");
+
+    let query = format!("&time_ns={}&known_time_ns={}", time, support::ORIGIN);
+    let (_, events) = frames(&app, &camera(query)).await;
+    assert_eq!(events[0].0["type"], "frame");
+}
+
+#[tokio::test]
+async fn views_validate_their_requests() {
+    let (_dir, app) = visual_app();
+    let cases = [
+        (view_url("views/latest", "/camera", "image", ""), 400),
+        (
+            view_url("views/latest", "/camera", "image", "&time_ns=x"),
+            400,
+        ),
+        (
+            view_url(
+                "views/latest",
+                "/camera",
+                "image",
+                "&time_ns=1&known_time_ns=x",
+            ),
+            400,
+        ),
+        (
+            view_url("views", "/camera", "image", "&start_ns=2&end_ns=1"),
+            400,
+        ),
+        (view_url("views", "/camera", "nope", ""), 422),
+        (view_url("views", "/nope", "image", ""), 422),
+        (view_url("views", "/tf", "image", ""), 422),
+    ];
+    for (url, expected) in cases {
+        let (status, _) = frames(&app, &url).await;
+        assert_eq!(status.as_u16(), expected, "{url}");
+    }
+    let error = resolve(&app, &view_url("views", "/camera", "nope", "")).await;
+    let (_, body) = raw_get(&app, &error).await;
+    assert!(body["error"].as_str().unwrap().contains("nope"));
 }
 
 #[tokio::test]
@@ -1379,6 +1584,38 @@ async fn frames_are_merged_from_every_transform_topic() {
 }
 
 #[tokio::test]
+async fn transforms_resolve_the_graph_at_a_time() {
+    let (_dir, app) = visual_app();
+    let time = support::ORIGIN + support::VISUAL_STEP_NS + support::VISUAL_STEP_NS / 2;
+    let url = format!("/r/transforms?target=map&time_ns={time}");
+    let (status, body) = get(app.clone(), &url).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["target"], "map");
+    assert_eq!(body["time_ns"], time.to_string());
+    assert_eq!(body["frames"]["map"]["translation"], json!([0.0, 0.0, 0.0]));
+    assert_eq!(
+        body["frames"]["base_link"]["translation"],
+        json!([1.5, 0.0, 0.0])
+    );
+    assert_eq!(
+        body["frames"]["lidar"]["translation"],
+        json!([1.5, 0.0, 2.0])
+    );
+
+    // Outside the dynamic samples only what the static edge connects remains.
+    let (_, body) = get(app.clone(), "/r/transforms?target=lidar&time_ns=1").await;
+    assert!(body["frames"].get("base_link").is_some());
+    assert!(body["frames"].get("map").is_none());
+
+    let (status, _) = get(app.clone(), "/r/transforms?target=nope&time_ns=1").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (status, _) = get(app.clone(), "/r/transforms?target=map&time_ns=x").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = get(app, "/r/transforms?target=map").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn a_run_without_transforms_has_no_frames() {
     let dir = fixture(1, true);
     let app = hahn::router(dir.path()).unwrap();
@@ -1389,3 +1626,20 @@ async fn a_run_without_transforms_has_no_frames() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+#[tokio::test]
+async fn gzip_leaves_frames_alone() {
+    let (_dir, app) = visual_app();
+    let app = hahn::gzip(app);
+    let url = resolve(&app, &view_url("views", "/lidar", "pointcloud", "")).await;
+    let response = app
+        .oneshot(
+            Request::get(&url)
+                .header("accept-encoding", "gzip")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response.headers().get("content-encoding").is_none());
+}

@@ -38,6 +38,20 @@ At present, a shortened string can only be recognized by the trailing `…`.
 
 For example, with `enum_values` equal to `[{"name":"RUN","value":"1"},{"name":"ACTIVE","value":"1"}]`, numeric value `1` is returned as `"RUN"`, not `"ACTIVE"` or `"1"`. Undefined values `123` and `-1` are returned as `"123"` and `"-1"`; a missing value is `null`. A list containing these values is `["RUN","123","-1",null]`. The same strings are used when reading a single enum field with `preview=false`.
 
+**In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example.
+
+### Wire format
+
+Both operations respond with `application/vnd.hahn.frames`, a sequence of frames. Integers are little endian.
+
+```
+u32 header_len | u32 payload_len | header (UTF-8 JSON) | padding | payload
+```
+
+`stamp_ns` determines when a spatial value was measured; the frame's `time_ns` locates its message in the recording. To place an image or point cloud, resolve the transform samples at its measurement stamp, requesting them with its message log time as `log_time_ns` and a range around the stamp. To inspect the graph at a playback position instead, first resolve that position through `/clock`. A missing measurement stamp is not permission to use log time as a measurement timestamp.
+
+## Coordinate frames
+
 An empty query result for an existing readable topic is successful: message history emits `complete` without rows, latest messages return `null`, and views emit only `complete`. Missing values on schema-valid paths remain `null`. For group information only, the existing `422` response is retained for an empty group and identified by `empty_group`. Do not report this code merely because a selected topic or requested range has no messages, or because message-count statistics are unknown. A read or decode failure must report `recording_unreadable` rather than fabricate a successful empty result; the exception is the frame graph, which leaves out a group that cannot be read. A nonexistent topic remains `unknown_topic` even when the group contains no messages.
 
 ## Compression
