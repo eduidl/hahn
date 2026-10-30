@@ -173,8 +173,8 @@ async fn metadata_includes_all_field_types() {
     assert_eq!(
         mode["enum_values"],
         json!([
-            {"name":"IDLE", "value":0},
-            {"name":"ACTIVE", "value":1}
+            {"name":"IDLE", "value":"0"},
+            {"name":"ACTIVE", "value":"1"}
         ])
     );
     let (_, position) = fields
@@ -1357,6 +1357,10 @@ fn visual_app() -> (tempfile::TempDir, axum::Router) {
     support::write_visual_fixture(&dir.path().join("visual.mcap")).unwrap();
     let app = hahn::router(dir.path()).unwrap();
     (dir, app)
+}
+
+fn view_url(path: &str, topic: &str, view: &str, query: &str) -> String {
+    format!("/g/{path}?topic={topic}&view={view}{query}")
 }
 
 #[tokio::test]

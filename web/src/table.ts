@@ -15,11 +15,11 @@ export const clampColumnWidth = (width: number) =>
 export function defaultColumnWidth(column: Pick<TableColumn, "dataType" | "enumValues">): number {
   switch (column.dataType) {
     case "bool": return 72;
-    case "i8": case "u8": return 80;
-    case "i16": case "u16": return 88;
-    case "i32": case "u32": case "f32": return 104;
-    case "i64": case "u64": return 160;
-    case "f64": return 136;
+    case "int8": case "uint8": return 80;
+    case "int16": case "uint16": return 88;
+    case "int32": case "uint32": case "float32": return 104;
+    case "int64": case "uint64": return 160;
+    case "float64": return 136;
     case "enum": {
       const length = (column.enumValues ?? []).reduce((max, entry) => Math.max(max, entry.name.length), 0);
       return Math.max(96, Math.min(160, length * 7 + 36));

@@ -1,7 +1,7 @@
 //! Indexed, chunked MCAP recordings decoded by `mcapdecode`.
 
-use super::{Format, Source, SourceInfo, TimeRange, TopicMeta, Visit, has_extension};
-use anyhow::{Context, bail};
+use super::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit, has_extension};
+use anyhow::{Context, bail, ensure};
 use mcapdecode::{McapReader, ReadOptions, core::FieldDefs};
 use std::{
     collections::HashMap,
@@ -152,6 +152,7 @@ fn recording_summary(path: &Path) -> anyhow::Result<mcap::read::Summary> {
 
 fn info_from_summary(summary: mcap::read::Summary) -> anyhow::Result<SourceInfo> {
     if let Some(stats) = summary.stats {
+        ensure!(stats.message_count > 0, "No message time range");
         return Ok(SourceInfo {
             start_ns: stats.message_start_time,
             end_ns: stats.message_end_time,

@@ -236,7 +236,8 @@ struct FieldType {
 #[derive(Clone, Serialize)]
 struct EnumValue {
     name: String,
-    value: i64,
+    /// A string like other 64-bit integers.
+    value: String,
 }
 
 fn enum_values(data_type: &DataTypeDef) -> Option<Vec<EnumValue>> {
@@ -247,7 +248,7 @@ fn enum_values(data_type: &DataTypeDef) -> Option<Vec<EnumValue>> {
                 .iter()
                 .map(|value| EnumValue {
                     name: value.name.clone(),
-                    value: value.value,
+                    value: value.value.to_string(),
                 })
                 .collect(),
         ),

@@ -1,3 +1,5 @@
+import type { EnumValue, Schemas } from "./types";
+
 export type Row = { time_ns: string; values: (number | string | boolean | null)[] };
 type MessagesEvent = Schemas["MessagesEvent"];
 /** The schema's events, generic over the row type the reader decodes them into. */
@@ -13,10 +15,10 @@ export type Point = {
 /** A discrete value as text: enum variant names, `true`/`false`, strings as is. */
 export function stateLabel(
   raw: number | string | boolean | null,
-  enumValues?: { name: string; value: number }[],
+  enumValues?: EnumValue[],
 ) {
   if (typeof raw === "boolean") return raw ? "true" : "false";
-  return enumValues?.find((entry) => entry.value === Number(raw))?.name ?? String(raw);
+  return enumValues?.find((entry) => entry.value === String(raw))?.name ?? String(raw);
 }
 export const secondsFrom = (ns: string, origin: string) =>
   Number(BigInt(ns) - BigInt(origin)) / 1e9;
@@ -25,11 +27,11 @@ export function point(
   row: Row,
   field: number,
   origin: string,
-  enumValues: { name: string; value: number }[] = [],
+  enumValues: EnumValue[] = [],
 ): Point {
   const raw = row.values[field];
   const enumValue = typeof raw === "string"
-    ? enumValues.find((entry) => entry.name === raw)?.value ?? Number(raw)
+    ? Number(enumValues.find((entry) => entry.name === raw)?.value ?? raw)
     : NaN;
   const n = raw === null ? NaN : typeof raw === "string" && enumValues.length ? enumValue : Number(raw);
   return {
