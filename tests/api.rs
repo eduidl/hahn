@@ -1329,6 +1329,20 @@ async fn parquet_rejects_reserved_field_names() {
 }
 
 #[tokio::test]
+async fn runs_declare_the_configured_timezone() {
+    let dir = fixture(10, true);
+    let declared = |app: axum::Router| async move {
+        let url = resolve(&app, "/g").await;
+        let run = url.split("/groups/").next().unwrap().to_owned();
+        raw_get(&app, &run).await.1["timezone"].clone()
+    };
+    let plain = hahn::router(dir.path()).unwrap();
+    assert_eq!(declared(plain).await, Value::Null);
+    let tokyo = hahn::router_with_timezone(dir.path(), Some("Asia/Tokyo".into())).unwrap();
+    assert_eq!(declared(tokyo).await, "Asia/Tokyo");
+}
+
+#[tokio::test]
 async fn a_group_without_messages_has_no_time_range() {
     for stats in [true, false] {
         let dir = fixture(0, stats);

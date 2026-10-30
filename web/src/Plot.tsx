@@ -6,7 +6,7 @@ import {
   useState,
   type SetStateAction,
 } from "react";
-import { timeFormatter, type TimeDisplay } from "./timeDisplay";
+import { useTimeFormatter, type TimeDisplay } from "./timeDisplay";
 import { lowerBound, nearest, type Point } from "./data";
 import {
   axisRange,

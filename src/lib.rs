@@ -44,25 +44,12 @@ pub fn gzip(router: Router) -> Router {
 }
 
 pub fn router(root: &FsPath) -> anyhow::Result<Router> {
-    let root = root.canonicalize()?;
-    let mut paths = Vec::new();
-    discover(&root, &mut paths)?;
-    paths.sort_by(|a, b| a.0.cmp(&b.0));
-    let files = paths
-        .into_iter()
-        .enumerate()
-        .map(|(id, (path, opener))| {
-            Ok(FileEntry {
-                id,
-                name: path.strip_prefix(&root)?.to_string_lossy().into_owned(),
-                size_bytes: path.metadata()?.len(),
-                format: opener.name(),
-                path,
-                opener,
-                source: OnceLock::new(),
-            })
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+    router_with_timezone(root, None)
+}
+
+/// `timezone` is the IANA name to declare for every run.
+pub fn router_with_timezone(root: &FsPath, timezone: Option<String>) -> anyhow::Result<Router> {
+    let runs = catalog::discover(&root.canonicalize()?, timezone)?;
     Ok(Router::new()
         .route("/api/runs", get(runs_list))
         .route("/api/runs/{run}", get(run_detail))

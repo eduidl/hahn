@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeFormatter } from "./timeDisplay";
+import { timeFormatter, usableTimeZone } from "./timeDisplay";
 const origin = (
   BigInt(Date.parse("2026-01-04T23:59:59.123Z")) * 1_000_000n +
   456_789n
@@ -36,5 +36,13 @@ describe("time display", () => {
     expect(relative.tooltip(-2)).toBe("-2 s");
     expect(timeFormatter(null, "absolute").tick(0).time).toBe("—");
     expect(timeFormatter(origin, "absolute").tick(1e308).time).toBe("—");
+  });
+});
+
+describe("usableTimeZone", () => {
+  it("keeps names the browser knows and drops the rest", () => {
+    expect(usableTimeZone("Asia/Tokyo")).toBe("Asia/Tokyo");
+    expect(usableTimeZone("Mars/Olympus")).toBeNull();
+    expect(usableTimeZone(null)).toBeNull();
   });
 });

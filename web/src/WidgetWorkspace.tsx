@@ -1,5 +1,7 @@
 import {
+  Suspense,
   createContext,
+  lazy,
   useContext,
   useCallback,
   useEffect,
@@ -14,7 +16,7 @@ import { TabBar } from "./TabControls";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
 import { Plot, defaultPlotView, type PlotView, type Series } from "./Plot";
-import { timeFormatter } from "./timeDisplay";
+import { useTimeFormatter } from "./timeDisplay";
 import type { DropVerdict } from "./drop";
 import { stateLabel } from "./data";
 import { LogView } from "./LogView";
@@ -102,7 +104,7 @@ function StatePlayhead({ fullEnd }: { fullEnd: number }) {
 }
 
 function StatePlot({ widget, series, fullEnd, originNs }: { widget: Widget; series: Series[]; fullEnd: number; originNs: string | null }) {
-  const formatter = timeFormatter(originNs, widget.timeDisplay);
+  const formatter = useTimeFormatter(originNs, widget.timeDisplay);
   const visible = series.filter((s) => !s.hidden);
   const segments = useMemo(
     () => new Map(visible.map((item) => [item.key, stateSegments(item, fullEnd)])),

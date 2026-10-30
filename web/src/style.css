@@ -86,14 +86,6 @@ header {
   color: #909090;
   margin-left: 20px;
 }
-.local {
-  font:
-    10px ui-monospace,
-    monospace;
-  letter-spacing: 1px;
-  color: #939393;
-}
-.local i,
 .playback-status i {
   display: inline-block;
   width: 6px;
@@ -773,9 +765,6 @@ canvas {
   .series-status {
     max-width: none;
   }
-  .local {
-    font-size: 8px;
-  }
   .plot-heading {
     flex-direction: column;
     align-items: stretch;
@@ -1131,9 +1120,6 @@ header .add-widget {
   outline-offset: -8px;
   background: #0c0e13;
 }
-header .local {
-  margin-left: 24px;
-}
 .workspace > main {
   height: calc(100dvh - 73px - var(--playback-height));
   min-height: 0;
@@ -1141,17 +1127,6 @@ header .local {
   overflow: hidden;
 }
 /* Centered on the header regardless of the side groups' widths. */
-.header-file {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 30vw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: #c5c5c5;
-}
 .playback-status .stop-loading {
   margin-left: 12px;
   padding: 2px 8px;
@@ -1551,9 +1526,6 @@ header .local {
   font-size: 12px;
 }
 @media (max-width: 640px) {
-  header .local {
-    display: none;
-  }
   .workspace > main {
     height: 75dvh;
     min-height: 360px;

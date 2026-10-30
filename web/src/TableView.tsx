@@ -3,7 +3,7 @@ import { secondsFrom } from "./data";
 import type { FieldIndex } from "./fieldIndex";
 import { usePlayback, usePlaybackStore } from "./playback";
 import { cellValue, clampColumnWidth, defaultColumnWidth, minColumnWidth, maxColumnWidth, tableColumns, type MessageRow, type TableColumn } from "./table";
-import { timeFormatter } from "./timeDisplay";
+import { useTimeFormatter } from "./timeDisplay";
 import type { MessageRecord } from "./useMessages";
 import type { Widget, WorkspaceAction } from "./widgets";
 
@@ -90,7 +90,7 @@ export function TableView({ widget, record, index, originNs, dispatch }: {
     widget.columnWidths?.[column === null ? "time" : JSON.stringify(column.path)] ?? (column === null ? timeWidth : defaultColumnWidth(column));
   const resize = (path: string[] | null, width: number) =>
     dispatch({ type: "table-column-width", id: widget.id, path, width });
-  const formatter = useMemo(() => timeFormatter(originNs, widget.timeDisplay), [originNs, widget.timeDisplay]);
+  const formatter = useTimeFormatter(originNs, widget.timeDisplay);
   const viewport = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(0);

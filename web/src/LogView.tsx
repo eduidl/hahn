@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { stateLabel } from "./data";
 import type { Series } from "./Plot";
 import { usePlayback, usePlaybackStore } from "./playback";
-import { timeFormatter } from "./timeDisplay";
+import { useTimeFormatter } from "./timeDisplay";
 import type { Widget } from "./widgets";
 
 type Row = { x: number; ns: string; series: number; value: string };
@@ -61,10 +61,7 @@ export function LogView({
   const visibility = JSON.stringify(series.map((s) => [s.key, s.hidden, s.points.length]));
   // Points grow in place, so rebuild on new data rather than on every playhead frame.
   const rows = useMemo(() => changes(series), [visibility, revision]);
-  const formatter = useMemo(
-    () => timeFormatter(originNs, widget.timeDisplay),
-    [originNs, widget.timeDisplay],
-  );
+  const formatter = useTimeFormatter(originNs, widget.timeDisplay);
   const list = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(0);
