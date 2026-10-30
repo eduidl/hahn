@@ -89,7 +89,7 @@ async fn compare(file_name: &str, topic: &str, fields: &[Vec<String>]) {
         .unwrap();
     let runs: serde_json::Value =
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
-    let id = files
+    let run = runs["items"]
         .as_array()
         .unwrap()
         .iter()

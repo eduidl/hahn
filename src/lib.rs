@@ -22,6 +22,10 @@ use tower_http::compression::{
     predicate::{DefaultPredicate, NotForContentType, Predicate},
 };
 
+/// Runs returned when a request sets no limit.
+const DEFAULT_RUNS: usize = 50;
+const MAX_RUNS: usize = 200;
+
 #[derive(Clone)]
 struct AppState {
     runs: Arc<Vec<Run>>,
@@ -163,6 +167,21 @@ async fn runs_list(
             format!("Limit must be between 1 and {MAX_RUNS}"),
         ));
     }
+    let needle = query.q.unwrap_or_default().to_lowercase();
+    let mut matches = state
+        .runs
+        .iter()
+        .filter(|r| r.name.to_lowercase().contains(&needle));
+    let items: Vec<_> = matches
+        .by_ref()
+        .take(limit)
+        .map(|r| RunSummary {
+            id: &r.id,
+            name: &r.name,
+        })
+        .collect();
+    let truncated = matches.next().is_some();
+    Ok(Json(RunList { items, truncated }).into_response())
 }
 
 async fn run_detail(

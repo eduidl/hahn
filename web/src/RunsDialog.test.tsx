@@ -33,3 +33,84 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("RunsDialog", () => {
+  it("asks the server for a limited list", async () => {
+    render(<RunsDialog {...props} open />);
+    await screen.findByText("Parking");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/runs?limit=50");
+  });
+
+  it("searches on the server once typing settles", async () => {
+    render(<RunsDialog {...props} open />);
+    await screen.findByText("Parking");
+    fetchMock.mockClear();
+    const search = screen.getByLabelText("走行を検索");
+    fireEvent.change(search, { target: { value: "dri" } });
+    fireEvent.change(search, { target: { value: "drive" } });
+    await vi.waitFor(() => expect(names()).toEqual(["Morning drive", "Night drive"]));
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/runs?limit=50&q=drive"]);
+  });
+
+  it("selects on click and with Enter on the first match", async () => {
+    const onSelect = vi.fn();
+    render(<RunsDialog {...props} onSelect={onSelect} open />);
+    fireEvent.click(await screen.findByRole("option", { name: "Parking", hidden: true }));
+    expect(onSelect).toHaveBeenLastCalledWith("c");
+    fireEvent.keyDown(screen.getByLabelText("走行を検索"), { key: "Enter" });
+    expect(onSelect).toHaveBeenLastCalledWith("a");
+  });
+
+  it("moves with the arrow keys, wrapping at the ends, and selects with Enter", async () => {
+    const onSelect = vi.fn();
+    render(<RunsDialog {...props} onSelect={onSelect} open />);
+    await screen.findByText("Parking");
+    const search = screen.getByLabelText("走行を検索");
+    const selected = () =>
+      screen.getAllByRole("option", { hidden: true }).filter((o) => o.getAttribute("aria-selected") === "true").map((o) => o.textContent);
+    expect(selected()).toEqual(["Morning drive"]);
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    expect(selected()).toEqual(["Night drive"]);
+    expect(search.getAttribute("aria-activedescendant")).toBe("run-option-1");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onSelect).toHaveBeenLastCalledWith("b");
+    fireEvent.keyDown(search, { key: "ArrowUp" });
+    fireEvent.keyDown(search, { key: "ArrowUp" });
+    expect(selected()).toEqual(["Parking"]);
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    expect(selected()).toEqual(["Morning drive"]);
+  });
+
+  it("returns to the first match when the results change", async () => {
+    render(<RunsDialog {...props} open />);
+    await screen.findByText("Parking");
+    const search = screen.getByLabelText("走行を検索");
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.change(search, { target: { value: "drive" } });
+    await vi.waitFor(() => expect(names()).toHaveLength(2));
+    expect(search.getAttribute("aria-activedescendant")).toBe("run-option-0");
+  });
+
+  it("asks to narrow down a truncated list", async () => {
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ items: runs, truncated: true })));
+    render(<RunsDialog {...props} open />);
+    await screen.findByText("上位 3 件を表示中。検索で絞り込んでください");
+  });
+
+  it("shows the server's error", async () => {
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: "disk failure" }), { status: 500 }));
+    render(<RunsDialog {...props} open />);
+    expect((await screen.findByRole("alert")).textContent).toBe("disk failure");
+  });
+
+  it("marks the current run and clears the search when reopened", async () => {
+    const { rerender } = render(<RunsDialog {...props} current="b" open />);
+    const night = await screen.findByRole("option", { name: "Night drive", hidden: true });
+    expect(night.getAttribute("aria-current")).toBe("true");
+    fireEvent.change(screen.getByLabelText("走行を検索"), { target: { value: "night" } });
+    await vi.waitFor(() => expect(names()).toEqual(["Night drive"]));
+    rerender(<RunsDialog {...props} current="b" open={false} />);
+    rerender(<RunsDialog {...props} current="b" open />);
+    expect((screen.getByLabelText("走行を検索") as HTMLInputElement).value).toBe("");
+    await vi.waitFor(() => expect(names()).toHaveLength(3));
+  });
+});

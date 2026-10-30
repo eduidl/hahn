@@ -1140,6 +1140,40 @@ async fn overlapping_segments_are_rejected() {
 }
 
 #[tokio::test]
+async fn runs_are_filtered_and_limited() {
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["Morning.csv", "morning_2.csv", "night.csv"] {
+        std::fs::write(dir.path().join(name), "t_ns,v\n1,1\n").unwrap();
+    }
+    let app = hahn::router(dir.path()).unwrap();
+    let names = |body: &Value| -> Vec<String> {
+        body["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["name"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let (_, all) = raw_get(&app, "/api/runs").await;
+    assert_eq!(names(&all).len(), 3);
+    assert_eq!(all["truncated"], false);
+    let (_, found) = raw_get(&app, "/api/runs?q=MORN").await;
+    assert_eq!(names(&found), ["Morning.csv", "morning_2.csv"]);
+    let (_, limited) = raw_get(&app, "/api/runs?q=morn&limit=1").await;
+    assert_eq!(names(&limited), ["Morning.csv"]);
+    assert_eq!(limited["truncated"], true);
+    let (_, exact) = raw_get(&app, "/api/runs?q=morn&limit=2").await;
+    assert_eq!(exact["truncated"], false);
+    let (_, none) = raw_get(&app, "/api/runs?q=nope").await;
+    assert_eq!(none, json!({"items": [], "truncated": false}));
+    for limit in ["0", "201", "x"] {
+        let (status, body) = raw_get(&app, &format!("/api/runs?limit={limit}")).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{limit}");
+        assert!(body["error"].is_string());
+    }
+}
+
+#[tokio::test]
 async fn exact_values_do_not_shorten_strings_and_require_a_scalar() {
     let long = "x".repeat(10_050);
     let dir = csv_fixture("drive.csv", &format!("t_ns,label\n1,{long}\n"));

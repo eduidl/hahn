@@ -56,6 +56,32 @@ const endsComplete = (url, events) => {
   if (events.at(-1)?.type !== "complete") failures.push(`${url}: does not end with complete`);
 };
 
+const unknown = "/api/runs/no-such-run";
+const [{ items: runs }] = await check("/api/runs", "/api/runs?limit=200", 200);
+for (const limit of ["0", "201", "x"]) await check("/api/runs", `/api/runs?limit=${limit}`, 400);
+const [limited] = await check("/api/runs", "/api/runs?limit=1", 200);
+if (limited.items.length !== 1 || limited.truncated !== runs.length > 1)
+  failures.push("limit=1: wrong items or truncated");
+const named = runs[0].name;
+const [found] = await check("/api/runs", `/api/runs?${new URLSearchParams({ q: named.toUpperCase() })}`, 200);
+if (!found.items.some((r) => r.id === runs[0].id) || found.items.some((r) => !r.name.toLowerCase().includes(named.toLowerCase())))
+  failures.push(`q=${named}: wrong matches`);
+const [noRuns] = await check("/api/runs", "/api/runs?q=no-such-run", 200);
+if (noRuns.items.length || noRuns.truncated) failures.push("q=no-such-run: expected nothing");
+await check("/api/runs/{run}", unknown, 404);
+let root;
+let visual;
+for (const run of runs) {
+  const [detail] = await check("/api/runs/{run}", `/api/runs/${run.id}`, 200);
+  const demo = detail.groups.find((g) => g.name.includes("demo"));
+  if (demo) root = `/api/runs/${run.id}/groups/${demo.id}`;
+  const recorded = detail.groups.find((g) => g.name.includes("visual"));
+  if (recorded) visual = `/api/runs/${run.id}/groups/${recorded.id}`;
+}
+if (!root) throw new Error("data/samples/demo.mcap is not being served");
+if (!visual) throw new Error("data/samples/visual.mcap is not being served");
+const runRoot = root.slice(0, root.indexOf("/groups/"));
+
 const info = "/api/runs/{run}/groups/{group}";
 await check(info, root, 200);
 await check(info, `${unknown}/groups/x`, 404);
