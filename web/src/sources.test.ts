@@ -40,3 +40,21 @@ describe("sourceUrl", () => {
   });
 });
 
+describe("initialSources", () => {
+  const group = (id: string, default_open: boolean) => ({ id, name: id, default_open });
+  const run = (...groups: ReturnType<typeof group>[]) => ({ id: "r", name: "r", timezone: null, groups });
+
+  it("opens what the server marks as default", () => {
+    expect(initialSources(run(group("a", true), group("b", false)))).toEqual(["r/a"]);
+    expect(initialSources(run(group("a", false), group("b", false)))).toEqual([]);
+  });
+
+  it("always opens a lone group", () => {
+    expect(initialSources(run(group("a", false)))).toEqual(["r/a"]);
+  });
+
+  it("opens nothing without groups", () => {
+    expect(initialSources(run())).toEqual([]);
+  });
+});
+
