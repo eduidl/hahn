@@ -38,7 +38,7 @@ describe("plot data", () => {
       { time_ns: "12", values: ["ACTIVE"] },
       0,
       "10",
-      [{ name: "IDLE", value: 0 }, { name: "ACTIVE", value: 1 }],
+      [{ name: "IDLE", value: "0" }, { name: "ACTIVE", value: "1" }],
     );
     expect(p.y).toBe(1);
     expect(p.raw).toBe("ACTIVE");

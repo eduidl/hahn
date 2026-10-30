@@ -518,6 +518,7 @@ export function App() {
                               t.message_count === null
                                 ? null
                                 : `${t.message_count.toLocaleString()} 件`,
+                              ...t.views.map((view) => view.name),
                             ]
                               .filter(Boolean)
                               .join(" · ")}

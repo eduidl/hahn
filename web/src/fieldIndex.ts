@@ -7,7 +7,7 @@ import {
   type Topic,
   type ValueKind,
 } from "./types";
-import { acceptsKind, widgetSpecs, widgetTypes, type Widget } from "./widgets";
+import { acceptsField, widgetSpecs, widgetTypes, type Widget } from "./widgets";
 
 export type IndexedField = {
   key: string;
@@ -65,7 +65,9 @@ export function buildFieldIndex(topics: Topic[]): FieldIndex {
   const candidates = Object.fromEntries(
     widgetTypes.map((type) => [
       type,
-      readable.filter((entry) => acceptsKind(widgetSpecs[type], entry.kind)),
+      readable.filter((entry) =>
+        acceptsField(widgetSpecs[type], entry.topic, entry.field.path, entry.kind),
+      ),
     ]),
   ) as FieldIndex["candidates"];
   return {

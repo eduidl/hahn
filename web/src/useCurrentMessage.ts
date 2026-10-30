@@ -59,7 +59,7 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
 
   const index = rows ? messageAt(rows, ns) : -1;
   const seed = fallback?.identity === identity ? fallback.row : undefined;
-  const message = index >= 0 ? rows![index] : seed !== undefined ? seed : rows && series && cache.hasHistory(series) ? rows[0] ?? null : undefined;
+  const message = index >= 0 ? rows![index] : seed !== undefined ? seed : rows && series && cache.hasHistory(series) ? null : undefined;
   const error = failure?.identity === identity ? failure.error : "";
   const buffering = !!series && !!info && message === undefined && !error;
   useEffect(() => {

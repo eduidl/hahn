@@ -7,7 +7,7 @@ import { keyOf, type Selected } from "./types";
 
 const first: Container = { widgetId: "widget-1", tabId: "tab-1" };
 const second: Container = { ...first, tabId: "tab-2" };
-const series: Selected = { key: keyOf(0, "/t", ["x"]), source: 0, topic: "/t", path: ["x"], color: "red", lineWidth: 2, hidden: false };
+const series: Selected = { key: keyOf("r/0", "/t", ["x"]), source: "r/0", topic: "/t", path: ["x"], color: "red", lineWidth: 2, hidden: false };
 const initial = () => reduce(initialWorkspace(), { type: "change-type", id: "widget-1", widgetType: "tabs" });
 function invariant(state: WorkspaceState) {
   const ids = [...leaves(state.layout), ...Object.values(state.widgets).flatMap((w) => w.type === "tabs" ? w.tabs.flatMap((t) => leaves(t.layout)) : [])];

@@ -6,9 +6,11 @@ import type { FieldIndex, IndexedField } from "./fieldIndex";
 import type { CachedSeries } from "./useSeries";
 import type { Selected } from "./types";
 import { tableColumns } from "./table";
+import { fixedFrameOf, useFrames } from "./useViewData";
 import {
   addFieldAction,
   legendPositions,
+  osmTiles,
   widgetSpecs,
   type LegendPosition,
   type Widget,
@@ -436,6 +438,72 @@ function SingleTargetPanel(props: PanelProps) {
   );
 }
 
+/** Series of a view have nothing to load in advance, and take no line width. */
+function ViewSeriesList(props: PanelProps) {
+  return (
+    <SeriesList
+      {...props}
+      showPoints={false}
+      row={(s) => (
+        <SeriesRow key={s.key} {...props} series={s} showStatus={false} marker={<i style={{ background: s.color }} />} />
+      )}
+    />
+  );
+}
+
+function ScenePanel(props: PanelProps) {
+  const { widget, dispatch } = props;
+  const { frames, error } = useFrames(widget.series.map((s) => s.source));
+  const fixed = fixedFrameOf(widget.fixedFrame, frames);
+  return (
+    <>
+      <PanelHeader {...props} />
+      <label className="time-display-setting">
+        固定座標系
+        <select
+          aria-label="固定座標系"
+          value={fixed ?? ""}
+          disabled={!frames.length}
+          onChange={(event) => dispatch({ type: "fixed-frame", id: widget.id, value: event.target.value })}
+        >
+          {!frames.length && <option value="">{error || "座標系がありません"}</option>}
+          {frames.map((frame) => <option key={frame.id} value={frame.id}>{frame.id}</option>)}
+        </select>
+      </label>
+      <FieldPicker {...props} />
+      <ViewSeriesList {...props} />
+    </>
+  );
+}
+
+function MapPanel(props: PanelProps) {
+  const { widget, dispatch } = props;
+  const setTiles = (value: string) => dispatch({ type: "tile-url", id: widget.id, value });
+  return (
+    <>
+      <PanelHeader {...props} />
+      <section className="target-setting" aria-label="地図タイル">
+        <div className="legend-heading">地図タイル</div>
+        <input
+          className="search"
+          type="url"
+          aria-label="地図タイルのURL"
+          placeholder="https://…/{z}/{x}/{y}.png"
+          value={widget.tileUrl}
+          onChange={(event) => setTiles(event.target.value.trim())}
+        />
+        <p className="help">表示範囲がタイルの配信元に送られます。送りたくない場合は「使わない」を選びます。</p>
+        <div className="table-column-actions">
+          <button disabled={widget.tileUrl === osmTiles} onClick={() => setTiles(osmTiles)}>OpenStreetMap を使う</button>
+          <button disabled={!widget.tileUrl} onClick={() => setTiles("")}>使わない</button>
+        </div>
+      </section>
+      <FieldPicker {...props} />
+      <ViewSeriesList {...props} />
+    </>
+  );
+}
+
 const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
   tabs: (props) => props.widget.type === "tabs" ? <TabSettings widget={props.widget} dispatch={props.dispatch} /> : null,
   "time-series": TimeSeriesPanel,
@@ -443,6 +511,9 @@ const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
   raw: SingleTargetPanel,
   log: LogPanel,
   table: SingleTargetPanel,
+  image: SingleTargetPanel,
+  scene: ScenePanel,
+  map: MapPanel,
 };
 
 /** Settings for the selected widget, chosen wholesale by widget type. */

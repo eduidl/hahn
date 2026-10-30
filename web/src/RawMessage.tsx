@@ -77,7 +77,7 @@ export function RawMessage({
 }) {
   const series = widget.series[0];
   const { message, error } = useCurrentMessage(series, info);
-  const formatter = useMemo(() => timeFormatter(info?.start_ns ?? null, widget.timeDisplay), [info?.start_ns, widget.timeDisplay]);
+  const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
 
   // Folding state lives in the <details> elements, so new messages keep it.
   const tree = useRef<HTMLDivElement>(null);

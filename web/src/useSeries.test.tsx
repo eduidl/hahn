@@ -11,8 +11,8 @@ const info: Info = {
   message_count: 2,
 };
 const field = (name: string): Selected => ({
-  key: keyOf(0, "/pose", [name]),
-  source: 0,
+  key: keyOf("r/0", "/pose", [name]),
+  source: "r/0",
   topic: "/pose",
   path: [name],
   color: "#91b8ff",

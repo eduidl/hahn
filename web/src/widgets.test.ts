@@ -12,8 +12,8 @@ import { keyOf, type Selected } from "./types";
 import { widgetSeries } from "./WidgetWorkspace";
 
 const series: Selected = {
-  key: keyOf(0, "/pose", ["x"]),
-  source: 0,
+  key: keyOf("r/0", "/pose", ["x"]),
+  source: "r/0",
   topic: "/pose",
   path: ["x"],
   color: "#ff0000",
@@ -131,7 +131,7 @@ describe("widget workspace", () => {
     expect(requestedSeries(state.widgets)).toEqual([]);
   });
   it("keeps series of recordings that stay open and resets views", () => {
-    const other: Selected = { ...series, key: keyOf(1, "/pose", ["x"]), source: 1 };
+    const other: Selected = { ...series, key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
     let state = reduce(initialWorkspace(), {
       type: "series",
       id: "widget-1",
@@ -142,7 +142,7 @@ describe("widget workspace", () => {
       id: "widget-1",
       update: (view) => ({ ...view, x: { center: 0.2, zoom: 4 } }),
     });
-    state = reduce(state, { type: "sources", open: new Set([1, 2]) });
+    state = reduce(state, { type: "sources", open: new Set(["r/1", "r/2"]) });
     expect(state.widgets["widget-1"].series).toEqual([other]);
     expect(state.widgets["widget-1"].view).toEqual(defaultPlotView());
   });
@@ -256,10 +256,10 @@ describe("widget workspace", () => {
         type: "view", id: "widget-1",
         update: (view) => ({ ...view, y: { center: 0.7, zoom: 3 }, pinnedYBase: [0, 1] }),
       });
-    const numeric = { ...series, dataType: "f64" };
+    const numeric = { ...series, dataType: "float64" };
     let state = reduce(initialWorkspace(), { type: "series", id: "widget-1", update: () => [numeric] });
     state = zoomed(state);
-    const other = { ...numeric, key: keyOf(0, "/pose", ["y"]), path: ["y"], dataType: "u8" };
+    const other = { ...numeric, key: keyOf("r/0", "/pose", ["y"]), path: ["y"], dataType: "uint8" };
     state = reduce(state, { type: "series", id: "widget-1", update: (list) => [...list, other] });
     expect(state.widgets["widget-1"].view.pinnedYBase).toEqual([0, 1]);
     // Emptying the widget returns it to the unconstrained state.
@@ -268,7 +268,7 @@ describe("widget workspace", () => {
     state = zoomed(state);
     state = reduce(state, {
       type: "series", id: "widget-1",
-      update: () => [{ ...series, dataType: "enum", enumValues: [{ name: "IDLE", value: 0 }] }],
+      update: () => [{ ...series, dataType: "enum", enumValues: [{ name: "IDLE", value: "0" }] }],
     });
     expect(state.widgets["widget-1"].view.y).toEqual(defaultPlotView().y);
     expect(state.widgets["widget-1"].view.pinnedYBase).toBeNull();
