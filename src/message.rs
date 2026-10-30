@@ -79,6 +79,15 @@ pub(crate) async fn message(
     .map(Json)
 }
 
+pub(crate) fn parse_time(value: &str) -> Result<u64, ApiError> {
+    value.parse().map_err(|_| {
+        ApiError(
+            StatusCode::BAD_REQUEST,
+            "Timestamps must be unsigned nanosecond strings".into(),
+        )
+    })
+}
+
 fn field_type<'a>(defs: &'a FieldDefs, index: &[usize]) -> &'a DataTypeDef {
     let data_type = &defs[index[0]].element.data_type;
     match (&index[1..], data_type) {

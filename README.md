@@ -123,7 +123,10 @@ npm run build
 
 `GET /api/files/{id}` は `start_ns`、`end_ns`（最終時刻を含む）、`message_count` を返します。StatisticsがなければChunkIndexの時間範囲を使い、件数はnullになります。
 
-`GET /api/files/{id}/topics` はトピック名、スキーマ名、メッセージ数、全フィールドのパス・型一覧、トピック単位の非対応理由を返します。
+```bash
+scripts/conformance.sh                                   # the Rust server
+cd web && BASE_URL=http://host:port npm run conformance  # any other server
+```
 
 `POST /api/files/{id}/series`:
 
