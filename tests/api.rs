@@ -1246,6 +1246,60 @@ async fn exact_values_do_not_shorten_strings_and_require_a_scalar() {
 }
 
 #[tokio::test]
+async fn meta_fields_read_times_recorded_beside_the_message() {
+    let dir = fixture(10, true);
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    assert_eq!(
+        topics[0]["meta_fields"],
+        json!([
+            {"name":"log_time","data_type":"uint64","type_name":"uint64"},
+            {"name":"publish_time","data_type":"uint64","type_name":"uint64"},
+        ])
+    );
+    let read = |meta: &'static str| {
+        stream(
+            app.clone(),
+            "/g/messages",
+            json!({"topic":"/telemetry","meta":meta}),
+        )
+    };
+    let (_, published) = read("publish_time").await;
+    let row = &published[0]["rows"][0];
+    assert_eq!(row["time_ns"], support::ORIGIN.to_string());
+    assert_eq!(
+        row["value"],
+        (support::ORIGIN + support::PUBLISH_DELAY_NS).to_string()
+    );
+    let (_, logged) = read("log_time").await;
+    assert_eq!(logged[0]["rows"][0]["value"], support::ORIGIN.to_string());
+    let (status, _) = read("nope").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (status, _) = stream(
+        app.clone(),
+        "/g/messages",
+        json!({"topic":"/telemetry","meta":"log_time","path":["signal"]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let at = support::ORIGIN + 3;
+    let (_, latest) = get(
+        app,
+        &format!("/g/messages/latest?topic=/telemetry&meta=publish_time&time_ns={at}"),
+    )
+    .await;
+    assert_eq!(
+        latest["value"],
+        (support::ORIGIN + support::PUBLISH_DELAY_NS).to_string()
+    );
+    // Formats without them list none.
+    let dir = csv_fixture("drive.csv", "t_ns,v\n1,1\n");
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app, "/g/topics").await;
+    assert_eq!(topics[0]["meta_fields"], json!([]));
+}
+
+#[tokio::test]
 async fn parquet_rejects_reserved_field_names() {
     use arrow::{
         array::{ArrayRef, Float64Array, RecordBatch, TimestampNanosecondArray},

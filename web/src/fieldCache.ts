@@ -1,7 +1,8 @@
 import { createContext, useContext } from "react";
 import { consumeStream, type StreamEvent } from "./data";
+import { messagesUrl, setField, sourceUrl } from "./sources";
 import type { Json, MessageRow } from "./table";
-import { keyOf, type Selected } from "./types";
+import { isMetaPath, keyOf, type Selected } from "./types";
 
 export type FieldTarget = Pick<Selected, "source" | "topic" | "path">;
 type Cell = { value: Json } | { children: string[] };
@@ -20,7 +21,9 @@ type Block = {
 };
 type Listener = (event: StreamEvent<MessageRow>) => void;
 type Job = { block: Block; controller: AbortController; listeners: Set<Listener>; done: Promise<void> };
-const prefix = (parent: string[], child: string[]) => parent.length <= child.length && parent.every((p, i) => p === child[i]);
+// A message holds its fields, but not the meta fields recorded beside it.
+const prefix = (parent: string[], child: string[]) => parent.length <= child.length && parent.every((p, i) => p === child[i])
+  && isMetaPath(parent) === isMetaPath(child);
 const pathKey = (path: string[]) => JSON.stringify(path);
 const compound = (value: Json): value is Record<string, Json> => value !== null && typeof value === "object" && !Array.isArray(value)
   && !("$bytes" in value) && !("$truncated" in value);
@@ -202,8 +205,8 @@ export class FieldCache {
     if (hit) return hit.result;
     const controller = new AbortController();
     const params = new URLSearchParams({ topic: target.topic, time_ns });
-    if (target.path.length) params.set("path", JSON.stringify(target.path));
-    const result = fetch(`/api/files/${target.source}/message?${params}`, { signal: controller.signal }).then(async (response) => {
+    setField(params, target.path);
+    const result = fetch(`${sourceUrl(target.source)}/messages/latest?${params}`, { signal: controller.signal }).then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error ?? `HTTP ${response.status}`);
       return body as MessageRow | null;
@@ -237,10 +240,7 @@ export class FieldCache {
       this.jobs.set(key, job);
       const current = job;
       const generation = this.generation;
-      job.done = fetch(`/api/files/${target.source}/messages`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: target.topic, path: target.path, ...range }), signal: controller.signal,
-      }).then((response) => consumeStream<MessageRow>(response, (event) => {
+      job.done = fetch(messagesUrl(target, { range }), { signal: controller.signal }).then((response) => consumeStream<MessageRow>(response, (event) => {
         if (controller.signal.aborted || generation !== this.generation) return;
         if (event.type === "batch") this.append(block, event.rows);
         if (event.type === "complete") block.complete = true;

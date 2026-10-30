@@ -24,6 +24,8 @@ pub(crate) struct MessageQuery {
     topic: String,
     /// JSON array of struct field names; omit for the whole message.
     path: Option<String>,
+    /// A name from the topic\'s `meta_fields`, to read instead of the message.
+    meta: Option<String>,
     time_ns: String,
 }
 
@@ -45,6 +47,7 @@ pub(crate) async fn latest(
     blocking(move || {
         let source = group.source()?;
         let defs = source.field_defs(&query.topic)?;
+        check_meta(&*source, &query.meta)?;
         let index = if field.is_empty() {
             Vec::new()
         } else {
@@ -106,6 +109,26 @@ fn parse_field(path: &Option<String>, meta: &Option<String>) -> Result<Vec<Strin
             .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Invalid field path".into())),
         None => Ok(Vec::new()),
     }
+}
+
+fn check_meta(source: &dyn Source, meta: &Option<String>) -> anyhow::Result<()> {
+    if let Some(name) = meta {
+        anyhow::ensure!(
+            source.meta_fields().contains(&name.as_str()),
+            "Unknown meta field: {name}"
+        );
+    }
+    Ok(())
+}
+
+/// Exact like any 64-bit integer, so a string.
+fn meta_value(name: &str, times: MessageTimes) -> serde_json::Value {
+    let time = match name {
+        "log_time" => Some(times.log_time),
+        "publish_time" => times.publish_time,
+        _ => None,
+    };
+    time.map_or(serde_json::Value::Null, |time| time.to_string().into())
 }
 
 fn field_type<'a>(defs: &'a FieldDefs, index: &[usize]) -> &'a DataTypeDef {

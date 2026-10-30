@@ -221,6 +221,9 @@ struct Topic {
     schema_encoding: Option<String>,
     message_count: Option<u64>,
     fields: Vec<FieldInfo>,
+    meta_fields: Vec<FieldInfo>,
+    /// The fixed kinds this topic can be converted to.
+    views: Vec<view::ViewInfo>,
     error: Option<String>,
 }
 
@@ -357,6 +360,8 @@ async fn topics(
                     schema_encoding: meta.schema_encoding,
                     message_count: meta.message_count,
                     fields,
+                    meta_fields,
+                    views,
                     error,
                 }
             })

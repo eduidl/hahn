@@ -91,19 +91,16 @@ impl Source for McapSource {
         Ok(self.reader.topic_field_defs(&self.path, topic)?)
     }
 
-    fn read(
-        &self,
-        topic: &str,
-        range: TimeRange,
-        limit: Option<usize>,
-        visit: &mut Visit,
-    ) -> anyhow::Result<()> {
+    fn meta_fields(&self) -> &'static [&'static str] {
+        &["log_time", "publish_time"]
+    }
+
+    fn read(&self, topic: &str, range: TimeRange, visit: &mut Visit) -> anyhow::Result<()> {
         let options = ReadOptions {
             time_range: Some(mcapdecode::TimeRange {
                 start: range.start,
                 end: range.end,
             }),
-            limit,
             parallel: Some(false),
             ..Default::default()
         };
@@ -114,7 +111,11 @@ impl Source for McapSource {
             topic,
             &options,
             |message| {
-                visit(message.log_time, message.value).map_err(|e| {
+                let times = MessageTimes {
+                    log_time: message.log_time,
+                    publish_time: Some(message.publish_time),
+                };
+                visit(times, message.value).map_err(|e| {
                     stopped = Some(e);
                     std::io::Error::other("Read stopped").into()
                 })

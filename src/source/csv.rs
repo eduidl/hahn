@@ -76,6 +76,7 @@ impl CsvSource {
             .collect();
         let tree = field_tree(columns)?;
         let defs = FieldDefs::new(field_defs(&tree, &kinds));
+        check_field_names(&defs)?;
 
         let mut rows: Vec<(u64, Value)> = records
             .iter()
@@ -127,13 +128,7 @@ impl Source for CsvSource {
         Ok(self.defs.clone())
     }
 
-    fn read(
-        &self,
-        topic: &str,
-        range: TimeRange,
-        limit: Option<usize>,
-        visit: &mut Visit,
-    ) -> anyhow::Result<()> {
+    fn read(&self, topic: &str, range: TimeRange, visit: &mut Visit) -> anyhow::Result<()> {
         self.check(topic)?;
         let from = range
             .start
@@ -147,12 +142,12 @@ impl Source for CsvSource {
         Ok(())
     }
 
-    fn latest_at(&self, topic: &str, time: u64) -> anyhow::Result<Option<(u64, Value)>> {
+    fn latest_at(&self, topic: &str, time: u64) -> anyhow::Result<Option<(MessageTimes, Value)>> {
         self.check(topic)?;
         let after = self.times.partition_point(|&t| t <= time);
         Ok(after
             .checked_sub(1)
-            .map(|i| (self.times[i], self.rows[i].clone())))
+            .map(|i| (self.times[i].into(), self.rows[i].clone())))
     }
 }
 

@@ -1,5 +1,5 @@
 import type { FieldIndex } from "./fieldIndex";
-import { topicKey, type EnumValue, type Selected } from "./types";
+import { isMetaPath, topicKey, type EnumValue, type Schemas, type Selected } from "./types";
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 /** The schema leaves `value` as any JSON; a recursive schema cannot be generated. */
@@ -37,7 +37,7 @@ export function tableColumns(index: FieldIndex, selected: Selected): TableColumn
     return [{ label: "値", path: [], dataType: root?.data_type ?? selected.dataType, enumValues: root?.enum_values ?? selected.enumValues }];
   const fields = index.topics.get(topicKey(selected.source, selected.topic))?.fields ?? [];
   return fields.filter((field) =>
-    field.data_type !== "struct" && field.path.length > selected.path.length &&
+    field.data_type !== "struct" && !isMetaPath(field.path) && field.path.length > selected.path.length &&
     selected.path.every((part, i) => field.path[i] === part),
   ).map((field) => ({
     label: field.path.slice(selected.path.length).join("."),
@@ -56,7 +56,7 @@ export function cellValue(value: Json, column: TableColumn): string {
   if (cell == null) return "—";
   if (cell === "") return "（空文字列）";
   if (typeof cell === "object") return JSON.stringify(cell);
-  return column.enumValues?.find((entry) => entry.value === Number(cell))?.name ?? String(cell);
+  return column.enumValues?.find((entry) => entry.value === String(cell))?.name ?? String(cell);
 }
 
 /** Exact nanosecond order and stable ties, even across successive batches. */
