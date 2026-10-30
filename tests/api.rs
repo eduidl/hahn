@@ -25,9 +25,12 @@ async fn get(app: axum::Router, url: &str) -> (StatusCode, Value) {
     (status, serde_json::from_slice(&body).unwrap())
 }
 async fn series(app: axum::Router, body: Value) -> (StatusCode, Vec<Value>) {
+    stream(app, "/api/files/0/series", body).await
+}
+async fn stream(app: axum::Router, url: &str, body: Value) -> (StatusCode, Vec<Value>) {
     let response = app
         .oneshot(
-            Request::post("/api/files/0/series")
+            Request::post(url)
                 .header("content-type", "application/json")
                 .body(Body::from(body.to_string()))
                 .unwrap(),
@@ -69,7 +72,7 @@ async fn metadata_includes_all_field_types() {
     let fields = telemetry["fields"].as_array().unwrap();
     for (path, kind) in [
         (vec!["position"], "struct"),
-        (vec!["position", "x"], "f64"),
+        (vec!["position", "x"], "float64"),
         (vec!["label"], "string"),
         (vec!["active"], "bool"),
     ] {
