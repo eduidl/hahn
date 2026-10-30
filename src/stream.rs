@@ -2,8 +2,7 @@ use crate::{ApiError, AppState, blocking, series_fields, source::TimeRange};
 use axum::{
     Json,
     body::{Body, Bytes},
-    extract::{Path, State},
-    http::{StatusCode, header},
+    http::header,
     response::{IntoResponse, Response},
 };
 use mcapdecode::core::{FieldDefs, Value};
@@ -148,12 +147,12 @@ pub(crate) async fn series(
     ))
 }
 
-/// Bounded, cancellable NDJSON delivery shared by scalar and message history.
+/// Bounded, cancellable NDJSON delivery of message history.
 pub(crate) fn stream_rows<T: Serialize + Send + 'static>(
     source: std::sync::Arc<dyn crate::source::Source>,
     topic: String,
     range: TimeRange,
-    convert: impl Fn(u64, Value) -> T + Send + 'static,
+    convert: impl Fn(MessageTimes, Value) -> T + Send + 'static,
 ) -> Response {
     let (tx, rx) = mpsc::channel(4);
     tokio::task::spawn_blocking(move || {

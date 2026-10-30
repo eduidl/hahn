@@ -6,7 +6,7 @@ import { FieldCache, FieldCacheContext } from "./fieldCache";
 import { PlaybackContext, createPlaybackStore } from "./playback";
 import { useCurrentMessage } from "./useCurrentMessage";
 import { keyOf, type Selected } from "./types";
-const selected: Selected = { source: 0, topic: "/t", path: ["x"], key: keyOf(0, "/t", ["x"]), color: "red", lineWidth: 1, hidden: false };
+const selected: Selected = { source: "r/0", topic: "/t", path: ["x"], key: keyOf("r/0", "/t", ["x"]), color: "red", lineWidth: 1, hidden: false };
 const info = { start_ns: "1000000000", end_ns: "8000000000", message_count: 4 };
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 function setup() {
@@ -16,8 +16,8 @@ function setup() {
   return { cache, playback, wrapper };
 }
 it("advances from prefetched fields without a request on each playhead update", async () => {
-  const fetch = vi.fn(async (_url, options: RequestInit) => {
-    const { start_ns } = JSON.parse(options.body as string);
+  const fetch = vi.fn(async (url: string) => {
+    const start_ns = new URL(url, "http://x").searchParams.get("start_ns")!;
     const start = BigInt(start_ns);
     const rows = [0n, 500_000_000n, 1_000_000_000n, 1_500_000_000n].map((offset) => ({ time_ns: String(start + offset), value: String(start + offset) }));
     return new Response(JSON.stringify({ type: "batch", rows, scanned_messages: 4 }) + "\n" + JSON.stringify({ type: "complete", scanned_messages: 4 }) + "\n");
@@ -45,7 +45,7 @@ it("uses a plot's full field cache, including the last equal-time message", asyn
   expect(fetch).not.toHaveBeenCalled();
 });
 it("uses the predecessor for a sparse topic and reports an empty topic", async () => {
-  const fetch = vi.fn(async (url) => String(url).includes("/message?")
+  const fetch = vi.fn(async (url) => String(url).includes("/messages/latest?")
     ? new Response(JSON.stringify({ time_ns: "500000000", value: 7 }))
     : new Response('{"type":"complete","scanned_messages":0}\n'));
   vi.stubGlobal("fetch", fetch);

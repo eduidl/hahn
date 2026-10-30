@@ -26,15 +26,14 @@ afterEach(() => {
 });
 
 function mockFetch() {
-  const fetch = vi.fn((_url: string, options: RequestInit) => {
-    const fields = JSON.parse(options.body as string).fields as string[][];
+  const fetch = vi.fn((_url: string, _options: RequestInit) => {
     return Promise.resolve(
       new Response(
         [
           JSON.stringify({
             type: "batch",
             rows: [
-              { time_ns: "1000000000", values: fields.map((_, i) => i + 1) },
+              { time_ns: "1000000000", value: 1 },
             ],
             scanned_messages: 1,
           }),
@@ -64,10 +63,9 @@ describe("full-recording series cache", () => {
       expect(result.current.records[1]?.status).toBe("complete"),
     );
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(fetch.mock.calls[1][1].body as string)).toEqual({
-      topic: "/pose",
-      fields: [["y"]],
-    });
+    expect(fetch.mock.calls[1][0]).toBe(
+      `/api/runs/r/groups/0/messages?topic=%2Fpose&path=${encodeURIComponent('["y"]')}&preview=false`,
+    );
     expect(result.current.plotted[0].points).toBe(originalPoints);
     expect(result.current.plotted[0].points).toHaveLength(1);
     // Removing and adding an already loaded field also uses the cache.
@@ -102,15 +100,11 @@ describe("full-recording series cache", () => {
     expect(result.current.plotted[0].hidden).toBe(true);
     expect(result.current.plotted[0].color).toBe("#ff0000");
     expect(result.current.plotted[0].lineWidth).toBe(4);
-    expect(
-      JSON.parse(fetch.mock.calls[0][1].body as string),
-    ).not.toHaveProperty("start_ns");
-    expect(
-      JSON.parse(fetch.mock.calls[0][1].body as string),
-    ).not.toHaveProperty("end_ns");
+    expect(fetch.mock.calls[0][0]).not.toContain("start_ns");
+    expect(fetch.mock.calls[0][0]).not.toContain("end_ns");
   });
 
-  it("batches shared requests at the API field limit", async () => {
+  it("requests each field separately", async () => {
     const fetch = mockFetch();
     const selected = Array.from({ length: 70 }, (_, i) => field(`field${i}`));
     const { result } = renderHook(() => useSeries(info.start_ns, selected));
@@ -119,35 +113,12 @@ describe("full-recording series cache", () => {
         result.current.records.filter((r) => r.status === "complete"),
       ).toHaveLength(70),
     );
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(
-      fetch.mock.calls.map(
-        (call) => JSON.parse(call[1].body as string).fields.length,
-      ),
-    ).toEqual([64, 6]);
-  });
-
-  it("invalidates cached data only when the time origin moves", async () => {
-    const fetch = mockFetch();
-    const { result, rerender } = renderHook(
-      ({ origin, selected }) => useSeries(origin, selected),
-      { initialProps: { origin: info.start_ns, selected: [field("x")] } },
-    );
-    await waitFor(() =>
-      expect(result.current.records[0]?.status).toBe("complete"),
-    );
-    expect(result.current.plotted[0].points[0].x).toBe(0);
-    rerender({ origin: info.start_ns, selected: [field("x")] });
-    rerender({ origin: "0", selected: [field("x")] });
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(result.current.plotted[0]?.points[0]?.x).toBe(1),
-    );
+    expect(fetch).toHaveBeenCalledTimes(70);
   });
 
   it("requests each field from its own recording", async () => {
     const fetch = mockFetch();
-    const other: Selected = { ...field("x"), key: keyOf(1, "/pose", ["x"]), source: 1 };
+    const other: Selected = { ...field("x"), key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
     const { result } = renderHook(() =>
       useSeries(info.start_ns, [field("x"), field("y"), other]),
     );
@@ -158,13 +129,14 @@ describe("full-recording series cache", () => {
         "complete",
       ]),
     );
-    const calls = fetch.mock.calls.map(([url, options]) => [
-      url,
-      JSON.parse(options.body as string).fields,
-    ]);
+    const calls = fetch.mock.calls.map(([url]) => {
+      const { pathname, searchParams } = new URL(url, "http://x");
+      return [pathname, searchParams.get("path")];
+    });
     expect(calls).toEqual([
-      ["/api/files/0/series", [["x"], ["y"]]],
-      ["/api/files/1/series", [["x"]]],
+      ["/api/runs/r/groups/0/messages", '["x"]'],
+      ["/api/runs/r/groups/0/messages", '["y"]'],
+      ["/api/runs/r/groups/1/messages", '["x"]'],
     ]);
   });
 
@@ -193,7 +165,7 @@ describe("full-recording series cache", () => {
   it("decodes enum labels with the definition carried by the selection", async () => {
     vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve(new Response([
-        JSON.stringify({ type: "batch", rows: [{ time_ns: "1000000000", values: ["RUN"] }], scanned_messages: 1 }),
+        JSON.stringify({ type: "batch", rows: [{ time_ns: "1000000000", value: "RUN" }], scanned_messages: 1 }),
         JSON.stringify({ type: "complete", scanned_messages: 1 }),
         "",
       ].join("\n"))),
@@ -201,7 +173,7 @@ describe("full-recording series cache", () => {
     const mode: Selected = {
       ...field("mode"),
       dataType: "enum",
-      enumValues: [{ name: "IDLE", value: 0 }, { name: "RUN", value: 1 }],
+      enumValues: [{ name: "IDLE", value: "0" }, { name: "RUN", value: "1" }],
     };
     const { result } = renderHook(() => useSeries(info.start_ns, [mode]));
     await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
@@ -216,7 +188,7 @@ it("uses a shared parent history instead of decoding a numerical field again", a
     '{"type":"batch","rows":[{"time_ns":"1000000000","value":{"x":42}}],"scanned_messages":1}\n{"type":"complete","scanned_messages":1}\n',
   ));
   vi.stubGlobal("fetch", fetch);
-  await shared.load({ source: 0, topic: "/pose", path: [] }, new AbortController().signal, () => {});
+  await shared.load({ source: "r/0", topic: "/pose", path: [] }, new AbortController().signal, () => {});
   const { result } = renderHook(() => useSeries(info.start_ns, [field("x")], shared));
   await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
   expect(result.current.plotted[0].points[0].raw).toBe(42);

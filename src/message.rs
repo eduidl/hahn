@@ -44,7 +44,7 @@ pub(crate) async fn message(
     let time = parse_time(&query.time_ns)?;
     let field = parse_field(&query.path, &query.meta)?;
     blocking(move || {
-        let source = state.source(id)?;
+        let source = group.source()?;
         let defs = source.field_defs(&query.topic)?;
         let index = if field.is_empty() {
             Vec::new()
@@ -78,6 +78,35 @@ pub(crate) fn parse_time(value: &str) -> Result<u64, ApiError> {
             "Timestamps must be unsigned nanosecond strings".into(),
         )
     })
+}
+
+pub(crate) fn parse_range(
+    start: &Option<String>,
+    end: &Option<String>,
+) -> Result<TimeRange, ApiError> {
+    let start = start.as_deref().map(parse_time).transpose()?;
+    let end = end.as_deref().map(parse_time).transpose()?;
+    if matches!((start, end), (Some(start), Some(end)) if start > end) {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Start must not exceed end".into(),
+        ));
+    }
+    Ok(TimeRange { start, end })
+}
+
+fn parse_field(path: &Option<String>, meta: &Option<String>) -> Result<Vec<String>, ApiError> {
+    if path.is_some() && meta.is_some() {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Path and meta cannot be combined".into(),
+        ));
+    }
+    match path {
+        Some(path) => serde_json::from_str(path)
+            .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Invalid field path".into())),
+        None => Ok(Vec::new()),
+    }
 }
 
 fn field_type<'a>(defs: &'a FieldDefs, index: &[usize]) -> &'a DataTypeDef {
@@ -173,7 +202,7 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct MessagesRequest {
+pub(crate) struct MessagesQuery {
     topic: String,
     /// JSON array of struct field names; omit for the whole message.
     path: Option<String>,
@@ -182,6 +211,8 @@ pub(crate) struct MessagesRequest {
     start_ns: Option<String>,
     /// Exclusive upper bound. Omit to include the last timestamp of a recording.
     end_ns: Option<String>,
+    /// `false` returns exact values of a scalar field.
+    preview: Option<bool>,
 }
 
 /// Messages in the requested range and subtree, retaining message boundaries and ties.
@@ -198,13 +229,18 @@ pub(crate) async fn messages(
     let topic = query.topic.clone();
     let checked = meta.clone();
     let (source, index, data_type) = blocking(move || {
-        let source = state.source(id)?;
+        let source = group.source()?;
         let defs = source.field_defs(&topic)?;
-        let index = if request.path.is_empty() {
+        check_meta(&*source, &checked)?;
+        if !preview {
+            let mut scalars = Vec::new();
+            scalar_fields(&defs, &[], &mut scalars);
+            anyhow::ensure!(scalars.contains(&field), "Unknown scalar field: {field:?}");
+        }
+        let index = if field.is_empty() {
             Vec::new()
         } else {
-            indexes(&defs, &request.path)
-                .ok_or_else(|| anyhow::anyhow!("Unknown field: {:?}", request.path))?
+            indexes(&defs, &field).ok_or_else(|| anyhow::anyhow!("Unknown field: {field:?}"))?
         };
         let data_type = if index.is_empty() {
             DataTypeDef::Struct(defs.into())
@@ -214,7 +250,7 @@ pub(crate) async fn messages(
         Ok((source, index, data_type))
     })
     .await?;
-    Ok(crate::stream::stream_rows(
+    Ok(stream_rows(
         source,
         query.topic,
         range,

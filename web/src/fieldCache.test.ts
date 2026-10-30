@@ -58,8 +58,8 @@ describe("shared field cache", () => {
   });
 
   it("evicts old playback windows and clears all recording data", async () => {
-    const fetch = vi.fn(async (_url, options: RequestInit) => {
-      const { start_ns } = JSON.parse(options.body as string);
+    const fetch = vi.fn(async (url: string) => {
+      const start_ns = new URL(url, "http://x").searchParams.get("start_ns")!;
       return stream([{ time_ns: start_ns, value: { pose: { x: 1 } } }]);
     }); vi.stubGlobal("fetch", fetch);
     const cache = new FieldCache();
@@ -78,8 +78,8 @@ describe("shared field cache", () => {
 });
 
 it("keeps displayed windows pinned while evicting unused lookahead", async () => {
-  vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
-    const { start_ns } = JSON.parse(options.body as string);
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const start_ns = new URL(url, "http://x").searchParams.get("start_ns")!;
     return stream([{ time_ns: start_ns, value: { pose: { x: 1 } } }]);
   }));
   const cache = new FieldCache();

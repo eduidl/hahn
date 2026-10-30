@@ -30,7 +30,7 @@ export type DragMode = "pan" | "zoom";
 
 export type Series = {
   key: string;
-  source: number;
+  source: string;
   topic: string;
   path: string[];
   color: string;

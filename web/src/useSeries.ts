@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { FieldCache } from "./fieldCache";
 import { appendPoints, consumeStream, point } from "./data";
 import type { Series } from "./Plot";
-import { errorMessage, topicKey, type Selected } from "./types";
+import { messagesUrl } from "./sources";
+import type { MessageRow } from "./table";
+import { errorMessage, type Selected } from "./types";
 
 export type CachedSeries = Series & {
   status: "loading" | "complete" | "stopped" | "error";
@@ -55,11 +57,9 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
         dirty.current = true;
       }
     }
-    // Group quick field additions, without cancelling existing streams.
+    // Wait out quick field additions, without cancelling existing streams.
     const timer = setTimeout(() => {
-      const groups = new Map<string, Selected[]>();
       for (const field of fields) {
-        const key = topicKey(field.source, field.topic);
         if (!cache.current.has(field.key)) {
           const hit = sharedCache?.readScalar(field, field.dataType);
           if (hit) {
@@ -80,73 +80,38 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
             }).catch((error) => {
               if (!controller.signal.aborted) { target.status = "error"; target.error = errorMessage(error); dirty.current = true; }
             }).finally(() => requests.current.delete(controller));
-          } else groups.set(key, [...(groups.get(key) ?? []), field]);
-        }
-      }
-      // Several widgets may request more than the API's 64-field batch limit.
-      const batches = [...groups.values()].flatMap((fields) =>
-        Array.from({ length: Math.ceil(fields.length / 64) }, (_, i) =>
-          fields.slice(i * 64, (i + 1) * 64),
-        ),
-      );
-      for (const group of batches) {
-        const { source, topic } = group[0];
-        const controller = new AbortController();
-        const targets = group.map((field) => {
-          const target: CachedSeries = {
-            key: field.key,
-            source,
-            topic,
-            path: field.path,
-            color: "",
-            lineWidth: 1.5,
-            hidden: false,
-            points: [],
-            dataType: field.dataType,
-            enumValues: field.enumValues,
-            status: "loading",
-            received: 0,
-          };
-          cache.current.set(field.key, target);
-          return target;
-        });
-        requests.current.set(controller, targets);
-        dirty.current = true;
-        fetch(`/api/files/${source}/series`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // Always load all timestamps, including the final message.
-          body: JSON.stringify({ topic, fields: group.map((f) => f.path) }),
-          signal: controller.signal,
-        })
-          .then((response) =>
-            consumeStream(response, (event) => {
-              if (controller.signal.aborted) return;
-              if (event.type === "batch") {
-                targets.forEach((target, i) => {
-                  target.points = appendPoints(
-                    target.points,
-                    event.rows.map((row) =>
-                      point(row, i, origin, targets[i].enumValues),
-                    ),
-                  );
-                  target.received = event.scanned_messages;
-                });
-              }
-              if (event.type === "complete")
-                targets.forEach((target) => {
-                  target.status = "complete";
-                  target.received = event.scanned_messages;
-                  sharedCache?.putScalar(target, target.points.map((p) => ({ time_ns: p.ns, value: p.raw })));
-                });
-              dirty.current = true;
-            }),
-          )
-          .catch((error) => {
-            if (!controller.signal.aborted) {
-              targets.forEach((target) => {
-                target.status = "error";
-                target.error = errorMessage(error);
+          } else {
+            const controller = new AbortController();
+            const target: CachedSeries = { ...field, color: "", lineWidth: 1.5, hidden: false, points: [], status: "loading", received: 0 };
+            cache.current.set(field.key, target);
+            requests.current.set(controller, [target]);
+            dirty.current = true;
+            // Always load all timestamps, including the final message.
+            fetch(messagesUrl(field, { exact: true }), { signal: controller.signal })
+              .then((response) =>
+                consumeStream<MessageRow>(response, (event) => {
+                  if (controller.signal.aborted) return;
+                  if (event.type === "batch") {
+                    target.points = appendPoints(target.points, event.rows.map((row) => point({ time_ns: row.time_ns, values: [row.value as number | string | boolean | null] }, 0, origin, field.enumValues)));
+                    target.received = event.scanned_messages;
+                  }
+                  if (event.type === "complete") {
+                    target.status = "complete";
+                    target.received = event.scanned_messages;
+                    sharedCache?.putScalar(target, target.points.map((p) => ({ time_ns: p.ns, value: p.raw })));
+                  }
+                  dirty.current = true;
+                }),
+              )
+              .catch((error) => {
+                if (!controller.signal.aborted) {
+                  target.status = "error";
+                  target.error = errorMessage(error);
+                  dirty.current = true;
+                }
+              })
+              .finally(() => {
+                requests.current.delete(controller);
               });
           }
         }

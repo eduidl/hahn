@@ -3,21 +3,22 @@
 import argparse
 import json
 import time
+import urllib.parse
 import urllib.request
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("url")
 parser.add_argument("--topic", required=True)
-parser.add_argument("--field", action="append", required=True, help="Dot-separated numeric field path")
+parser.add_argument("--field", required=True, help="Dot-separated scalar field path")
 parser.add_argument("--start-ns")
 parser.add_argument("--end-ns")
 args = parser.parse_args()
-payload = {"topic": args.topic, "fields": [field.split(".") for field in args.field]}
+query = {"topic": args.topic, "path": json.dumps(args.field.split(".")), "preview": "false"}
 if args.start_ns is not None:
-    payload["start_ns"] = args.start_ns
+    query["start_ns"] = args.start_ns
 if args.end_ns is not None:
-    payload["end_ns"] = args.end_ns
-request = urllib.request.Request(args.url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+    query["end_ns"] = args.end_ns
+request = f"{args.url}?{urllib.parse.urlencode(query)}"
 started = time.perf_counter()
 first = None
 total_bytes = rows = batches = 0

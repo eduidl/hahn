@@ -98,6 +98,27 @@ const scalarPaths = (fields, prefix = []) =>
   });
 const scalars = scalarPaths(topic.fields);
 
+const messages = `${info}/messages`;
+const historyUrl = (params, at = root) => `${at}/messages?${new URLSearchParams(params)}`;
+const whole = await check(messages, historyUrl({ topic: topic.topic }), 200);
+endsComplete(messages, whole);
+const first = whole.find((e) => e.type === "batch")?.rows[0].value;
+if (topic.fields.some((f) => !(f.name in (first ?? {}))))
+  failures.push(`${messages}: a struct must name its fields`);
+for (const path of scalars) {
+  const exact = await check(messages, historyUrl({ topic: topic.topic, path: JSON.stringify(path), preview: "false" }), 200);
+  endsComplete(`${messages} ${path}`, exact);
+}
+await check(messages, historyUrl({ topic: topic.topic, start_ns: "2", end_ns: "1" }), 400);
+await check(messages, historyUrl({ topic: topic.topic, start_ns: "x" }), 400);
+await check(messages, historyUrl({ topic: topic.topic, path: "nope" }), 400);
+await check(messages, historyUrl({ topic: topic.topic, preview: "maybe" }), 400);
+await check(messages, `${root}/messages`, 400);
+await check(messages, historyUrl({ topic: topic.topic }, `${unknown}/groups/x`), 404);
+await check(messages, historyUrl({ topic: "/nope" }), 422);
+await check(messages, historyUrl({ topic: topic.topic, path: '["nope"]' }), 422);
+await check(messages, historyUrl({ topic: topic.topic, preview: "false" }), 422);
+
 const message = `${info}/messages/latest`;
 const query = (params) => `${root}/messages/latest?${new URLSearchParams(params)}`;
 await check(message, query({ topic: topic.topic, time_ns: "18446744073709551615" }), 200);
