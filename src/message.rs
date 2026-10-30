@@ -33,9 +33,8 @@ pub(crate) struct MessageResponse {
     value: serde_json::Value,
 }
 
-/// The message current at `time_ns`: the latest one at or before it, or the
-/// first one after it when the topic has not published yet.
-pub(crate) async fn message(
+/// The latest message at or before `time_ns`, if the topic has published by then.
+pub(crate) async fn latest(
     State(state): State<AppState>,
     Path((run, group)): Path<(String, String)>,
     Query(query): Query<MessageQuery>,

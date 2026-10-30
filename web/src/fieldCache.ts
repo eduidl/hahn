@@ -124,8 +124,6 @@ export class FieldCache {
       };
       first = Math.max(0, bound(start) - (block.scope === "full" ? 1 : 0));
       last = bound(end);
-      // Preserve the single-message endpoint's first-after-start behavior.
-      if (block.scope === "full" && last === 0 && block.times.length) last = 1;
     }
     return block.times.slice(first, last).map((time_ns, offset) => ({ time_ns, value: valueAt(path, first + offset) ?? null }));
   }

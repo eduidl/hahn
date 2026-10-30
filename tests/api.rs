@@ -449,9 +449,9 @@ async fn message_at_time_is_latest_at_or_before_with_named_fields() {
             .collect::<Vec<_>>(),
         ["x"]
     );
-    // Before the first message the first one is shown; far after the end, the last.
+    // Before the first message there is nothing yet; far after the end, the last.
     let (_, body) = get(app.clone(), &at(1)).await;
-    assert_eq!(body["time_ns"], support::ORIGIN.to_string());
+    assert!(body.is_null());
     let (_, body) = get(app.clone(), &at(support::ORIGIN + 3_600_000_000_000)).await;
     assert_eq!(
         body["time_ns"],
@@ -543,7 +543,7 @@ async fn csv_series_and_message_follow_the_shared_range_rules() {
     // Exact 64-bit integers are strings, as for MCAP.
     assert_eq!(body["value"]["pose"], json!({"x": "1", "y": 1.5}));
     let (_, body) = get(app.clone(), &at("1")).await;
-    assert_eq!(body["time_ns"], "1760000000000000100");
+    assert!(body.is_null());
     let (status, _) = series(app, json!({"topic":"/other","fields":[["count"]]})).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
@@ -551,15 +551,17 @@ async fn csv_series_and_message_follow_the_shared_range_rules() {
 #[tokio::test]
 async fn csv_time_units_and_malformed_files() {
     let dir = csv_fixture("a.csv", "t_ms,v\n1760000000000.5,1\n");
-    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/g").await;
     assert_eq!(info["start_ns"], "1760000000000500000");
     let dir = csv_fixture("a.csv", "time,v\n1760000000.25,1\n");
-    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/api/files/0").await;
+    let (_, info) = get(hahn::router(dir.path()).unwrap(), "/g").await;
     assert_eq!(info["start_ns"], "1760000000250000000");
     for content in [
         "time_ns,v\nsoon,1\n",
         "time_ns,v,v\n1,1,2\n",
         "time_ns,a,a.b\n1,1,2\n",
+        "time_ns,$bytes\n1,1\n",
+        "time_ns,pose.$x\n1,1\n",
         "time_ns,v\n1,1,extra\n",
         "time_ns,v\n",
     ] {

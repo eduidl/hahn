@@ -53,6 +53,15 @@ it("uses the predecessor for a sparse topic and reports an empty topic", async (
   const { result } = renderHook(() => useCurrentMessage(selected, info), { wrapper });
   await waitFor(() => expect(result.current.message?.value).toBe(7));
 });
+it("shows nothing before a loaded field's first message", async () => {
+  vi.stubGlobal("fetch", vi.fn());
+  const { cache, playback, wrapper } = setup();
+  cache.putScalar(selected, [{ time_ns: "2000000000", value: 3 }]);
+  const { result } = renderHook(() => useCurrentMessage(selected, info), { wrapper });
+  expect(result.current.message).toBeNull();
+  act(() => playback.seek(1));
+  expect(result.current.message?.value).toBe(3);
+});
 it("releases a buffering consumer when its widget is removed", async () => {
   vi.stubGlobal("fetch", vi.fn((_url, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
     options.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
