@@ -16,15 +16,6 @@ use std::{
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
-#[derive(Deserialize)]
-pub(crate) struct SeriesRequest {
-    topic: String,
-    fields: Vec<Vec<String>>,
-    start_ns: Option<String>,
-    /// Exclusive upper bound. Omit to include the last timestamp of a recording.
-    end_ns: Option<String>,
-}
-
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Event<T> {
@@ -39,12 +30,6 @@ enum Event<T> {
         message: String,
     },
 }
-#[derive(Serialize)]
-struct Row {
-    time_ns: String,
-    values: Vec<serde_json::Value>,
-}
-
 pub(crate) fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
     let (head, tail) = path.split_first()?;
     let index = defs.iter().position(|f| &f.name == head)?;
@@ -58,7 +43,7 @@ pub(crate) fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
     Some(result)
 }
 
-fn scalar(root: &Value, path: &[usize]) -> serde_json::Value {
+pub(crate) fn scalar(root: &Value, path: &[usize]) -> serde_json::Value {
     let mut value = root;
     for &index in path {
         let Value::Struct(values) = value else {

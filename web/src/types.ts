@@ -1,15 +1,14 @@
-export type FileEntry = { id: number; name: string; size_bytes: number; format: string };
-export type Info = {
-  start_ns: string;
-  end_ns: string;
-  message_count: number | null;
-};
-export type EnumValue = { name: string; value: number };
-export type Field = { path: string[]; data_type: string; type_name?: string; enum_values?: EnumValue[] };
+import type { components } from "./api.gen";
+
+export type Schemas = components["schemas"];
+export type RunList = Schemas["RunList"];
+export type Run = Schemas["Run"];
+export type Group = Schemas["Group"];
+export type Info = Schemas["RecordingInfo"];
+export type EnumValue = Schemas["EnumValue"];
+/** A struct field as the UI browses it; see `flattenFields`. */
+export type Field = Pick<Schemas["FieldType"], "data_type" | "type_name" | "enum_values"> & { path: string[] };
 const rosTypes: Record<string, string> = {
-  i8: "int8", i16: "int16", i32: "int32", i64: "int64",
-  u8: "uint8", u16: "uint16", u32: "uint32", u64: "uint64",
-  f32: "float32", f64: "float64",
   // ROS has no bytes type; decoders map uint8[] to it.
   bytes: "uint8[]",
 };
