@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
-import { timeFormatter } from "./timeDisplay";
+import { useTimeFormatter } from "./timeDisplay";
 import { playbackSpeeds, usePlayback, usePlaybackStore } from "./playback";
 import type { Info } from "./types";
 
@@ -43,10 +43,7 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
   const speed = usePlayback((s) => s.speed);
   const loop = usePlayback((s) => s.loop);
   const disabled = info === null;
-  const clock = useMemo(
-    () => timeFormatter(info?.start_ns ?? null, "absolute"),
-    [info],
-  );
+  const clock = useTimeFormatter(info?.start_ns ?? null, "absolute");
   const track = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
   // Playback resumes after a scrub only if it was playing when the scrub began.

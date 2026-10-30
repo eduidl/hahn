@@ -159,7 +159,7 @@ function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
           })
         }
       >
-        <option value="absolute">実時刻（ローカル）</option>
+        <option value="absolute">実時刻</option>
         <option value="relative">録画開始からの秒数</option>
       </select>
     </label>

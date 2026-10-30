@@ -105,6 +105,7 @@ export function App() {
     [JSON.stringify(openGroups)],
   );
   const multiSource = sources.length > 1;
+  const serverZone = usableTimeZone(run?.timezone);
   const count = activeWidget
     ? widgetSeries(activeWidget, plotted).reduce(
         (n, s) => n + s.points.length,
@@ -283,6 +284,7 @@ export function App() {
   return (
     <FieldCacheContext.Provider value={fieldCache}>
     <PlaybackContext.Provider value={playback}>
+    <DisplayTimeZone.Provider value={zoneSource === "server" ? serverZone ?? undefined : undefined}>
     <SourceNames.Provider value={sourceNames}>
     <div className="app">
       <RunsDialog
@@ -388,10 +390,7 @@ export function App() {
             </div>
           ))}
         </div>
-        <span className="local">
-          <i />
-          LOCAL WORKSPACE
-        </span>
+        <TimeZoneSelect source={zoneSource} serverZone={serverZone} onChange={setZoneSource} />
       </header>
       <div className="workspace">
         <aside>
@@ -470,7 +469,7 @@ export function App() {
                 エラーのあるトピックを表示
               </label>
               <div className="topics">
-                {loadingInfo && <p className="muted">録画情報を読み込み中…</p>}
+                {loadingInfo && <p className="muted">グループ情報を読み込み中…</p>}
                 {visibleTopics.map((t, i) => {
                   const id = topicKey(t.source, t.topic);
                   // Several recordings: head each one's topics with its name.
@@ -642,6 +641,7 @@ export function App() {
       <PlaybackBar info={info} fullEnd={fullEnd} busy={busy || messages.busy} stop={() => { stop(); messages.stop(); }} />
     </div>
     </SourceNames.Provider>
+    </DisplayTimeZone.Provider>
     </PlaybackContext.Provider>
     </FieldCacheContext.Provider>
   );

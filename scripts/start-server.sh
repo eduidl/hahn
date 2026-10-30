@@ -15,6 +15,27 @@ if [[ ! -d web/node_modules ]]; then
 fi
 npm --prefix web run build
 
+# The IANA name of this machine's timezone, if it can be determined.
+local_timezone() {
+  if [[ -n "${TZ:-}" ]]; then
+    echo "${TZ#:}"
+  elif command -v timedatectl >/dev/null 2>&1 \
+    && timedatectl show --property=Timezone --value 2>/dev/null | grep -q .; then
+    timedatectl show --property=Timezone --value
+  elif [[ -s /etc/timezone ]]; then
+    cat /etc/timezone
+  elif [[ -L /etc/localtime ]]; then
+    readlink /etc/localtime | sed 's|.*/zoneinfo/||'
+  fi
+}
+
+# Override with HAHN_TIMEZONE; an empty value declares no timezone.
+timezone="${HAHN_TIMEZONE-$(local_timezone)}"
+timezone_args=()
+if [[ -n "$timezone" ]]; then
+  timezone_args=(--timezone "$timezone")
+fi
+
 watch_pids=()
 cleanup() {
   trap - EXIT INT TERM
@@ -37,6 +58,7 @@ watch_pids+=("$!")
 cargo watch --ignore 'web/**' --ignore 'data/**' -- cargo run --release -- \
   --data-dir "${HAHN_DATA_DIR:-${MCAP_DATA_DIR:-$project_dir/data}}" \
   --listen "${HAHN_LISTEN:-127.0.0.1:3000}" \
+  "${timezone_args[@]}" \
   "$@" &
 watch_pids+=("$!")
 

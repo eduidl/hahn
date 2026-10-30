@@ -1,4 +1,29 @@
+import { createContext, useContext, useMemo } from "react";
+
 export type TimeDisplay = "absolute" | "relative";
+
+/** Where the displayed timezone comes from, chosen once for the whole workspace. */
+export type TimeZoneSource = "browser" | "server";
+
+/** The timezone clock times are shown in; undefined means the browser's. */
+export const DisplayTimeZone = createContext<string | undefined>(undefined);
+
+export const browserTimeZone = () => new Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export function usableTimeZone(zone: string | null | undefined): string | null {
+  if (!zone) return null;
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: zone });
+    return zone;
+  } catch {
+    return null;
+  }
+}
+
+export function useTimeFormatter(originNs: string | null, mode: TimeDisplay) {
+  const zone = useContext(DisplayTimeZone);
+  return useMemo(() => timeFormatter(originNs, mode, zone), [originNs, mode, zone]);
+}
 
 /** Format only the labels; all plotting and hit testing stays relative to the recording. */
 export function timeFormatter(
