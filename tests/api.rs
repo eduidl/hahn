@@ -885,6 +885,40 @@ async fn ros_uint8_sequences_use_list_previews() {
         );
     }
 }
+
+#[tokio::test]
+async fn extractor_rejections_are_json_errors() {
+    let dir = fixture(10, true);
+    let app = hahn::router(dir.path()).unwrap();
+    let base = resolve(&app, "/g").await;
+    let requests = [
+        (
+            Request::get(format!("{base}/messages/latest?topic=x")).body(Body::empty()),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            Request::get(format!("{base}/messages")).body(Body::empty()),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            Request::get(format!("{base}/messages?topic=x&preview=maybe")).body(Body::empty()),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            Request::get(format!("{base}/messages?topic=x&path=nope")).body(Body::empty()),
+            StatusCode::BAD_REQUEST,
+        ),
+    ];
+    for (request, expected) in requests {
+        let response = app.clone().oneshot(request.unwrap()).await.unwrap();
+        assert_eq!(response.status(), expected);
+        assert_eq!(response.headers()["content-type"], "application/json");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert!(!body["error"].as_str().unwrap().is_empty());
+    }
+}
+
 fn visual_app() -> (tempfile::TempDir, axum::Router) {
     let dir = tempfile::tempdir().unwrap();
     support::write_visual_fixture(&dir.path().join("visual.mcap")).unwrap();

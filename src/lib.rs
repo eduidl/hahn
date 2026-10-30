@@ -4,8 +4,10 @@ mod stream;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
-    http::StatusCode,
+    body::to_bytes,
+    extract::{Path, Query, State},
+    http::{StatusCode, header},
+    middleware::map_response,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -91,6 +93,22 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         (self.0, Json(serde_json::json!({"error": self.1}))).into_response()
     }
+}
+/// Extractor rejections are plain text; the API reports every error as JSON.
+async fn json_errors(response: Response) -> Response {
+    let plain = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .is_some_and(|value| value.as_bytes().starts_with(b"text/plain"));
+    if response.status().is_success() || !plain {
+        return response;
+    }
+    let status = response.status();
+    let message = match to_bytes(response.into_body(), usize::MAX).await {
+        Ok(body) => String::from_utf8_lossy(&body).into_owned(),
+        Err(e) => e.to_string(),
+    };
+    ApiError(status, message).into_response()
 }
 impl From<anyhow::Error> for ApiError {
     fn from(error: anyhow::Error) -> Self {
