@@ -1,3 +1,24 @@
+//! A group's coordinate frame graph, merged from all of its transform topics.
+
+use super::convert::{Message, has, is_string, is_struct, quaternion, vector};
+use crate::{
+    ApiError, AppState, blocking,
+    message::parse_time,
+    source::{Source, TimeRange},
+};
+use anyhow::ensure;
+use axum::{
+    Json,
+    extract::{Path, Query, State},
+    http::StatusCode,
+};
+use mcapdecode::core::FieldDefs;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    sync::Arc,
+};
+
 #[derive(Serialize)]
 struct FrameInfo<'a> {
     id: &'a str,

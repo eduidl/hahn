@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { get } from "./sources";
 import { errorMessage, type RunList } from "./types";
 
+const LIMIT = 50;
+const SEARCH_DELAY_MS = 200;
+
 /** Picks the run to view. A server may have many, so it searches on the server. */
 export function RunsDialog({
   open,
