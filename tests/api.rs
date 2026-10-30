@@ -128,6 +128,14 @@ async fn stream_batches_exact_values_gaps_and_completion() {
     assert!(events.len() >= 4);
     assert_eq!(events[0]["type"], "batch");
     assert_eq!(events.last().unwrap()["type"], "complete");
+    // A long stream arrives in several batches.
+    let (_, raw) = stream(
+        hahn::router(dir.path()).unwrap(),
+        "/g/messages",
+        json!({"topic":"/telemetry","path":["signal"],"preview":false}),
+    )
+    .await;
+    assert!(raw.len() >= 4);
     let rows: Vec<_> = events
         .iter()
         .filter_map(|e| e["rows"].as_array())
