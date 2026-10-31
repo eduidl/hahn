@@ -8,6 +8,7 @@ export type MessageRecord = {
   key: string;
   source: string;
   topic: string;
+  topicName?: string;
   rows: MessageRow[];
   status: "loading" | "complete" | "stopped" | "error";
   received: number;
@@ -34,7 +35,13 @@ export function useMessages(
     ).values(),
   ].sort((a, b) => a.path.length - b.path.length);
   const selectionKey = JSON.stringify(
-    selections.map(({ key, source, topic, path }) => ({ key, source, topic, path })),
+    selections.map(({ key, source, topic, topicName, path }) => ({
+      key,
+      source,
+      topic,
+      topicName,
+      path,
+    })),
   );
 
   useEffect(() => {
@@ -65,6 +72,7 @@ export function useMessages(
         key: s.key,
         source: s.source,
         topic: s.topic,
+        topicName: s.topicName,
         rows: [],
         status: "loading",
         received: 0,

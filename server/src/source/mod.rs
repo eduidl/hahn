@@ -36,6 +36,7 @@ pub struct SourceInfo {
 
 #[derive(Clone)]
 pub struct TopicMeta {
+    pub id: String,
     pub topic: String,
     pub schema_name: Option<String>,
     /// Lets the client name types in the schema's own language (ROS 2, protobuf, ...).

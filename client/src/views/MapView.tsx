@@ -66,11 +66,12 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
   if (history?.error)
     return (
       <p className="view-error">
-        {series.topic}: {history.error}
+        {series.topicName ?? series.topic}: {history.error}
       </p>
     );
-  if (!history) return <p className="view-status">{series.topic}: Loading…</p>;
-  if (!frames?.length) return <p className="view-status">{series.topic}: No location</p>;
+  if (!history) return <p className="view-status">{series.topicName ?? series.topic}: Loading…</p>;
+  if (!frames?.length)
+    return <p className="view-status">{series.topicName ?? series.topic}: No location</p>;
   return null;
 }
 

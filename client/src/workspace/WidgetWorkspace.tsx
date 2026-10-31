@@ -145,7 +145,7 @@ function StatePlot({
       {visible.map((s) => (
         <div className="state-row" key={s.key}>
           <div className="state-label">
-            <SeriesName source={s.source} topic={s.topic} path={s.path} />
+            <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
           </div>
           <div className="state-track">
             {(segments.get(s.key) ?? []).map((segment, i) => {
@@ -265,7 +265,7 @@ function TimeSeriesWindow({
     .map((series) => {
       const group = sourceNames.size > 1 ? sourceNames.get(series.source) : undefined;
       const field = series.path.length ? ` · ${series.path.join(".")}` : "";
-      return `${group ? `${group} · ` : ""}${series.topic}${field}`;
+      return `${group ? `${group} · ` : ""}${series.topicName ?? series.topic}${field}`;
     })
     .join(", ");
   const owner = ownerOf(state, widget.id);

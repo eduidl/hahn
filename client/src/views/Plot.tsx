@@ -25,6 +25,7 @@ export type Series = {
   key: string;
   source: string;
   topic: string;
+  topicName?: string;
   path: string[];
   color: string;
   lineWidth: number;
@@ -502,7 +503,7 @@ export function Plot({
             .map((s) => (
               <div key={s.key} className="tooltip-row">
                 <i style={{ background: s.color }} />
-                <SeriesName source={s.source} topic={s.topic} path={s.path} />
+                <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
               </div>
             ))}
         </div>

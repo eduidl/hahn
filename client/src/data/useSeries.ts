@@ -24,10 +24,11 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
   const [revision, setRevision] = useState(0);
   // Fields are rebuilt from this key, so it must carry everything decoding needs.
   const selectionKey = JSON.stringify(
-    selected.map(({ key, source, topic, path, dataType, enumValues }) => ({
+    selected.map(({ key, source, topic, topicName, path, dataType, enumValues }) => ({
       key,
       source,
       topic,
+      topicName,
       path,
       dataType,
       enumValues,

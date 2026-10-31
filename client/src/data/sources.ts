@@ -1,5 +1,31 @@
 import { createContext, useContext } from "react";
-import { isMetaPath, type Info, type Run, type Topic } from "../types";
+import {
+  flattenFields,
+  isMetaPath,
+  metaFields,
+  type Info,
+  type Run,
+  type Schemas,
+  type Topic,
+} from "../types";
+
+/** Keep display names separate from the server's unique topic identifiers. */
+export function sourceTopics(source: string, topics: Schemas["Topic"][]): Topic[] {
+  const counts = new Map<string, number>();
+  const ordinals = new Map<string, number>();
+  for (const topic of topics) counts.set(topic.topic, (counts.get(topic.topic) ?? 0) + 1);
+  return topics.map((topic) => {
+    const ordinal = (ordinals.get(topic.topic) ?? 0) + 1;
+    ordinals.set(topic.topic, ordinal);
+    return {
+      ...topic,
+      topicName: counts.get(topic.topic)! > 1 ? `${topic.topic} [${ordinal}]` : topic.topic,
+      topic: topic.id,
+      source,
+      fields: [...flattenFields(topic.fields), ...metaFields(topic.meta_fields)],
+    };
+  });
+}
 
 export async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });

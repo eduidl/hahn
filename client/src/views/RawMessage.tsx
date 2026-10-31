@@ -158,7 +158,7 @@ export function RawMessage({
           </div>
           <Node
             key={`${series.key}:${info?.start_ns}`}
-            name={series.path.length ? series.path.join(".") : series.topic}
+            name={series.path.length ? series.path.join(".") : (series.topicName ?? series.topic)}
             value={message.value}
             depth={0}
             path={[]}

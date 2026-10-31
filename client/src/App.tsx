@@ -27,6 +27,7 @@ import {
   get,
   initialSources,
   mergeInfo,
+  sourceTopics,
   sourceOf,
   sourceUrl,
   type LoadedSource,
@@ -41,8 +42,6 @@ import {
   type Run,
   type Schemas,
   type Info,
-  flattenFields,
-  metaFields,
   type Topic,
   type TopicDrag,
 } from "./types";
@@ -152,18 +151,14 @@ export function App() {
         get<Info>(sourceUrl(id), controller.signal),
         get<Schemas["Topic"][]>(`${sourceUrl(id)}/topics`, controller.signal),
       ])
-        .then(([info, topics]) =>
+        .then(([info, topics]) => {
           settle({
             info,
-            topics: topics.map((topic) => ({
-              ...topic,
-              source: id,
-              fields: [...flattenFields(topic.fields), ...metaFields(topic.meta_fields)],
-            })),
+            topics: sourceTopics(id, topics),
             error: "",
             loading: false,
-          }),
-        )
+          });
+        })
         .catch((e) => settle({ info: null, topics: [], error: errorMessage(e), loading: false }));
     }
   }, [sources]);
@@ -210,7 +205,8 @@ export function App() {
     event.dataTransfer.setData(dragMime, JSON.stringify(payload));
     event.dataTransfer.setData(
       "text/plain",
-      payload.topic + (payload.path ? ` · ${payload.path.join(".")}` : ""),
+      (topics.find((t) => t.source === payload.source && t.topic === payload.topic)?.topicName ??
+        payload.topic) + (payload.path ? ` · ${payload.path.join(".")}` : ""),
     );
     event.dataTransfer.effectAllowed = "copy";
     setDrag(payload);
@@ -461,7 +457,7 @@ export function App() {
                               </div>
                             );
                           const query = search.toLowerCase();
-                          const topicMatch = t.topic.toLowerCase().includes(query);
+                          const topicMatch = (t.topicName ?? t.topic).toLowerCase().includes(query);
                           const fields = t.fields.filter(
                             (f) => topicMatch || f.path.join(".").toLowerCase().includes(query),
                           );
@@ -490,7 +486,7 @@ export function App() {
                                 onDragEnd={() => setDrag(null)}
                               >
                                 <span className="topic-label">
-                                  <span className="topic-name">{t.topic}</span>
+                                  <span className="topic-name">{t.topicName ?? t.topic}</span>
                                   <span className="topic-type">
                                     {[
                                       t.schema_name,
@@ -572,7 +568,7 @@ export function App() {
                         <div className="error-item" key={r.key}>
                           <strong>
                             {multiSource && <small>{sourceNames.get(r.source)} </small>}
-                            {r.topic}
+                            {r.topicName ?? r.topic}
                           </strong>
                           <span>Stream error</span>
                           <p>{r.error}</p>
@@ -582,7 +578,7 @@ export function App() {
                         <div className="error-item" key={topicKey(t.source, t.topic)}>
                           <strong>
                             {multiSource && <small>{sourceNames.get(t.source)} </small>}
-                            {t.topic}
+                            {t.topicName ?? t.topic}
                           </strong>
                           <span>Unreadable</span>
                           <p>{t.error}</p>

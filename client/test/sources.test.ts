@@ -3,10 +3,38 @@ import {
   initialSources,
   mergeInfo,
   messagesUrl,
+  sourceTopics,
   sourceOf,
   sourceUrl,
   type LoadedSource,
 } from "../src/data/sources";
+
+it("keeps same-name channels distinct for display, selection and requests", () => {
+  const common = {
+    topic: "/tf",
+    schema_name: null,
+    schema_encoding: null,
+    message_count: 1,
+    fields: [],
+    meta_fields: [],
+    views: [],
+    error: null,
+  };
+  const topics = sourceTopics("r/g", [
+    { ...common, id: "first" },
+    { ...common, id: "second" },
+  ]);
+  expect(topics.map((topic) => [topic.topic, topic.topicName])).toEqual([
+    ["first", "/tf [1]"],
+    ["second", "/tf [2]"],
+  ]);
+  expect(
+    new URL(
+      messagesUrl({ source: "r/g", topic: topics[1].topic, path: [] }),
+      "http://localhost",
+    ).searchParams.get("topic"),
+  ).toBe("second");
+});
 
 const source = (start: string, end: string, count: number | null = 1): LoadedSource => ({
   info: { start_ns: start, end_ns: end, message_count: count },

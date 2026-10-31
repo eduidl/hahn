@@ -51,7 +51,9 @@ export function buildFieldIndex(topics: Topic[]): FieldIndex {
         topic,
         field,
         kind: fieldKind(field),
-        label: field.path.length ? `${topic.topic} · ${field.path.join(".")}` : topic.topic,
+        label: field.path.length
+          ? `${topic.topicName ?? topic.topic} · ${field.path.join(".")}`
+          : (topic.topicName ?? topic.topic),
         typeLabel: typeLabel(topic, field),
       });
     }

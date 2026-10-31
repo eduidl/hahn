@@ -4,7 +4,6 @@ use super::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visi
 use anyhow::{Context, bail, ensure};
 use mcapdecode::{McapReader, ReadOptions, core::FieldDefs};
 use std::{
-    collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
     sync::Arc,
@@ -43,40 +42,46 @@ impl Source for McapSource {
     }
 
     fn topics(&self) -> anyhow::Result<Vec<TopicMeta>> {
+        let channels = self.reader.list_channels(&self.path)?;
         let summary = recording_summary(&self.path)?;
-        let mut schemas = HashMap::new();
-        self.reader
-            .list_topics(&self.path)?
+        let mut counts = std::collections::HashMap::new();
+        let mut schemas = std::collections::HashMap::new();
+        for channel in &channels {
+            *counts.entry(channel.topic.clone()).or_insert(0usize) += 1;
+        }
+        channels
             .into_iter()
-            .map(|info| {
-                let channels: Vec<_> = summary
-                    .channels
-                    .values()
-                    .filter(|c| c.topic == info.topic)
-                    .collect();
-                let cache_key = if channels.len() == 1 {
-                    channels[0]
+            .map(|channel| {
+                let key = summary.channels.get(&channel.id).and_then(|channel| {
+                    channel
                         .schema
                         .as_ref()
-                        .map(|s| (s.id, channels[0].message_encoding.clone()))
-                } else {
-                    None
+                        .map(|schema| (schema.id, channel.message_encoding.clone()))
+                });
+                let fields = match key {
+                    Some(key) => schemas
+                        .entry(key)
+                        .or_insert_with(|| {
+                            self.reader
+                                .field_defs_by_channel_id(&self.path, channel.id)
+                                .map_err(|e| e.to_string())
+                        })
+                        .clone(),
+                    None => self
+                        .reader
+                        .field_defs_by_channel_id(&self.path, channel.id)
+                        .map_err(|e| e.to_string()),
                 };
-                let defs = || {
-                    self.reader
-                        .topic_field_defs(&self.path, &info.topic)
-                        .map_err(|e| e.to_string())
-                };
-                let fields = match cache_key {
-                    Some(key) => schemas.entry(key).or_insert_with(defs).clone(),
-                    None => defs(),
-                };
-                let schema = channels.iter().find_map(|channel| channel.schema.as_ref());
                 Ok(TopicMeta {
-                    topic: info.topic,
-                    schema_name: info.schema_name,
-                    schema_encoding: schema.map(|schema| schema.encoding.clone()),
-                    message_count: info.message_count,
+                    id: if counts[&channel.topic] == 1 && !channel.topic.starts_with("@mcap:") {
+                        channel.topic.clone()
+                    } else {
+                        format!("@mcap:{}", channel.id)
+                    },
+                    topic: channel.topic,
+                    schema_name: channel.schema_name,
+                    schema_encoding: Some(channel.schema_encoding),
+                    message_count: channel.message_count,
                     fields,
                 })
             })
@@ -84,7 +89,13 @@ impl Source for McapSource {
     }
 
     fn field_defs(&self, topic: &str) -> anyhow::Result<FieldDefs> {
-        Ok(self.reader.topic_field_defs(&self.path, topic)?)
+        if let Some(id) = topic.strip_prefix("@mcap:") {
+            Ok(self
+                .reader
+                .field_defs_by_channel_id(&self.path, id.parse()?)?)
+        } else {
+            Ok(self.reader.topic_field_defs(&self.path, topic)?)
+        }
     }
 
     fn meta_fields(&self) -> &'static [&'static str] {
@@ -102,21 +113,32 @@ impl Source for McapSource {
         };
         // Carry the visitor's own error out unchanged rather than as a decoder error.
         let mut stopped = None;
-        let result = self.reader.for_each_decoded_message_with_options(
-            &self.path,
-            topic,
-            &options,
-            |message| {
-                let times = MessageTimes {
-                    log_time: message.log_time,
-                    publish_time: Some(message.publish_time),
-                };
-                visit(times, message.value).map_err(|e| {
-                    stopped = Some(e);
-                    std::io::Error::other("Read stopped").into()
-                })
-            },
-        );
+        let mut callback = |message: mcapdecode::core::DecodedMessage| {
+            let times = MessageTimes {
+                log_time: message.log_time,
+                publish_time: Some(message.publish_time),
+            };
+            visit(times, message.value).map_err(|e| {
+                stopped = Some(e);
+                std::io::Error::other("Read stopped").into()
+            })
+        };
+        let result = if let Some(id) = topic.strip_prefix("@mcap:") {
+            self.reader
+                .for_each_decoded_message_by_channel_id_with_options(
+                    &self.path,
+                    id.parse()?,
+                    &options,
+                    &mut callback,
+                )
+        } else {
+            self.reader.for_each_decoded_message_with_options(
+                &self.path,
+                topic,
+                &options,
+                &mut callback,
+            )
+        };
         match stopped {
             Some(e) => Err(e),
             None => Ok(result?),

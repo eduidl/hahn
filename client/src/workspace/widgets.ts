@@ -269,7 +269,7 @@ export const acceptsField = (
 /** Append a field as a new series, or replace the series of a single-series widget. */
 export function addSeries(
   list: Selected[],
-  { source, topic, views }: Pick<Topic, "source" | "topic" | "views">,
+  { source, topic, views, topicName }: Pick<Topic, "source" | "topic" | "views" | "topicName">,
   field: Field,
   spec: WidgetSpec,
 ): Selected[] {
@@ -287,6 +287,7 @@ export function addSeries(
       key,
       source,
       topic,
+      topicName,
       path: field.path,
       color,
       lineWidth: 1.5,
@@ -299,7 +300,7 @@ export function addSeries(
 }
 export const addFieldAction = (
   widget: Widget,
-  topic: Pick<Topic, "source" | "topic" | "views">,
+  topic: Pick<Topic, "source" | "topic" | "views" | "topicName">,
   field: Field,
 ): WorkspaceAction => ({
   type: "series",

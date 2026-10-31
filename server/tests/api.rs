@@ -1096,21 +1096,29 @@ async fn numbered_files_of_a_bag_read_as_one_recording() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|r| r["time_ns"].as_str().unwrap().parse().unwrap())
+        .filter(|t| t["topic"] == "/telemetry")
         .collect();
-    assert!(times[COUNT - 1] < times[COUNT], "segments in numeric order");
-
-    // Lookups cross the boundary: a time in the gap finds the first segment's last
-    // message, and one past the end of the first segment finds the second's.
-    let boundary = support::ORIGIN + span;
-    let at =
-        |t: u64| format!("/g/messages/latest?topic=/telemetry&path=%5B%22signal%22%5D&time_ns={t}");
-    let (_, before) = get(app.clone(), &at(boundary - 1)).await;
-    assert_eq!(before["time_ns"], (boundary - 10_000_000).to_string());
-    let (_, after) = get(app.clone(), &at(boundary)).await;
-    assert_eq!(after["time_ns"], boundary.to_string());
-    let (_, early) = get(app, &at(support::ORIGIN - 1)).await;
-    assert!(early.is_null());
+    assert_eq!(telemetry.len(), 2);
+    assert_ne!(telemetry[0]["id"], telemetry[1]["id"]);
+    for (i, topic) in telemetry.iter().enumerate() {
+        assert_eq!(topic["message_count"], COUNT);
+        let (status, events) = series(
+            app.clone(),
+            json!({"topic":topic["id"],"fields":[["counter"]]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let rows: Vec<_> = events
+            .iter()
+            .filter_map(|e| e["rows"].as_array())
+            .flatten()
+            .collect();
+        assert_eq!(rows.len(), COUNT);
+        assert_eq!(
+            rows[0]["time_ns"],
+            (support::ORIGIN + span * i as u64).to_string()
+        );
+    }
 }
 
 #[tokio::test]

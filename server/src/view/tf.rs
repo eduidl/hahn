@@ -231,7 +231,7 @@ impl TfIndex {
                     continue;
                 }
                 let from_static_topic = is_static_topic(&meta.topic);
-                source.read(&meta.topic, TimeRange::default(), &mut |times, value| {
+                source.read(&meta.id, TimeRange::default(), &mut |times, value| {
                     // One bad sample must not take every frame of the run with it.
                     if let Ok(message) = Message::new(defs, &value) {
                         let messages = if schema_name == "foxglove.FrameTransforms" {

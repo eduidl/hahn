@@ -32,7 +32,7 @@ export function ImageView({ widget, info }: { widget: Widget; info: Info | null 
     error || frame?.error || (value && !mime ? `Unsupported image format: ${value.format}` : "");
   return (
     <div className="view-image">
-      {url && !problem && <img src={url} alt={series.topic} />}
+      {url && !problem && <img src={url} alt={series.topicName ?? series.topic} />}
       {problem ? (
         <p className="view-status view-error">{problem}</p>
       ) : frame === undefined ? (

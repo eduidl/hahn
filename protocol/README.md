@@ -18,10 +18,12 @@ Unimplemented ideas are preserved in [drafts/README.md](drafts/README.md) and it
 |---|---|
 | Run | One drive. The client opens only one at a time |
 | Group | A kind of data in a run. The server decides how to divide them |
-| Topic | A series of messages in a group. Names are unique only within a group |
+| Topic | A series of messages in a group, identified by its opaque `id`. Display names may be shared |
 | Field | A value in a message |
 | User type | A type defined by the user: the schema of a recording's topic, named by `schema_name` |
 | Hahn type | A type defined by Hahn, such as `image` or `pose`, named by `kind` |
+
+The `topic` field is a display name and may be duplicated. Use the topic's `id` as the `topic` query parameter for messages and views; do not interpret its contents.
 
 ## Time
 
@@ -114,12 +116,14 @@ The client selects views by supported `kind`. Images in an unsupported format sh
 
 Transforms are not a Hahn type. They are not something to show but the context for reading other values, they have to be merged across topics (`/tf`, `/tf_static`), and a single message may hold only some of the frames. So a run has one graph of frames, merged from all of its groups whether open or not, and the server resolves it. A view of any group refers to the same graph, since how a run divides into groups is up to the server. A group that cannot be read is left out. Which topics feed it is up to the server. Those topics are still readable through `/messages`.
 
+The Rust server reads `foxglove.FrameTransform` and arrays in `foxglove.FrameTransforms`. It treats topics whose final path segment is `tf_static` or `tf-static` as static. It reads each channel and segment separately and combines their transforms in the run's graph.
+
 Coordinates are right-handed, in meters and radians. The server converts recordings on other conventions.
 
 `/transforms` resolves the graph by these rules:
 
 - Dynamic transforms are interpolated between the samples around `time_ns`: linearly for translation, by slerp for rotation. Static ones hold at all times, and what counts as static is up to the server.
-- Between samples with different parents, nothing is interpolated: the earlier sample holds unchanged until the later one, so the frame stays under its earlier parent. With several samples at the same time, the last in recording order applies, and across groups the last in the order of the run's groups.
+- Between samples with different parents, nothing is interpolated: the earlier sample holds unchanged until the later one, so the frame stays under its earlier parent. With several samples at the same time, the last in source order applies: recording order within a channel, then topic order within a group, then the order of the run's groups.
 - Rotations are interpolated the short way round, since `q` and `-q` are the same rotation.
 - A sample with a non-finite number, or without both of its frames, is ignored.
 - A cycle of frames is invalid data. The response is still valid, but which way round the frames on it were resolved is unspecified.
