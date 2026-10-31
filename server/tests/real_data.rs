@@ -12,7 +12,7 @@ use tower::ServiceExt;
 fn data_dir() -> PathBuf {
     std::env::var_os("MCAP_TEST_DATA_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data"))
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("data"))
 }
 
 fn scalar(defs: &FieldDefs, value: &Value, path: &[&str]) -> serde_json::Value {
