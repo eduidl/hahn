@@ -2,14 +2,25 @@
 
 ローカルの録画（MCAP・CSV・Parquet）をRustでデコードし、ブラウザへ逐次配信するプロットビューワ。複数の録画を共通の時間軸に並べて表示できます。
 
+## Public sample recording
+
+[Labelbox Robotics Datasets](https://huggingface.co/datasets/Labelbox/robotics-datasets) provides real robot recordings under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Download this approximately 968 MB recording to try it with Hahn:
+
+```bash
+mkdir -p data
+curl -fL -o data/labelbox-arm-original.mcap 'https://huggingface.co/datasets/Labelbox/robotics-datasets/resolve/0960b924abcf0250ab0c47d4410c32caf5abfebe/data/bimanual/xarm6/place_clothing_into_basket/recording_0021.mcap'
+```
+
+Restart the server after adding the recording and select the `labelbox-arm-original.mcap` run. For a time series, try `/left-arm-leader` → `pose.position.x`.
+
 ## 起動
 
 Rust 1.95以上、Node.js 22.12以上（または20.19以上）が必要です。
-`Cargo.toml` は手元の `~/repos/eduidl/mcapdecode-rs/mcapdecode/mcapdecode` を相対パスで参照しています。
+`server/Cargo.toml` は手元の `~/repos/eduidl/mcapdecode-rs/mcapdecode/mcapdecode` を相対パスで参照しています。
 別の場所にチェックアウトした場合は、この依存パスを変更してください。
 
 ```bash
-cd web
+cd client
 npm ci
 npm run build
 cd ..
