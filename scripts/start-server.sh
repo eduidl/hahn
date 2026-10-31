@@ -55,11 +55,14 @@ watch_pids+=("$!")
 
 # Override these environment variables to use another recording directory/port.
 # Recordings are inputs, so changes under data/ do not restart the server.
-cargo watch --ignore 'web/**' --ignore 'data/**' -- cargo run --release -- \
-  --data-dir "${HAHN_DATA_DIR:-${MCAP_DATA_DIR:-$project_dir/data}}" \
-  --listen "${HAHN_LISTEN:-127.0.0.1:3000}" \
-  "${timezone_args[@]}" \
-  "$@" &
+(
+  cd server
+  exec cargo watch -w "$project_dir/server" --ignore target -C "$project_dir" -- cargo run --manifest-path "$project_dir/server/Cargo.toml" --release -- \
+    --data-dir "${HAHN_DATA_DIR:-${MCAP_DATA_DIR:-$project_dir/data}}" \
+    --listen "${HAHN_LISTEN:-127.0.0.1:3000}" \
+    "${timezone_args[@]}" \
+    "$@"
+) &
 watch_pids+=("$!")
 
 # Stop both watchers if either one exits.

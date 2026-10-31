@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 port="${CONFORMANCE_PORT:-3918}"
-cargo build --quiet --locked --bins --examples
+cargo build --manifest-path server/Cargo.toml --quiet --locked --bins --examples
 fixtures="$(mktemp -d)"
 server=""
 cleanup() {
@@ -20,9 +20,9 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-target/debug/examples/generate_demo "$fixtures/demo.mcap" 2200
-target/debug/examples/generate_visual "$fixtures/visual.mcap"
-target/debug/hahn --data-dir "$fixtures" --listen "127.0.0.1:$port" >"$fixtures/server.log" 2>&1 &
+server/target/debug/examples/generate_demo "$fixtures/demo.mcap" 2200
+server/target/debug/examples/generate_visual "$fixtures/visual.mcap"
+server/target/debug/hahn --data-dir "$fixtures" --listen "127.0.0.1:$port" >"$fixtures/server.log" 2>&1 &
 server=$!
 ready=false
 for _ in {1..50}; do
@@ -38,5 +38,5 @@ if [[ "$ready" != true ]] || ! kill -0 "$server" 2>/dev/null; then
   echo 'Conformance server did not start' >&2
   exit 1
 fi
-cd web
+cd client
 BASE_URL="http://127.0.0.1:$port" npm run --silent conformance

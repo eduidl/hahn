@@ -13,7 +13,7 @@ cd web
 npm ci
 npm run build
 cd ..
-cargo run --release
+cargo run --manifest-path server/Cargo.toml --release
 ```
 
 録画は既定でリポジトリ直下の `data/` から探します（サブディレクトリも対象）。別の場所は `--data-dir` で指定します。
@@ -71,7 +71,7 @@ cargo run --release
 `--gzip` を指定すると、圧縮に対応するクライアントへのAPI応答を最速レベルで圧縮します。ネットワーク経由で使う場合に指定してください。localhostでは圧縮しない場合より遅くなります。
 
 サーバは既定でlocalhostのみで待ち受けます。`--listen` と `--web-dir` で変更できます。
-開発時はサーバを起動したうえで `cd web && npm run dev` を実行します。Viteは `/api` をポート3000へ転送します。
+開発時はサーバを起動したうえで `cd client && npm run dev` を実行します。Viteは `/api` をポート3000へ転送します。
 
 ## 実データでの検証
 
@@ -79,10 +79,10 @@ cargo run --release
 
 `data/samples/` には境界条件用のデモMCAP（`demo.mcap`、下記の生成コマンドの出力）、時刻が `demo.mcap` と重なるCSV（`imu.csv`）とParquet（`wheels.parquet`。構造体・dictionary・リストの列を含む）を置いています。まとめて開くと、形式の違う録画を共通の時間軸で確認できます。
 
-`visual.mcap` は画像・点群・位置・座標変換の変換（View）を確認するための録画です。`cargo run --example generate_visual -- data/samples/visual.mcap` で生成します。
+`visual.mcap` は画像・点群・位置・座標変換の変換（View）を確認するための録画です。`cargo run --manifest-path server/Cargo.toml --example generate_visual -- data/samples/visual.mcap` で生成します。
 
 ```bash
-cargo test --test real_data -- --ignored
+cargo test --manifest-path server/Cargo.toml --test real_data -- --ignored
 ```
 
 このテストは、データディレクトリ直下の各MCAPから数値フィールドを持つトピックを1つ選び、配信された最初のサンプルをライブラリの直接デコード結果と照合します。
