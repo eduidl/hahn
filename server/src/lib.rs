@@ -4,6 +4,9 @@ mod source;
 mod stream;
 mod view;
 
+pub use mcapdecode::core::{DataTypeDef, FieldDefs};
+pub use view::{ImageConverter, ImageView, Message};
+
 use axum::{
     Json, Router,
     body::to_bytes,
@@ -14,7 +17,6 @@ use axum::{
     routing::get,
 };
 use catalog::{Group, Run};
-use mcapdecode::core::{DataTypeDef, FieldDefs};
 use serde::{Deserialize, Serialize};
 use std::{path::Path as FsPath, sync::Arc};
 use tower_http::compression::{
@@ -29,6 +31,7 @@ const MAX_RUNS: usize = 200;
 #[derive(Clone)]
 struct AppState {
     runs: Arc<Vec<Run>>,
+    converters: Arc<Vec<Arc<dyn view::Converter>>>,
 }
 
 /// Compresses API responses at the fastest level, which beats higher ones once their
@@ -49,6 +52,16 @@ pub fn router(root: &FsPath) -> anyhow::Result<Router> {
 
 /// `timezone` is the IANA name to declare for every run.
 pub fn router_with_timezone(root: &FsPath, timezone: Option<String>) -> anyhow::Result<Router> {
+    router_with_image_converters(root, timezone, Vec::new())
+}
+
+/// Builds a router with additional image converters alongside the built-in converters.
+pub fn router_with_image_converters(
+    root: &FsPath,
+    timezone: Option<String>,
+    converters: Vec<Arc<dyn ImageConverter>>,
+) -> anyhow::Result<Router> {
+    let converters = Arc::new(view::converters(converters)?);
     let runs = catalog::discover(&root.canonicalize()?, timezone)?;
     Ok(Router::new()
         .route("/api/runs", get(runs_list))
@@ -73,6 +86,7 @@ pub fn router_with_timezone(root: &FsPath, timezone: Option<String>) -> anyhow::
         .layer(map_response(json_errors))
         .with_state(AppState {
             runs: Arc::new(runs),
+            converters,
         }))
 }
 
@@ -337,7 +351,7 @@ async fn topics(
                     Ok(defs) => (
                         schema_fields(&defs),
                         meta_fields.clone(),
-                        view::declared(meta.schema_name.as_deref(), &defs),
+                        view::declared(meta.schema_name.as_deref(), &defs, &state.converters),
                         None,
                     ),
                     Err(e) => (Vec::new(), Vec::new(), Vec::new(), Some(e)),

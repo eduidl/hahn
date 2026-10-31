@@ -22,11 +22,66 @@ pub(crate) trait Converter: Send + Sync {
     ) -> anyhow::Result<serde_json::Value>;
 }
 
-pub(crate) const CONVERTERS: &[&dyn Converter] = &[&Image, &PointCloud, &Geo];
+pub(crate) fn converters() -> Vec<Arc<dyn Converter>> {
+    vec![
+        Arc::new(ImageAdapter(Arc::new(Image))),
+        Arc::new(PointCloud),
+        Arc::new(Geo),
+    ]
+}
+
+/// An encoded image in Hahn's image view.
+pub struct ImageView {
+    pub frame_id: Option<String>,
+    pub format: String,
+    pub data: Arc<[u8]>,
+}
+
+/// Converts a decoded message into a Hahn image view.
+pub trait ImageConverter: Send + Sync {
+    /// Unique among all view converters registered with a server.
+    fn id(&self) -> &'static str;
+    fn name(&self) -> &'static str;
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool;
+    fn convert(&self, message: &Message<'_>) -> anyhow::Result<ImageView>;
+}
+
+pub(crate) struct ImageAdapter(pub Arc<dyn ImageConverter>);
+
+impl Converter for ImageAdapter {
+    fn id(&self) -> &'static str {
+        self.0.id()
+    }
+    fn kind(&self) -> &'static str {
+        "image"
+    }
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        self.0.accepts(schema_name, defs)
+    }
+    fn convert(
+        &self,
+        message: &Message,
+        payload: &mut Payload,
+    ) -> anyhow::Result<serde_json::Value> {
+        let image = self.0.convert(message)?;
+        let format = image.format.to_ascii_lowercase();
+        ensure!(
+            matches!(format.as_str(), "jpeg" | "jpg" | "png" | "webp" | "avif"),
+            "Unsupported image format: {format:?}"
+        );
+        let format = if format == "jpg" { "jpeg" } else { &format };
+        Ok(
+            json!({"kind": "image", "frame_id": image.frame_id, "format": format, "role": "color", "data": payload.add(image.data)}),
+        )
+    }
+}
 
 /// Reads a decoded struct by field name.
 #[derive(Clone, Copy)]
-pub(crate) struct Message<'a> {
+pub struct Message<'a> {
     defs: &'a FieldDefs,
     values: &'a [Value],
 }
@@ -59,7 +114,7 @@ impl<'a> Message<'a> {
         })
     }
 
-    pub(crate) fn string(&self, name: &str) -> anyhow::Result<&'a str> {
+    pub fn string(&self, name: &str) -> anyhow::Result<&'a str> {
         match self.present(name)? {
             Some(Value::String(value)) => Ok(value),
             None => Ok(""),
@@ -67,14 +122,14 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub(crate) fn number(&self, name: &str) -> anyhow::Result<f64> {
+    pub fn number(&self, name: &str) -> anyhow::Result<f64> {
         let value = self
             .present(name)?
             .with_context(|| format!("Field {name} has no value"))?;
         number(value).with_context(|| format!("Field {name} is not a number"))
     }
 
-    pub(crate) fn numbers(&self, name: &str) -> anyhow::Result<Vec<f64>> {
+    pub fn numbers(&self, name: &str) -> anyhow::Result<Vec<f64>> {
         match self.present(name)? {
             Some(Value::List(values) | Value::Array(values)) => values
                 .iter()
@@ -87,7 +142,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    fn bytes(&self, name: &str) -> anyhow::Result<Arc<[u8]>> {
+    pub fn bytes(&self, name: &str) -> anyhow::Result<Arc<[u8]>> {
         match self.present(name)? {
             Some(Value::Bytes(value) | Value::Uint8List(value)) => Ok(value.clone()),
             None => Ok(Arc::from([])),
@@ -96,7 +151,7 @@ impl<'a> Message<'a> {
     }
 
     /// A nested struct, or `None` when the message leaves it out.
-    pub(crate) fn child(&self, name: &str) -> anyhow::Result<Option<Message<'a>>> {
+    pub fn child(&self, name: &str) -> anyhow::Result<Option<Message<'a>>> {
         let (data_type, value) = self.field(name)?;
         match (data_type, value) {
             (_, Value::Null) => Ok(None),
@@ -237,11 +292,8 @@ pub(crate) fn vector(message: Option<Message>) -> anyhow::Result<[f64; 3]> {
 /// `foxglove.CompressedImage`.
 struct Image;
 
-impl Converter for Image {
+impl ImageConverter for Image {
     fn id(&self) -> &'static str {
-        "image"
-    }
-    fn kind(&self) -> &'static str {
         "image"
     }
     fn name(&self) -> &'static str {
@@ -253,24 +305,13 @@ impl Converter for Image {
             && has(defs, "format", is_string)
             && has(defs, "frame_id", is_string)
     }
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
-        let format = message.string("format")?.to_ascii_lowercase();
-        ensure!(
-            matches!(format.as_str(), "jpeg" | "jpg" | "png" | "webp" | "avif"),
-            "Unsupported image format: {format:?}"
-        );
-        let format = if format == "jpg" { "jpeg" } else { &format };
-        Ok(json!({
-            "kind": "image",
-            "frame_id": frame_id(message)?,
-            "format": format,
-            "role": "color",
-            "data": payload.add(message.bytes("data")?),
-        }))
+    fn convert(&self, message: &Message) -> anyhow::Result<ImageView> {
+        let frame = message.string("frame_id")?;
+        Ok(ImageView {
+            frame_id: (!frame.is_empty()).then(|| frame.to_owned()),
+            format: message.string("format")?.to_owned(),
+            data: message.bytes("data")?,
+        })
     }
 }
 
@@ -533,7 +574,7 @@ mod tests {
                 Value::string(format),
             ]);
             let message = Message::new(&defs, &value).unwrap();
-            Image.convert(&message, &mut Payload::default())
+            ImageAdapter(Arc::new(Image)).convert(&message, &mut Payload::default())
         };
         let value = convert("JPG").unwrap();
         assert_eq!(value["format"], "jpeg");

@@ -22,7 +22,8 @@ use axum::{
     http::header,
     response::{IntoResponse, Response},
 };
-use convert::{CONVERTERS, Converter, Message};
+pub(crate) use convert::Converter;
+pub use convert::{ImageConverter, ImageView, Message};
 pub(crate) use frame::CONTENT_TYPE;
 use frame::{Payload, encode};
 use mcapdecode::core::{FieldDefs, Value};
@@ -30,6 +31,24 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+
+pub(crate) fn converters(
+    extra: Vec<Arc<dyn ImageConverter>>,
+) -> anyhow::Result<Vec<Arc<dyn Converter>>> {
+    let mut converters = convert::converters();
+    for converter in extra {
+        anyhow::ensure!(!converter.id().is_empty(), "Converter ID must not be empty");
+        anyhow::ensure!(
+            converters
+                .iter()
+                .all(|existing| existing.id() != converter.id()),
+            "Duplicate converter ID: {}",
+            converter.id()
+        );
+        converters.push(Arc::new(convert::ImageAdapter(converter)));
+    }
+    Ok(converters)
+}
 
 #[derive(Clone, Serialize)]
 pub(crate) struct ViewInfo {
@@ -39,8 +58,12 @@ pub(crate) struct ViewInfo {
 }
 
 /// The views a topic of this schema offers.
-pub(crate) fn declared(schema_name: Option<&str>, defs: &FieldDefs) -> Vec<ViewInfo> {
-    accepted(schema_name, defs)
+pub(crate) fn declared(
+    schema_name: Option<&str>,
+    defs: &FieldDefs,
+    converters: &[Arc<dyn Converter>],
+) -> Vec<ViewInfo> {
+    accepted(schema_name, defs, converters)
         .map(|converter| ViewInfo {
             id: converter.id(),
             kind: converter.kind(),
@@ -52,15 +75,16 @@ pub(crate) fn declared(schema_name: Option<&str>, defs: &FieldDefs) -> Vec<ViewI
 fn accepted<'a>(
     schema_name: Option<&'a str>,
     defs: &'a FieldDefs,
-) -> impl Iterator<Item = &'static dyn Converter> + 'a {
-    CONVERTERS.iter().copied().filter(move |converter| {
+    converters: &'a [Arc<dyn Converter>],
+) -> impl Iterator<Item = &'a Arc<dyn Converter>> + 'a {
+    converters.iter().filter(move |converter| {
         schema_name.is_some_and(|schema_name| converter.accepts(schema_name, defs))
     })
 }
 
 struct TopicViews {
     defs: Arc<FieldDefs>,
-    converters: Vec<&'static dyn Converter>,
+    converters: Vec<Arc<dyn Converter>>,
 }
 
 /// Which converters apply to which topic. Kept per group, since it is looked up on
@@ -70,11 +94,16 @@ pub(crate) struct ViewIndex {
 }
 
 impl ViewIndex {
-    pub(crate) fn build(source: &dyn Source) -> anyhow::Result<Self> {
+    pub(crate) fn build(
+        source: &dyn Source,
+        registry: &[Arc<dyn Converter>],
+    ) -> anyhow::Result<Self> {
         let mut topics = HashMap::new();
         for meta in source.topics()? {
             let Ok(defs) = meta.fields else { continue };
-            let converters: Vec<_> = accepted(meta.schema_name.as_deref(), &defs).collect();
+            let converters: Vec<_> = accepted(meta.schema_name.as_deref(), &defs, registry)
+                .cloned()
+                .collect();
             if !converters.is_empty() {
                 let defs = Arc::new(defs);
                 topics.insert(meta.topic, TopicViews { defs, converters });
@@ -83,16 +112,12 @@ impl ViewIndex {
         Ok(Self { topics })
     }
 
-    fn get(
-        &self,
-        topic: &str,
-        view: &str,
-    ) -> anyhow::Result<(Arc<FieldDefs>, &'static dyn Converter)> {
+    fn get(&self, topic: &str, view: &str) -> anyhow::Result<(Arc<FieldDefs>, Arc<dyn Converter>)> {
         self.topics
             .get(topic)
             .and_then(|views| {
                 let converter = views.converters.iter().find(|c| c.id() == view)?;
-                Some((views.defs.clone(), *converter))
+                Some((views.defs.clone(), converter.clone()))
             })
             .ok_or_else(|| anyhow::anyhow!("Unknown view {view:?} of topic {topic:?}"))
     }
@@ -186,7 +211,7 @@ pub(crate) async fn views(
     let (topic, view) = (query.topic, query.view);
     let (source, topic, defs, converter) = blocking(move || {
         let source = group.source()?;
-        let (defs, converter) = group.views()?.get(&topic, &view)?;
+        let (defs, converter) = group.views(&state.converters)?.get(&topic, &view)?;
         Ok((source, topic, defs, converter))
     })
     .await?;
@@ -205,7 +230,7 @@ pub(crate) async fn views(
                 return Err(disconnected().into());
             }
             scanned += 1;
-            send(frame(converter, &defs, times, &value)?)?;
+            send(frame(&*converter, &defs, times, &value)?)?;
             Ok(())
         });
         if tx.is_closed() {
@@ -246,14 +271,16 @@ pub(crate) async fn latest(
     let known = query.known_time_ns.as_deref().map(parse_time).transpose()?;
     let chunks = blocking(move || {
         let source = group.source()?;
-        let (defs, converter) = group.views()?.get(&query.topic, &query.view)?;
+        let (defs, converter) = group
+            .views(&state.converters)?
+            .get(&query.topic, &query.view)?;
         let mut chunks = Vec::new();
         let latest = source.latest_at(&query.topic, time)?;
         if let Some((times, value)) = &latest {
             if known == Some(times.log_time) {
                 chunks.extend(control(&Header::Unchanged)?);
             } else {
-                chunks.extend(frame(converter, &defs, *times, value)?);
+                chunks.extend(frame(&*converter, &defs, *times, value)?);
             }
         }
         chunks.extend(control(&Header::Complete {
