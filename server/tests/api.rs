@@ -1421,6 +1421,88 @@ async fn topics_declare_their_views_from_the_schema() {
     assert_eq!(topics[0]["views"], json!([]));
 }
 
+struct CustomImage;
+
+impl hahn::ImageConverter for CustomImage {
+    fn id(&self) -> &'static str {
+        "custom-image"
+    }
+    fn name(&self) -> &'static str {
+        "Custom image"
+    }
+    fn accepts(&self, schema_name: &str, defs: &hahn::FieldDefs) -> bool {
+        schema_name == "foxglove.CompressedImage" && defs.iter().any(|field| field.name == "data")
+    }
+    fn convert(&self, message: &hahn::Message<'_>) -> anyhow::Result<hahn::ImageView> {
+        Ok(hahn::ImageView {
+            frame_id: None,
+            format: "PNG".into(),
+            data: message.bytes("data")?,
+        })
+    }
+}
+
+#[tokio::test]
+async fn external_image_converter_is_declared_and_served() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_visual_fixture(&dir.path().join("visual.mcap")).unwrap();
+    let app = hahn::router_with_image_converters(
+        dir.path(),
+        None,
+        vec![std::sync::Arc::new(CustomImage)],
+    )
+    .unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    let camera = topics
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|topic| topic["topic"] == "/camera")
+        .unwrap();
+    assert!(
+        camera["views"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|view| view["id"] == "image")
+    );
+    assert!(
+        camera["views"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|view| view["id"] == "custom-image" && view["kind"] == "image")
+    );
+    let time = support::ORIGIN + support::VISUAL_STEP_NS;
+    let (status, events) = frames(
+        &app,
+        &view_url(
+            "views/latest",
+            "/camera",
+            "custom-image",
+            &format!("&time_ns={time}"),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let value = &events[0].0["value"];
+    assert_eq!(value["format"], "png");
+    let offset = value["data"]["$blob"]["offset"].as_u64().unwrap() as usize;
+    let len = value["data"]["$blob"]["length"].as_u64().unwrap() as usize;
+    assert_eq!(&events[0].1[offset..offset + len], support::PNG);
+    assert!(
+        hahn::router_with_image_converters(
+            dir.path(),
+            None,
+            vec![
+                std::sync::Arc::new(CustomImage),
+                std::sync::Arc::new(CustomImage)
+            ]
+        )
+        .is_err()
+    );
+}
+
 #[tokio::test]
 async fn image_frames_carry_the_recorded_bytes() {
     let (_dir, app) = visual_app();

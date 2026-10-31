@@ -4,14 +4,20 @@
 
 ## Public sample recording
 
-[Labelbox Robotics Datasets](https://huggingface.co/datasets/Labelbox/robotics-datasets) provides real robot recordings under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Download this approximately 968 MB recording to try it with Hahn:
+[WireFishing-M](https://huggingface.co/datasets/harpreetsahota/wirefishing-m) provides real robot recordings under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Download this approximately 342 MB recording to try its JPEG camera images and robot telemetry with Hahn:
 
 ```bash
 mkdir -p data
-curl -fL -o data/labelbox-arm-original.mcap 'https://huggingface.co/datasets/Labelbox/robotics-datasets/resolve/0960b924abcf0250ab0c47d4410c32caf5abfebe/data/bimanual/xarm6/place_clothing_into_basket/recording_0021.mcap'
+curl -fL -o data/wirefishing-cable-3.mcap 'https://huggingface.co/datasets/harpreetsahota/wirefishing-m/resolve/283fcc1bf97a6337aea8db0f00b338ff07e71987/data/cable_3_human_trial_1.mcap'
 ```
 
-Restart the server after adding the recording and select the `labelbox-arm-original.mcap` run. For a time series, try `/left-arm-leader` → `pose.position.x`.
+Restart the server after adding the recording and select the `wirefishing-cable-3.mcap` run. For an image view, select `/camera/global/image_raw`; for a time series, try `/robot/ee_position` → `x`.
+
+## Custom image converters
+
+Rust applications embedding Hahn can implement `hahn::ImageConverter` and pass it to `hahn::router_with_image_converters`. The built-in converters remain available. Each converter needs a unique, nonempty ID and must check the schema name and fields in `accepts`. Its `convert` method reads the decoded `Message` and returns an `ImageView`; Hahn validates the image format and handles framing and delivery. See `external_image_converter_is_declared_and_served` in [`server/tests/api.rs`](server/tests/api.rs) for a complete example.
+
+This extension currently covers encoded images only. Point clouds, geographic views, and transforms still use the built-in converters. The decoded message types come from `mcapdecode`, which is currently a local path dependency.
 
 ## 起動
 

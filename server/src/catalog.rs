@@ -8,7 +8,7 @@
 
 use crate::{
     source::{self, Format, Source},
-    view::{TfIndex, ViewIndex},
+    view::{Converter, TfIndex, ViewIndex},
 };
 use serde::Serialize;
 use std::{
@@ -83,11 +83,14 @@ impl Group {
     }
 
     /// Built on first use like the source. Blocks, so call it inside `blocking`.
-    pub(crate) fn views(&self) -> anyhow::Result<Arc<ViewIndex>> {
+    pub(crate) fn views(
+        &self,
+        converters: &[Arc<dyn Converter>],
+    ) -> anyhow::Result<Arc<ViewIndex>> {
         if let Some(views) = self.views.get() {
             return Ok(views.clone());
         }
-        let views = Arc::new(ViewIndex::build(&*self.source()?)?);
+        let views = Arc::new(ViewIndex::build(&*self.source()?, converters)?);
         Ok(self.views.get_or_init(|| views).clone())
     }
 }
