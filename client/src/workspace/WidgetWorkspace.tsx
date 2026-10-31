@@ -26,6 +26,7 @@ import type { FieldIndex } from "./fieldIndex";
 import { RawMessage } from "../views/RawMessage";
 import { ImageView } from "../views/ImageView";
 import { SeriesName } from "../SeriesName";
+import { SourceNames } from "../data/sources";
 import { usePlayback } from "./playback";
 import { dragMime, type Info } from "../types";
 import {
@@ -257,6 +258,14 @@ function TimeSeriesWindow({
 }: Props & { widget: Widget; path: MosaicPath }) {
   const { state, dispatch, data, info, fullEnd, revision, dragVerdict, drop, openSettings } = props;
   const moving = useContext(MoveContext);
+  const sourceNames = useContext(SourceNames);
+  const selection = widget.series
+    .map((series) => {
+      const group = sourceNames.size > 1 ? sourceNames.get(series.source) : undefined;
+      const field = series.path.length ? ` · ${series.path.join(".")}` : "";
+      return `${group ? `${group} · ` : ""}${series.topic}${field}`;
+    })
+    .join(", ");
   const owner = ownerOf(state, widget.id);
   const canDrop =
     (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, owner)) ||
@@ -615,7 +624,9 @@ function TimeSeriesWindow({
           ) : (
             <>
               <div className="widget-plot-toolbar">
-                <span>{widget.series.length} series</span>
+                <span className="widget-selection" title={selection || undefined}>
+                  {selection || "No topic selected"}
+                </span>
                 <div className="toolbar">
                   {widget.type === "time-series" && (
                     <div className="drag-mode" role="group" aria-label="Drag mode">
