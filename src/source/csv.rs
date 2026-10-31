@@ -16,10 +16,6 @@ use std::{path::Path, sync::Arc};
 pub(super) struct Csv;
 
 impl Format for Csv {
-    fn name(&self) -> &'static str {
-        "csv"
-    }
-
     fn accepts(&self, path: &Path) -> bool {
         has_extension(path, "csv")
     }

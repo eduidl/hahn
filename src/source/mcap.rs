@@ -13,10 +13,6 @@ use std::{
 pub(super) struct Mcap;
 
 impl Format for Mcap {
-    fn name(&self) -> &'static str {
-        "mcap"
-    }
-
     fn accepts(&self, path: &Path) -> bool {
         has_extension(path, "mcap")
     }
