@@ -1,0 +1,2958 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "description": "UNIMPLEMENTED DESIGN PROPOSAL. Not the current API or a compatibility promise. Do not use for client generation or conformance; use ../openapi.json. The protocol between the Hahn client and its servers. This document holds the operations and every field. protocol/README.md holds the concepts across them and the binary format of view frames.",
+    "title": "Hahn API — unimplemented proposal",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/runs": {
+      "get": {
+        "operationId": "runs",
+        "description": "List of runs. Implement this as a light operation that does not open recordings.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Returns only runs whose name contains this text, ignoring case.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "The most runs to return. Values out of range or not numeric return 400.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}": {
+      "get": {
+        "operationId": "run",
+        "description": "A run and its groups. Implement this as a light operation that does not open recordings.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/groups/{group}": {
+      "get": {
+        "operationId": "info",
+        "description": "Time range and message count of a group. A readable group known to have no messages returns 422 with code empty_group, since it has no time range. Failure to open, read or decode the recording returns recording_unreadable, not empty_group. Successful topic queries with no matching messages retain their normal empty responses.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordingInfo"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/groups/{group}/topics": {
+      "get": {
+        "operationId": "topics",
+        "description": "Topics and their schemas",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The topics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Topic"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/groups/{group}/messages": {
+      "get": {
+        "operationId": "messages",
+        "description": "History of messages or of a field within a log-time range, as a stream. Selection uses the common time-query rules in the README, shared with views. Each request reads one field; read several fields with separate requests. Rows are in recording order, not necessarily timestamp order. Message time_ns always holds log time; stamp_ns, when available, holds measurement time. Messages with the same time remain separate rows. Measurement timestamps and clock correspondence are not required to select history.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          },
+          {
+            "$ref": "#/components/parameters/Topic"
+          },
+          {
+            "$ref": "#/components/parameters/FieldPath"
+          },
+          {
+            "$ref": "#/components/parameters/LogStartNs"
+          },
+          {
+            "$ref": "#/components/parameters/LogEndNs"
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "description": "`true` returns values for display. `false` returns exact values, without shortening strings, for where they are needed, such as plots: `path` must then name a single number, bool, enum or string field, anything else returning 422. Enum representation follows the Message values rules in the README for both settings; enum strings are never shortened.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Meta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NDJSON stream",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/groups/{group}/messages/latest": {
+      "get": {
+        "operationId": "latestMessage",
+        "description": "The latest message at or before log_time_ns, or at or before clock_time_ns within the interval identified by log_time_ns when that optional parameter is present. Equal lookup timestamps are ordered by log time, then recording order, with the last winning. Returns null for a successful search with no matching message. An unresolved clock, interval or required measurement timestamp is an error, not an empty result. Optional log_start_ns excludes messages with earlier log times before latest selection, even when clock_time_ns is supplied. If no candidate remains, return the normal empty result. Each request returns its selected value or conversion error independently of previous requests, including requests for other topics or views.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          },
+          {
+            "$ref": "#/components/parameters/Topic"
+          },
+          {
+            "$ref": "#/components/parameters/FieldPath"
+          },
+          {
+            "$ref": "#/components/parameters/LogTime"
+          },
+          {
+            "$ref": "#/components/parameters/ClockTime"
+          },
+          {
+            "$ref": "#/components/parameters/Meta"
+          },
+          {
+            "$ref": "#/components/parameters/LogStartNs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The latest message, or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/MessageResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/groups/{group}/views": {
+      "get": {
+        "operationId": "views",
+        "description": "The same log-time range selection as /messages, followed by conversion to the specified view. Returned time_ns remains log time, with optional stamp_ns for measurement time. Frames remain in recording order. Clients needing time order sort stably by time_ns for log time or stamp_ns for measurement time. Measurement-clock range filtering is not supported.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          },
+          {
+            "$ref": "#/components/parameters/Topic"
+          },
+          {
+            "$ref": "#/components/parameters/ViewId"
+          },
+          {
+            "$ref": "#/components/parameters/LogStartNs"
+          },
+          {
+            "$ref": "#/components/parameters/LogEndNs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ViewFrames"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/groups/{group}/views/latest": {
+      "get": {
+        "operationId": "latestView",
+        "description": "The same message selection as /messages/latest, followed by conversion to the specified view: at most one frame followed by complete, or just complete for a successful search with no message. An unresolved clock, interval or required measurement timestamp is an error. Without clock_time_ns, search by log_time_ns. With clock_time_ns, selection is confined to the interval identified by log_time_ns and never crosses a measurement-clock reset. Optional log_start_ns excludes messages with earlier log times before latest selection, even when clock_time_ns is supplied. If no candidate remains, return the normal empty result. Each request returns its selected value or conversion error independently of previous requests, including requests for other topics or views.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          },
+          {
+            "$ref": "#/components/parameters/Topic"
+          },
+          {
+            "$ref": "#/components/parameters/ViewId"
+          },
+          {
+            "$ref": "#/components/parameters/LogTime"
+          },
+          {
+            "$ref": "#/components/parameters/ClockTime"
+          },
+          {
+            "$ref": "#/components/parameters/LogStartNs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ViewFrames"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/clock": {
+      "get": {
+        "operationId": "clock",
+        "description": "Resolve log_time_ns to the run measurement clock, which may be simulated or a system clock. The server decides how clock correspondence is obtained, including whether the clocks are identical. For sampled correspondence, use the interpolation and reset rules in the README; do not extrapolate. An unresolved clock or interval returns 422 with code time_unresolved.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "name": "log_time_ns",
+            "in": "query",
+            "required": true,
+            "description": "The log-time playback position to resolve.",
+            "schema": {
+              "$ref": "#/components/schemas/TimeNs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The corresponding simulation/measurement time",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Clock"
+                },
+                "examples": {
+                  "interpolated": {
+                    "summary": "A log-time position between two advancing clock samples",
+                    "value": {
+                      "log_time_ns": "1500000000",
+                      "clock_time_ns": "11000000000"
+                    }
+                  },
+                  "paused": {
+                    "summary": "Simulation time remains constant while log time advances",
+                    "value": {
+                      "log_time_ns": "2500000000",
+                      "clock_time_ns": "12000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/frames": {
+      "get": {
+        "operationId": "frames",
+        "description": "The coordinate frames of a run.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frames",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameList"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/transforms/static": {
+      "get": {
+        "operationId": "staticTransforms",
+        "description": "The static transforms of a run, merged from all of its groups. They are time-independent, so a client reads them once per run. Each child frame appears at most once. See Coordinate frames in the README.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The static transforms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaticTransforms"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/transforms/dynamic": {
+      "get": {
+        "operationId": "dynamicTransforms",
+        "description": "Dynamic transform samples in a measurement-clock range of one reset interval, merged from all of the groups of a run, as a stream. Rows are ordered by stamp_ns, then log time, then recording order, then the order of the run's groups, across the whole stream. Samples with the same time remain separate rows. For each child frame the response also holds its samples at the last stamp_ns before the range and at the first stamp_ns at or after the end of the range, within the interval, so rows can lie outside the range. An empty range therefore returns the samples around one time. A range with no samples is just complete. An unresolved interval returns 422 with code time_unresolved. See Coordinate frames in the README.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "name": "log_time_ns",
+            "in": "query",
+            "required": true,
+            "description": "A log-time position selecting the reset interval to read. It is not a bound on the log times of samples.",
+            "schema": {
+              "$ref": "#/components/schemas/TimeNs"
+            }
+          },
+          {
+            "name": "clock_start_ns",
+            "in": "query",
+            "required": true,
+            "description": "Inclusive measurement-clock bound. Greater than clock_end_ns returns 400.",
+            "schema": {
+              "$ref": "#/components/schemas/TimeNs"
+            }
+          },
+          {
+            "name": "clock_end_ns",
+            "in": "query",
+            "required": true,
+            "description": "Exclusive measurement-clock bound.",
+            "schema": {
+              "$ref": "#/components/schemas/TimeNs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NDJSON stream",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/DynamicTransformsEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Id": {
+        "description": "An opaque URL-safe id of a run or group. Run ids must be unique among the runs exposed by the server; group ids must be unique within their run. An id keeps identifying the same run or group for as long as that resource is exposed; it is never reassigned to a different one. Deriving ids from names must preserve this uniqueness: lossy character replacement alone is insufficient. For example, a.b.mcap and a_b.mcap must not become the same run id. Use a collision-free encoding or disambiguate collisions; if uniqueness cannot be ensured, report an error rather than silently aliasing, merging or hiding distinct resources. Dots are excluded by the allowed alphabet so ids can never become the special URL path segments . or .., which URL parsers normalize. A client uses the id as it is in URLs and does not interpret its content.",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_~-]+$"
+      },
+      "TimeNs": {
+        "description": "A non-negative timestamp in nanoseconds, as a decimal string because JavaScript numbers lack the precision. Its clock and origin are defined by the containing field or request. It does not imply UTC or the Unix epoch; simulated time may start at zero.",
+        "type": "string",
+        "pattern": "^[0-9]+$"
+      },
+      "Count": {
+        "description": "A count, as a JSON number within the safe integer range.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "ErrorBody": {
+        "description": "The body of every error.",
+        "type": "object",
+        "required": [
+          "error",
+          "code"
+        ],
+        "properties": {
+          "error": {
+            "description": "What went wrong.",
+            "type": "string"
+          },
+          "code": {
+            "description": "Stable machine-readable error code, defined in the README Errors section. It identifies the failure without parsing the human-readable description. Unknown codes still denote a failure. Required on every error, including time_unresolved for an unresolved clock, reset interval or required measurement timestamp.",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "examples": [
+          {
+            "code": "recording_unreadable",
+            "error": "The recording could not be read"
+          },
+          {
+            "code": "time_unresolved",
+            "error": "The simulation clock reverses around this log-time position"
+          }
+        ]
+      },
+      "Vec3": {
+        "description": "`[x, y, z]` in meters.",
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "minItems": 3,
+        "maxItems": 3
+      },
+      "Quaternion": {
+        "description": "A rotation as `[x, y, z, w]`, of unit length: a server normalizes them, and treats a recorded one of zero length, such as an unset rotation, as no rotation.",
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "minItems": 4,
+        "maxItems": 4
+      },
+      "Pose": {
+        "description": "A position and orientation, moving a point into the parent: `p_parent = orientation * p + position`.",
+        "type": "object",
+        "required": [
+          "position",
+          "orientation"
+        ],
+        "properties": {
+          "position": {
+            "$ref": "#/components/schemas/Vec3"
+          },
+          "orientation": {
+            "$ref": "#/components/schemas/Quaternion"
+          }
+        }
+      },
+      "Transform": {
+        "description": "Moves a point from `child` into `parent`: `p_parent = rotation * p_child + translation`.",
+        "type": "object",
+        "required": [
+          "translation",
+          "rotation"
+        ],
+        "properties": {
+          "translation": {
+            "$ref": "#/components/schemas/Vec3"
+          },
+          "rotation": {
+            "$ref": "#/components/schemas/Quaternion"
+          }
+        }
+      },
+      "Color": {
+        "description": "`[r, g, b, a]` from 0 to 1. A suggestion that a client may override, and chooses itself when it is left out.",
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "minItems": 4,
+        "maxItems": 4
+      },
+      "BlobRef": {
+        "description": "A range of the payload of a frame",
+        "type": "object",
+        "required": [
+          "$blob"
+        ],
+        "properties": {
+          "$blob": {
+            "type": "object",
+            "required": [
+              "offset",
+              "length"
+            ],
+            "properties": {
+              "offset": {
+                "description": "Bytes from the start of the payload. Always a multiple of 8.",
+                "type": "integer",
+                "minimum": 0,
+                "multipleOf": 8
+              },
+              "length": {
+                "description": "Size of the data in bytes, without the padding after it.",
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "examples": [
+          {
+            "$blob": {
+              "offset": 0,
+              "length": 5
+            }
+          }
+        ]
+      },
+      "FrameId": {
+        "description": "The coordinate frame of the coordinates: an `id` in `/frames`, unless the run has no transforms for it, or `null` when unknown.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "RunSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "description": "For display.",
+            "type": "string"
+          }
+        }
+      },
+      "RunList": {
+        "type": "object",
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "properties": {
+          "items": {
+            "description": "The server decides the order. Clients only see the head of the list, so returning recent or relevant runs first is recommended.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            }
+          },
+          "truncated": {
+            "description": "`true` when more runs match than `limit` allows. There is no paging; narrow the search instead.",
+            "type": "boolean"
+          }
+        }
+      },
+      "Run": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "groups",
+              "timezone"
+            ],
+            "properties": {
+              "groups": {
+                "description": "The client shows a run with no groups as an error.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              },
+              "timezone": {
+                "description": "The timezone of where the run took place: an IANA name such as Asia/Tokyo, or null when unknown. A display hint for wall-clock timestamps only; it does not define the origin of log time or turn simulation time into a calendar date.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "Group": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "default_open"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "description": "For display.",
+            "type": "string"
+          },
+          "default_open": {
+            "description": "Whether to open the group first when opening the run. It is fine for no group to be `true`; the user then chooses which groups to open. The client opens the only group of a run regardless.",
+            "type": "boolean"
+          }
+        }
+      },
+      "RecordingInfo": {
+        "type": "object",
+        "required": [
+          "start_ns",
+          "end_ns",
+          "message_count"
+        ],
+        "properties": {
+          "end_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "The last log time of the recording. Included, unlike the log_end_ns query bound."
+          },
+          "message_count": {
+            "description": "`null` when the recording has no statistics.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Count"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "The first log time of the recording."
+          }
+        }
+      },
+      "Topic": {
+        "type": "object",
+        "required": [
+          "topic",
+          "schema_name",
+          "schema_encoding",
+          "message_count",
+          "fields",
+          "error",
+          "meta_fields",
+          "views"
+        ],
+        "properties": {
+          "error": {
+            "description": "Why the topic cannot be decoded. Such a topic is still listed, with empty `fields`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fields": {
+            "description": "The fields of a message, as a tree.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          },
+          "message_count": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Count"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_encoding": {
+            "description": "Lets a client name types in the schema's own language, such as ROS 2 or protobuf.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema_name": {
+            "description": "The name of the user type.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topic": {
+            "description": "Unique only within its group.",
+            "type": "string"
+          },
+          "meta_fields": {
+            "description": "Values recorded separately from the message rather than inside it, in the same shape as `fields`. For MCAP it has `log_time` and `publish_time`. The server decides which exist, and it is empty if there are none.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          },
+          "views": {
+            "description": "The views the topic offers, empty when it cannot be converted. The server decides from the schema, without reading messages.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/View"
+            }
+          }
+        }
+      },
+      "Field": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldType"
+          },
+          {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "description": "Names starting with `$` are reserved, to tell them apart from `$truncated` and `$bytes` in values. Servers must not return them: if a recording contains one, either report an error for that topic or recording, or return the field under another name.",
+                "type": "string",
+                "pattern": "^[^$]"
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "name": "points",
+            "data_type": "list",
+            "type_name": "Point[]",
+            "element": {
+              "data_type": "struct",
+              "type_name": "Point",
+              "fields": [
+                {
+                  "name": "x",
+                  "data_type": "float64",
+                  "type_name": "float64"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "FieldType": {
+        "type": "object",
+        "required": [
+          "data_type"
+        ],
+        "properties": {
+          "data_type": {
+            "description": "The kind of value, which decides how a client reads it. Details such as bounds belong in `type_name`.",
+            "type": "string",
+            "enum": [
+              "null",
+              "bool",
+              "int8",
+              "int16",
+              "int32",
+              "int64",
+              "uint8",
+              "uint16",
+              "uint32",
+              "uint64",
+              "float32",
+              "float64",
+              "string",
+              "wstring",
+              "bytes",
+              "enum",
+              "struct",
+              "list",
+              "array",
+              "map"
+            ]
+          },
+          "type_name": {
+            "description": "The type name for display.",
+            "type": "string"
+          },
+          "enum_values": {
+            "description": "The ordered names and numeric values of an enum. This order determines the name returned for numeric aliases, as defined under Message values in the README.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnumValue"
+            }
+          },
+          "fields": {
+            "description": "The fields of a struct.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          },
+          "element": {
+            "$ref": "#/components/schemas/FieldType",
+            "description": "The element type of a list or array. Structs inside lists are described here too. Maps have no element schema."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "data_type"
+              ],
+              "properties": {
+                "data_type": {
+                  "enum": [
+                    "struct"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "fields"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "data_type"
+              ],
+              "properties": {
+                "data_type": {
+                  "enum": [
+                    "list",
+                    "array"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "element"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "data_type"
+              ],
+              "properties": {
+                "data_type": {
+                  "enum": [
+                    "enum"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "enum_values"
+              ]
+            }
+          }
+        ]
+      },
+      "EnumValue": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "description": "A decimal string, like other 64-bit integers.",
+            "type": "string",
+            "pattern": "^-?[0-9]+$"
+          }
+        }
+      },
+      "View": {
+        "description": "A conversion of a topic to a Hahn type.",
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "description": "Unique within the topic, and its content has no meaning. Requests name a view by `id`, since a topic can offer several views, even of one Hahn type.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "The Hahn type. A client ignores a view whose `kind` it does not know.",
+            "type": "string"
+          },
+          "name": {
+            "description": "For display.",
+            "type": "string"
+          },
+          "path": {
+            "description": "The field the view is converted from, when it names one.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "examples": [
+          {
+            "id": "image",
+            "kind": "image",
+            "name": "Image"
+          }
+        ]
+      },
+      "MessagesEvent": {
+        "description": "One line of a message stream",
+        "oneOf": [
+          {
+            "description": "A set of rows.",
+            "type": "object",
+            "required": [
+              "rows",
+              "scanned_messages",
+              "type"
+            ],
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              },
+              "scanned_messages": {
+                "$ref": "#/components/schemas/Count",
+                "description": "The running total read by this request, which is not progress through the whole recording."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "batch"
+                ]
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/StreamComplete"
+          },
+          {
+            "$ref": "#/components/schemas/StreamError"
+          }
+        ]
+      },
+      "MessageResponse": {
+        "type": "object",
+        "required": [
+          "time_ns",
+          "value"
+        ],
+        "properties": {
+          "time_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "The message log time, regardless of the query clock."
+          },
+          "value": {
+            "description": "The message or field, in the form described under Message values in the README."
+          },
+          "stamp_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "The message measurement timestamp interpreted by the server on the run simulation/measurement clock. Omitted when unknown; never substitute log time without a known clock correspondence. Independent of the selected message field or meta field."
+          }
+        },
+        "examples": [
+          {
+            "time_ns": "1760000000123456789",
+            "value": 14
+          },
+          {
+            "time_ns": "1760000000123456789",
+            "stamp_ns": "11000000000",
+            "value": 14
+          }
+        ]
+      },
+      "StreamComplete": {
+        "description": "Finished normally.",
+        "type": "object",
+        "required": [
+          "type",
+          "scanned_messages"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "complete"
+            ]
+          },
+          "scanned_messages": {
+            "$ref": "#/components/schemas/Count",
+            "description": "The total read by this request."
+          }
+        }
+      },
+      "StreamError": {
+        "description": "Failed during delivery.",
+        "type": "object",
+        "required": [
+          "type",
+          "message",
+          "code"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "error"
+            ]
+          },
+          "message": {
+            "description": "The reason.",
+            "type": "string"
+          },
+          "code": {
+            "description": "Stable machine-readable error code, defined in the README Errors section. It identifies the failure without parsing the human-readable description. Unknown codes still denote a failure. Required on every error, including time_unresolved for an unresolved clock, reset interval or required measurement timestamp.",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "examples": [
+          {
+            "type": "error",
+            "code": "time_unresolved",
+            "message": "A candidate message has no resolvable measurement timestamp"
+          },
+          {
+            "type": "error",
+            "code": "recording_unreadable",
+            "message": "The recording could not be read during delivery"
+          }
+        ]
+      },
+      "Clock": {
+        "description": "The run measurement clock resolved at a log-time playback position. This may be a simulation or system clock and is shared by the run groups, stamp_ns and transform samples.",
+        "type": "object",
+        "required": [
+          "log_time_ns",
+          "clock_time_ns"
+        ],
+        "properties": {
+          "log_time_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "The requested log-time position."
+          },
+          "clock_time_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "The corresponding measurement time; it is not necessarily a wall-clock timestamp."
+          }
+        }
+      },
+      "FrameList": {
+        "description": "The frames of a run. A run without transforms has an empty list.",
+        "type": "object",
+        "required": [
+          "frames"
+        ],
+        "properties": {
+          "frames": {
+            "description": "Sorted by `id`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FrameInfo"
+            }
+          }
+        },
+        "examples": [
+          {
+            "frames": [
+              {
+                "id": "base_link",
+                "parent": "map"
+              },
+              {
+                "id": "lidar",
+                "parent": "base_link"
+              },
+              {
+                "id": "map",
+                "parent": null
+              }
+            ]
+          }
+        ]
+      },
+      "FrameInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "parent"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parent": {
+            "description": "The parent last recorded, or `null` for a root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "StaticTransforms": {
+        "description": "The static transforms of a run. A run without them has an empty list.",
+        "type": "object",
+        "required": [
+          "transforms"
+        ],
+        "properties": {
+          "transforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaticTransform"
+            }
+          }
+        },
+        "examples": [
+          {
+            "transforms": [
+              {
+                "parent": "base_link",
+                "child": "lidar",
+                "translation": [
+                  0,
+                  0,
+                  1
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "StaticTransform": {
+        "description": "A time-independent transform.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Transform"
+          },
+          {
+            "type": "object",
+            "required": [
+              "parent",
+              "child"
+            ],
+            "properties": {
+              "parent": {
+                "description": "An `id` in `/frames`.",
+                "type": "string"
+              },
+              "child": {
+                "description": "An `id` in `/frames`.",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "DynamicTransform": {
+        "description": "One transform sample.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StaticTransform"
+          },
+          {
+            "type": "object",
+            "required": [
+              "stamp_ns"
+            ],
+            "properties": {
+              "stamp_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "When the sample was measured, on the run measurement clock."
+              }
+            }
+          }
+        ]
+      },
+      "DynamicTransformsEvent": {
+        "description": "One line of a dynamic transform stream",
+        "oneOf": [
+          {
+            "description": "A set of rows.",
+            "type": "object",
+            "required": [
+              "type",
+              "rows",
+              "scanned_messages"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "batch"
+                ]
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DynamicTransform"
+                }
+              },
+              "scanned_messages": {
+                "$ref": "#/components/schemas/Count",
+                "description": "The running total read by this request, which is not progress through the whole recording."
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/DynamicTransformsComplete"
+          },
+          {
+            "$ref": "#/components/schemas/StreamError"
+          }
+        ],
+        "examples": [
+          {
+            "type": "batch",
+            "rows": [
+              {
+                "stamp_ns": "10000000000",
+                "parent": "map",
+                "child": "base_link",
+                "translation": [
+                  1,
+                  2,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            ],
+            "scanned_messages": 1
+          }
+        ]
+      },
+      "DynamicTransformsComplete": {
+        "description": "Finished normally.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StreamComplete"
+          },
+          {
+            "type": "object",
+            "required": [
+              "interval"
+            ],
+            "properties": {
+              "interval": {
+                "description": "The reset interval that log_time_ns selected, for a client to tell whether samples of different responses can be used together. Two responses with the same bounds have the same interval.",
+                "type": "object",
+                "required": [
+                  "log_start_ns",
+                  "log_end_ns"
+                ],
+                "properties": {
+                  "log_start_ns": {
+                    "$ref": "#/components/schemas/TimeNs",
+                    "description": "The first log time of the interval, inclusive."
+                  },
+                  "log_end_ns": {
+                    "$ref": "#/components/schemas/TimeNs",
+                    "description": "The last log time of the interval, inclusive."
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "type": "complete",
+            "scanned_messages": 1,
+            "interval": {
+              "log_start_ns": "1760000000000000000",
+              "log_end_ns": "1760000060000000000"
+            }
+          }
+        ]
+      },
+      "ViewEvent": {
+        "description": "The JSON header of one frame",
+        "oneOf": [
+          {
+            "description": "A converted message.",
+            "type": "object",
+            "required": [
+              "type",
+              "time_ns",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "frame"
+                ]
+              },
+              "time_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "The selected message log time, regardless of the query clock."
+              },
+              "value": {
+                "$ref": "#/components/schemas/ViewValue"
+              },
+              "stamp_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "The message measurement timestamp interpreted by the server on the run simulation/measurement clock. Omitted when unknown; never substitute log time without a known clock correspondence. Independent of the selected message field or meta field."
+              }
+            },
+            "examples": [
+              {
+                "type": "frame",
+                "time_ns": "1760000000123456789",
+                "value": {
+                  "kind": "image",
+                  "frame_id": "camera",
+                  "format": "jpeg",
+                  "data": {
+                    "$blob": {
+                      "offset": 0,
+                      "length": 1024
+                    }
+                  },
+                  "stamp_ns": "10000000000",
+                  "camera_info": null
+                },
+                "stamp_ns": "10000000000"
+              }
+            ]
+          },
+          {
+            "description": "A message that could not be converted. The stream goes on. The schema cannot rule out bad values.",
+            "type": "object",
+            "required": [
+              "type",
+              "time_ns",
+              "error"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "frame"
+                ]
+              },
+              "time_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "The selected message log time, regardless of the query clock."
+              },
+              "error": {
+                "description": "Why it could not be converted.",
+                "type": "string"
+              },
+              "stamp_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "The message measurement timestamp interpreted by the server on the run simulation/measurement clock. Omitted when unknown; never substitute log time without a known clock correspondence. Independent of the selected message field or meta field."
+              }
+            },
+            "examples": [
+              {
+                "type": "frame",
+                "time_ns": "1760000000223456789",
+                "error": "Unsupported image format: \"bmp\""
+              }
+            ]
+          },
+          {
+            "$ref": "#/components/schemas/StreamComplete"
+          },
+          {
+            "$ref": "#/components/schemas/StreamError"
+          }
+        ]
+      },
+      "ViewValue": {
+        "description": "A value of a Hahn type. The rules common to all of them are in the README.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ImageValue"
+          },
+          {
+            "$ref": "#/components/schemas/PositionValue"
+          },
+          {
+            "$ref": "#/components/schemas/PoseValue"
+          },
+          {
+            "$ref": "#/components/schemas/PathValue"
+          },
+          {
+            "$ref": "#/components/schemas/PointCloudValue"
+          },
+          {
+            "$ref": "#/components/schemas/GeoLocationValue"
+          },
+          {
+            "$ref": "#/components/schemas/GeoValue"
+          },
+          {
+            "$ref": "#/components/schemas/SceneValue"
+          }
+        ]
+      },
+      "StampedValue": {
+        "description": "Fields of every Hahn type",
+        "type": "object",
+        "properties": {
+          "stamp_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "When this value was measured, on the run simulation/measurement clock used by transforms. It equals the view frame stamp_ns for a value representing the whole message. Omitted when unknown; log time is not an implicit substitute. Nested values may have their own measurement timestamps."
+          }
+        }
+      },
+      "FramedValue": {
+        "description": "Fields of a Hahn type in a coordinate frame",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StampedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "frame_id"
+            ],
+            "properties": {
+              "frame_id": {
+                "$ref": "#/components/schemas/FrameId"
+              }
+            }
+          }
+        ]
+      },
+      "OpticalValue": {
+        "description": "Fields of a Hahn type in the optical frame of a camera",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "frame_id": {
+                "$ref": "#/components/schemas/FrameId",
+                "description": "The optical frame of the camera: origin at the optical center, x right, y down and z forward in the image, or `null` when unknown."
+              }
+            }
+          }
+        ]
+      },
+      "ImageValue": {
+        "description": "An encoded or raw image, with the calibration for its delivered pixels in the same value. The server resolves calibration per image; unknown, ambiguous, invalid or otherwise unresolvable calibration is null and does not prevent the image from being returned. Invalid image data itself remains a conversion error. Raw and rectified image views must not share calibration unless it is correct for both; frame_id or topic names alone do not establish an association.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OpticalValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "format",
+              "data",
+              "camera_info"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              },
+              "format": {
+                "description": "`jpeg` or `png` for an encoded image; otherwise a pixel format, with 8 bits per channel.",
+                "type": "string",
+                "enum": [
+                  "jpeg",
+                  "png",
+                  "rgb8",
+                  "rgba8",
+                  "bgr8",
+                  "bgra8",
+                  "mono8"
+                ]
+              },
+              "width": {
+                "description": "Size in pixels. Required with a pixel format.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "height": {
+                "description": "Size in pixels. Required with a pixel format.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "step": {
+                "description": "Bytes per row, including any padding. Required with a pixel format.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "data": {
+                "$ref": "#/components/schemas/BlobRef",
+                "description": "Blob of the encoded file, or of the pixels row by row."
+              },
+              "camera_info": {
+                "description": "The calibration matching this image optical frame, measurement time and delivered pixels, or null when no valid unambiguous calibration can be resolved. Returned with every image; it is not a separately fetched view.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CameraInfo"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "if": {
+              "properties": {
+                "format": {
+                  "enum": [
+                    "rgb8",
+                    "rgba8",
+                    "bgr8",
+                    "bgra8",
+                    "mono8"
+                  ]
+                }
+              },
+              "required": [
+                "format"
+              ]
+            },
+            "then": {
+              "required": [
+                "width",
+                "height",
+                "step"
+              ]
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "image",
+            "frame_id": "camera",
+            "format": "jpeg",
+            "data": {
+              "$blob": {
+                "offset": 0,
+                "length": 1024
+              }
+            },
+            "camera_info": null
+          },
+          {
+            "kind": "image",
+            "frame_id": "camera",
+            "format": "jpeg",
+            "data": {
+              "$blob": {
+                "offset": 0,
+                "length": 1024
+              }
+            },
+            "camera_info": {
+              "width": 1920,
+              "height": 1080,
+              "k": [
+                1000,
+                0,
+                960,
+                0,
+                1000,
+                540,
+                0,
+                0,
+                1
+              ],
+              "distortion": {
+                "radial": [
+                  -0.1,
+                  0.01,
+                  0.001
+                ],
+                "tangential": [
+                  0.0001,
+                  0.0002
+                ]
+              }
+            }
+          },
+          {
+            "kind": "image",
+            "frame_id": "camera",
+            "format": "jpeg",
+            "data": {
+              "$blob": {
+                "offset": 0,
+                "length": 1024
+              }
+            },
+            "camera_info": {
+              "width": 1920,
+              "height": 1080,
+              "k": [
+                1010,
+                0,
+                960,
+                0,
+                1010,
+                540,
+                0,
+                0,
+                1
+              ],
+              "distortion": null
+            }
+          }
+        ]
+      },
+      "CameraInfo": {
+        "description": "Calibration for the containing image pixels as delivered. It uses the image optical frame and measurement time, so it has no separate kind, frame_id or stamp_ns. Width and height must match the delivered image. Raw and rectified images require their own intrinsics; rectified images have no distortion.",
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "k"
+        ],
+        "properties": {
+          "width": {
+            "description": "Size of the calibrated image in pixels.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "height": {
+            "description": "Size of the calibrated image in pixels.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "k": {
+            "description": "Intrinsic matrix of the image as delivered, 3×3, row-major.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 9,
+            "maxItems": 9
+          },
+          "distortion": {
+            "description": "Distortion of the image as delivered. Null or left out when it has none, as with a rectified image.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "radial"
+            ],
+            "properties": {
+              "model": {
+                "description": "The distortion model.",
+                "type": "string",
+                "enum": [
+                  "plumb_bob",
+                  "equidistant"
+                ],
+                "default": "plumb_bob"
+              },
+              "radial": {
+                "description": "`[k1, k2, k3, k4, k5, k6]` with `plumb_bob`, and `[k1, k2, k3, k4]` with `equidistant`. Coefficients left out are 0. With `plumb_bob`, `k1` to `k3` form the numerator of the radial factor and `k4` to `k6` its denominator, as in OpenCV.",
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 6
+              },
+              "tangential": {
+                "description": "`[p1, p2]`. 0 when left out.",
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        "examples": [
+          {
+            "width": 1920,
+            "height": 1080,
+            "k": [
+              1000,
+              0,
+              960,
+              0,
+              1000,
+              540,
+              0,
+              0,
+              1
+            ],
+            "distortion": {
+              "radial": [
+                -0.1,
+                0.01,
+                0.001
+              ],
+              "tangential": [
+                0.0001,
+                0.0002
+              ]
+            }
+          }
+        ]
+      },
+      "PositionValue": {
+        "description": "One position, without an orientation. To draw the trajectory of a topic, read its history from `/views`.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "position"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "position"
+                ]
+              },
+              "position": {
+                "$ref": "#/components/schemas/Vec3"
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "position",
+            "frame_id": "map",
+            "position": [
+              1,
+              2,
+              0
+            ]
+          }
+        ]
+      },
+      "PoseValue": {
+        "description": "One pose: where something is at the frame's time. To draw the trajectory of a topic, read its history from `/views`.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "$ref": "#/components/schemas/Pose"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "pose"
+                ]
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "pose",
+            "frame_id": "map",
+            "position": [
+              1,
+              2,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "PathValue": {
+        "description": "The poses of a path in order, all held by one message. A planned route is an example: each message replaces the whole path. A path of one pose is still a path, and a single pose is a `pose` value.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "items"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "path"
+                ]
+              },
+              "items": {
+                "description": "The poses, in order.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Pose"
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "path",
+            "frame_id": "map",
+            "items": [
+              {
+                "position": [
+                  1,
+                  2,
+                  0
+                ],
+                "orientation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "PointCloudValue": {
+        "description": "A point cloud, with one blob per column so that a client can use them as typed arrays directly. Laser scans are converted to these. A server drops points without a position, and may send fewer points or fields than were recorded, to save transfer.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "count",
+              "pose",
+              "positions",
+              "fields"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "pointcloud"
+                ]
+              },
+              "count": {
+                "description": "Number of points.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose",
+                "description": "The origin of the points in `frame_id`: `p_frame = orientation * p_point + position`."
+              },
+              "positions": {
+                "$ref": "#/components/schemas/BlobRef",
+                "description": "Blob of f32 `[x, y, z]` for each of the `count` points, in meters, all finite. Positions are f32, so a server moves large coordinates into `pose`."
+              },
+              "fields": {
+                "description": "Further values per point, such as `intensity`. Empty when there are none.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "type",
+                    "data"
+                  ],
+                  "properties": {
+                    "name": {
+                      "description": "Name of the value.",
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "u8",
+                        "i8",
+                        "u16",
+                        "i16",
+                        "u32",
+                        "i32",
+                        "f32",
+                        "f64"
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BlobRef",
+                      "description": "Blob of one value per point."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "pointcloud",
+            "frame_id": "lidar",
+            "count": 2,
+            "pose": {
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            "positions": {
+              "$blob": {
+                "offset": 0,
+                "length": 24
+              }
+            },
+            "fields": [
+              {
+                "name": "intensity",
+                "type": "u8",
+                "data": {
+                  "$blob": {
+                    "offset": 24,
+                    "length": 2
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "GeoLocationValue": {
+        "description": "One location on a map. The locations of a topic's history form its trail, so read them from `/views` to draw it.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StampedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "position"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "geo_location"
+                ]
+              },
+              "position": {
+                "description": "`[longitude, latitude]` in degrees, longitude first, WGS 84. Altitude is not represented.",
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "heading": {
+                "description": "Radians clockwise from true north.",
+                "type": "number"
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "geo_location",
+            "position": [
+              139.76,
+              35.68
+            ],
+            "heading": 1.57
+          }
+        ]
+      },
+      "GeoValue": {
+        "description": "Shapes on a map, all held by one message. Each message replaces them entirely, and connecting lines or polygons across messages means nothing, so they have no trail. A single location is a `geo_location`.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StampedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "features"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "geo"
+                ]
+              },
+              "features": {
+                "description": "GeoJSON features.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "geometry",
+                    "properties"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "Feature"
+                      ]
+                    },
+                    "geometry": {
+                      "description": "Any GeoJSON geometry, with positions as `[longitude, latitude]` in degrees, WGS 84.",
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "properties": {
+                      "description": "Free for the server to fill. A client may show it.",
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "geo",
+            "features": [
+              {
+                "type": "Feature",
+                "geometry": {
+                  "type": "LineString",
+                  "coordinates": [
+                    [
+                      139.76,
+                      35.68
+                    ],
+                    [
+                      139.77,
+                      35.69
+                    ]
+                  ]
+                },
+                "properties": {}
+              }
+            ]
+          }
+        ]
+      },
+      "SceneValue": {
+        "description": "A whole scene of shapes, for what no other Hahn type can express. A use that is settled gets its own Hahn type instead, since a client can do more with it than draw shapes: it can draw a trajectory from `pose`, for example. A scene replaces the previous one entirely, so shapes have no id or lifetime.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "primitives"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "scene"
+                ]
+              },
+              "primitives": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ScenePrimitive"
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "kind": "scene",
+            "frame_id": "map",
+            "primitives": [
+              {
+                "type": "box",
+                "color": [
+                  1,
+                  0,
+                  0,
+                  0.5
+                ],
+                "pose": {
+                  "position": [
+                    5,
+                    0,
+                    1
+                  ],
+                  "orientation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                },
+                "size": [
+                  4,
+                  2,
+                  2
+                ]
+              },
+              {
+                "type": "line",
+                "points": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    0
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "ScenePrimitive": {
+        "oneOf": [
+          {
+            "description": "A line through a list of points.",
+            "type": "object",
+            "required": [
+              "type",
+              "points"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "line"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "points": {
+                "description": "To close a line, repeat its first point at the end.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Vec3"
+                }
+              }
+            },
+            "examples": [
+              {
+                "type": "line",
+                "points": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    1,
+                    0
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "description": "A box.",
+            "type": "object",
+            "required": [
+              "type",
+              "pose",
+              "size"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "box"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose",
+                "description": "The center of the box."
+              },
+              "size": {
+                "$ref": "#/components/schemas/Vec3",
+                "description": "Edge lengths along each axis."
+              }
+            },
+            "examples": [
+              {
+                "type": "box",
+                "pose": {
+                  "position": [
+                    5,
+                    0,
+                    1
+                  ],
+                  "orientation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                },
+                "size": [
+                  4,
+                  2,
+                  2
+                ]
+              }
+            ]
+          },
+          {
+            "description": "A sphere, or an ellipsoid when its diameters differ.",
+            "type": "object",
+            "required": [
+              "type",
+              "pose",
+              "size"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "sphere"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose",
+                "description": "The center of the sphere."
+              },
+              "size": {
+                "$ref": "#/components/schemas/Vec3",
+                "description": "Diameters along each axis."
+              }
+            },
+            "examples": [
+              {
+                "type": "sphere",
+                "pose": {
+                  "position": [
+                    5,
+                    0,
+                    1
+                  ],
+                  "orientation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                },
+                "size": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          },
+          {
+            "description": "A cylinder along the z axis of its pose.",
+            "type": "object",
+            "required": [
+              "type",
+              "pose",
+              "size"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "cylinder"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose",
+                "description": "The center of the cylinder."
+              },
+              "size": {
+                "$ref": "#/components/schemas/Vec3",
+                "description": "Diameters along x and y and the height along z."
+              }
+            },
+            "examples": [
+              {
+                "type": "cylinder",
+                "pose": {
+                  "position": [
+                    5,
+                    0,
+                    1
+                  ],
+                  "orientation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                },
+                "size": [
+                  1,
+                  1,
+                  2
+                ]
+              }
+            ]
+          },
+          {
+            "description": "An arrow from a pose, pointing along its x axis.",
+            "type": "object",
+            "required": [
+              "type",
+              "pose",
+              "length"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "arrow"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose",
+                "description": "The start of the arrow."
+              },
+              "length": {
+                "description": "In meters.",
+                "type": "number"
+              }
+            },
+            "examples": [
+              {
+                "type": "arrow",
+                "pose": {
+                  "position": [
+                    5,
+                    0,
+                    1
+                  ],
+                  "orientation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                },
+                "length": 2
+              }
+            ]
+          },
+          {
+            "description": "A mesh of triangles. This example is a square of two triangles.",
+            "type": "object",
+            "required": [
+              "type",
+              "vertices",
+              "indices"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "triangles"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "vertices": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Vec3"
+                }
+              },
+              "indices": {
+                "description": "Indices into `vertices`, three per triangle.",
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "examples": [
+              {
+                "type": "triangles",
+                "vertices": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    1,
+                    0
+                  ]
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2,
+                  0,
+                  2,
+                  3
+                ]
+              }
+            ]
+          },
+          {
+            "description": "Text placed in space.",
+            "type": "object",
+            "required": [
+              "type",
+              "pose",
+              "text"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              },
+              "color": {
+                "$ref": "#/components/schemas/Color"
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose",
+                "description": "Where the text is placed."
+              },
+              "text": {
+                "description": "The text. Its size on screen is up to the client.",
+                "type": "string"
+              }
+            },
+            "examples": [
+              {
+                "type": "text",
+                "pose": {
+                  "position": [
+                    5,
+                    0,
+                    1
+                  ],
+                  "orientation": [
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                },
+                "text": "stop"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "parameters": {
+      "Run": {
+        "name": "run",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "Group": {
+        "name": "group",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "Topic": {
+        "name": "topic",
+        "in": "query",
+        "required": true,
+        "description": "The topic's name.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ViewId": {
+        "name": "view",
+        "in": "query",
+        "required": true,
+        "description": "The `id` of a view of the topic.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "FieldPath": {
+        "name": "path",
+        "in": "query",
+        "required": false,
+        "description": "The field to read, as a JSON array of field names in a string, for example [\"pose\",\"x\"], so names containing dots stay unambiguous. Omitted or [] reads the whole message. Each step selects a named field of a struct; only structs may be traversed. A path may end at a list, array or map to read that whole value under the normal message-value and preview rules, but it must not traverse into a collection. For example, [\"points\"] reads a points collection, while [\"points\",\"x\"] returns 422 if points is a list, array or map; there is no implicit projection over elements. Element indices, map-key lookup and wildcards are not supported. Strings such as \"0\" and \"*\" are literal struct field names, not indices or wildcards. A well-formed string-array path that names no field or traverses a non-struct returns 422; a path that is not a JSON array of strings returns 400. If the path is valid in the schema but an intermediate or final field is missing in an individual message, return null for that message, as for other missing values; do not fail the request or stream. For example, [\"pose\",\"x\"] returns null when pose is missing in that message.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Meta": {
+        "name": "meta",
+        "in": "query",
+        "required": false,
+        "description": "Reads a `meta_fields` value, for example `publish_time`, instead of `path`. The two cannot be combined (400). These values are kept apart from the message, so they are not part of the whole topic's value. They are 64-bit integers, so they are returned as strings.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "LogTime": {
+        "name": "log_time_ns",
+        "in": "query",
+        "required": true,
+        "description": "The log-time lookup position. Without clock_time_ns, search by this log time. With clock_time_ns, use this position to identify the measurement-clock reset interval; it is not a cutoff on message log times. An unresolved required interval returns 422 with code time_unresolved.",
+        "schema": {
+          "$ref": "#/components/schemas/TimeNs"
+        }
+      },
+      "ClockTime": {
+        "name": "clock_time_ns",
+        "in": "query",
+        "required": false,
+        "description": "The optional measurement-clock lookup time. When present, search this clock within the interval identified by log_time_ns; otherwise search by log_time_ns. The measurement clock may be simulated or a system clock.",
+        "schema": {
+          "$ref": "#/components/schemas/TimeNs"
+        }
+      },
+      "LogStartNs": {
+        "name": "log_start_ns",
+        "in": "query",
+        "required": false,
+        "description": "Inclusive lower bound on message log time. For history, omit for the recording start; greater than log_end_ns returns 400. For latest, omit for no lower bound, and filter candidates before selection regardless of whether clock_time_ns is supplied.",
+        "schema": {
+          "$ref": "#/components/schemas/TimeNs"
+        }
+      },
+      "LogEndNs": {
+        "name": "log_end_ns",
+        "in": "query",
+        "required": false,
+        "description": "Exclusive log-time history bound. Omit to include the last message.",
+        "schema": {
+          "$ref": "#/components/schemas/TimeNs"
+        }
+      }
+    },
+    "responses": {
+      "ViewFrames": {
+        "description": "Binary frames; the schema is the header of one",
+        "content": {
+          "application/vnd.hahn.frames": {
+            "schema": {
+              "$ref": "#/components/schemas/ViewEvent"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request syntax or parameter value; code invalid_request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            },
+            "examples": {
+              "invalid_request": {
+                "value": {
+                  "code": "invalid_request",
+                  "error": "Invalid field path JSON"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "The run or group does not exist; code run_not_found or group_not_found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            },
+            "examples": {
+              "run_not_found": {
+                "value": {
+                  "code": "run_not_found",
+                  "error": "Run not found"
+                }
+              },
+              "group_not_found": {
+                "value": {
+                  "code": "group_not_found",
+                  "error": "Group not found in this run"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "Cannot process the requested data or selection. The required machine-readable code distinguishes empty_group, unknown_topic, unknown_field, unknown_meta_field, unknown_view, invalid_selection, recording_unreadable and time_unresolved; see the README for their meanings.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            },
+            "examples": {
+              "empty_group": {
+                "value": {
+                  "code": "empty_group",
+                  "error": "The readable group contains no messages and has no time range"
+                }
+              },
+              "unknown_topic": {
+                "value": {
+                  "code": "unknown_topic",
+                  "error": "Topic not found in this group"
+                }
+              },
+              "unknown_field": {
+                "value": {
+                  "code": "unknown_field",
+                  "error": "The path cannot traverse the points list"
+                }
+              },
+              "unknown_meta_field": {
+                "value": {
+                  "code": "unknown_meta_field",
+                  "error": "Meta field not found"
+                }
+              },
+              "unknown_view": {
+                "value": {
+                  "code": "unknown_view",
+                  "error": "View not found on this topic"
+                }
+              },
+              "invalid_selection": {
+                "value": {
+                  "code": "invalid_selection",
+                  "error": "preview=false requires a scalar field"
+                }
+              },
+              "recording_unreadable": {
+                "value": {
+                  "code": "recording_unreadable",
+                  "error": "The recording could not be decoded"
+                }
+              },
+              "time_unresolved": {
+                "value": {
+                  "code": "time_unresolved",
+                  "error": "The requested log-time position lies in a clock reset gap"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected server failure; code internal_error. Use recording_unreadable for a recording that cannot be opened or decoded.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            },
+            "examples": {
+              "internal_error": {
+                "value": {
+                  "code": "internal_error",
+                  "error": "Unexpected server failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

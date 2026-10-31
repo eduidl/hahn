@@ -178,9 +178,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description A URL-safe id of a run or group. A server deriving ids from file names replaces other characters, such as dots. A client uses it as it is in URLs, and its content has no meaning. */
+        /** @description A URL-safe id of a run or group. Dots are not allowed, because URL parsers treat `.` and `..` as path segments; a server deriving ids from file names replaces them. A client uses it as it is in URLs, and its content has no meaning. */
         Id: string;
-        /** @description Nanoseconds since the Unix epoch in UTC, as a string because JavaScript numbers lack the precision. It has no timezone. */
+        /** @description Unsigned nanoseconds as a decimal string because JavaScript numbers lack the precision. The current API uses the recording time (MCAP log_time); it may be relative rather than a Unix epoch timestamp. */
         TimeNs: string;
         /** @description A count, as a JSON number within the safe integer range. */
         Count: number;
@@ -208,8 +208,6 @@ export interface components {
             translation: components["schemas"]["Vec3"];
             rotation: components["schemas"]["Quaternion"];
         };
-        /** @description `[r, g, b, a]` from 0 to 1. A suggestion that a client may override, and chooses itself when it is left out. */
-        Color: number[];
         /**
          * @description A range of the payload of a frame
          * @example {
@@ -327,16 +325,6 @@ export interface components {
          *       "kind": "image",
          *       "name": "Image"
          *     }
-         * @example {
-         *       "id": "rectified",
-         *       "kind": "image",
-         *       "name": "Rectified image",
-         *       "camera_info": {
-         *         "group": "cameras",
-         *         "topic": "/camera/calibration",
-         *         "view": "rectified-calibration"
-         *       }
-         *     }
          */
         View: {
             /** @description Unique within the topic, and its content has no meaning. Requests name a view by `id`, since a topic can offer several views, even of one Hahn type. */
@@ -345,17 +333,6 @@ export interface components {
             kind: string;
             /** @description For display. */
             name: string;
-            /** @description The field the view is converted from, when it names one. */
-            path?: string[];
-            /** @description For an image view, the exact calibration of its delivered pixels. The reference is within the same run and names a view of kind `camera_info`, even when it is in another group or on the same topic. Omitted when no calibration is known; clients must not infer one from a topic name or frame_id. Different image views, such as raw and rectified, may reference different calibrations. */
-            camera_info?: {
-                /** @description The group ID of the calibration. */
-                group: components["schemas"]["Id"];
-                /** @description The topic containing the calibration view. */
-                topic: string;
-                /** @description The exact View.id of the calibration, not its kind or display name. */
-                view: string;
-            };
         };
         /** @description One line of a message stream */
         MessagesEvent: {
@@ -475,23 +452,13 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["CameraInfoValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PathValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoLocationValue"] | components["schemas"]["GeoValue"] | components["schemas"]["SceneValue"];
-        /** @description Fields of every Hahn type */
-        StampedValue: {
-            /** @description When the data was measured, such as `header.stamp` of a ROS message, on the clock of the transforms. Left out when unknown or on a different clock, such as time since boot; a client then uses the frame's `time_ns`. */
-            stamp_ns?: components["schemas"]["TimeNs"];
-        };
-        /** @description Fields of a Hahn type in a coordinate frame */
-        FramedValue: components["schemas"]["StampedValue"] & {
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"];
+        /** @description Coordinate frame of an image or point cloud. */
+        FramedValue: {
             frame_id: components["schemas"]["FrameId"];
         };
-        /** @description Fields of a Hahn type in the optical frame of a camera */
-        OpticalValue: components["schemas"]["FramedValue"] & {
-            /** @description The optical frame of the camera: origin at the optical center, x right, y down and z forward in the image, or `null` when unknown. */
-            frame_id?: components["schemas"]["FrameId"];
-        };
         /**
-         * @description An encoded or raw image.
+         * @description An encoded image. The current converter reads foxglove.CompressedImage; raw pixels and calibration are not implemented.
          * @example {
          *       "kind": "image",
          *       "frame_id": "camera",
@@ -504,143 +471,21 @@ export interface components {
          *       }
          *     }
          */
-        ImageValue: components["schemas"]["OpticalValue"] & {
+        ImageValue: components["schemas"]["FramedValue"] & {
             /** @enum {string} */
             kind: "image";
             /**
-             * @description `jpeg` or `png` for an encoded image; otherwise a pixel format, with 8 bits per channel.
+             * @description Encoding of the image file. jpg is normalized to jpeg.
              * @enum {string}
              */
-            format: "jpeg" | "png" | "rgb8" | "rgba8" | "bgr8" | "bgra8" | "mono8";
-            /** @description Size in pixels. Required with a pixel format. */
-            width?: number;
-            /** @description Size in pixels. Required with a pixel format. */
-            height?: number;
-            /** @description Bytes per row, including any padding. Required with a pixel format. */
-            step?: number;
-            /** @description Blob of the encoded file, or of the pixels row by row. */
+            format: "jpeg" | "png" | "webp" | "avif";
+            /** @description Blob of the encoded image file. */
             data: components["schemas"]["BlobRef"];
-        };
-        /**
-         * @description The calibration of a camera: its intrinsics and distortion. It describes the pixels of an image as it is delivered, so a raw and a rectified image of one camera have different values. To show a rectified image, a server delivers it as its own view rather than leaving it to the client. The image View.camera_info explicitly identifies the calibration by group, topic and view ID; frame_id only identifies the optical coordinate frame and does not identify a calibration. A topic can offer several views, so an image topic can offer camera_info beside image, and a topic holding only a calibration can offer camera_info alone.
-         * @example {
-         *       "kind": "camera_info",
-         *       "frame_id": "camera",
-         *       "width": 1920,
-         *       "height": 1080,
-         *       "k": [
-         *         1000,
-         *         0,
-         *         960,
-         *         0,
-         *         1000,
-         *         540,
-         *         0,
-         *         0,
-         *         1
-         *       ],
-         *       "distortion": {
-         *         "radial": [
-         *           -0.1,
-         *           0.01,
-         *           0.001
-         *         ],
-         *         "tangential": [
-         *           0.0001,
-         *           0.0002
-         *         ]
-         *       }
-         *     }
-         */
-        CameraInfoValue: components["schemas"]["OpticalValue"] & {
-            /** @enum {string} */
-            kind: "camera_info";
-            /** @description Size of the calibrated image in pixels. */
-            width: number;
-            /** @description Size of the calibrated image in pixels. */
-            height: number;
-            /** @description Intrinsic matrix of the image as delivered, 3×3, row-major. */
-            k: number[];
-            /** @description Distortion of the image as delivered. Null or left out when it has none, as with a rectified image. */
-            distortion?: {
-                /**
-                 * @description The distortion model.
-                 * @default plumb_bob
-                 * @enum {string}
-                 */
-                model: "plumb_bob" | "equidistant";
-                /** @description `[k1, k2, k3, k4, k5, k6]` with `plumb_bob`, and `[k1, k2, k3, k4]` with `equidistant`. Coefficients left out are 0. With `plumb_bob`, `k1` to `k3` form the numerator of the radial factor and `k4` to `k6` its denominator, as in OpenCV. */
-                radial: number[];
-                /** @description `[p1, p2]`. 0 when left out. */
-                tangential?: number[];
-            } | null;
-        };
-        /**
-         * @description One position, without an orientation. To draw the trajectory of a topic, read its history from `/views`.
-         * @example {
-         *       "kind": "position",
-         *       "frame_id": "map",
-         *       "position": [
-         *         1,
-         *         2,
-         *         0
-         *       ]
-         *     }
-         */
-        PositionValue: components["schemas"]["FramedValue"] & {
-            /** @enum {string} */
-            kind: "position";
-            position: components["schemas"]["Vec3"];
-        };
-        /**
-         * @description One pose: where something is at the frame's time. To draw the trajectory of a topic, read its history from `/views`.
-         * @example {
-         *       "kind": "pose",
-         *       "frame_id": "map",
-         *       "position": [
-         *         1,
-         *         2,
-         *         0
-         *       ],
-         *       "orientation": [
-         *         0,
-         *         0,
-         *         0,
-         *         1
-         *       ]
-         *     }
-         */
-        PoseValue: components["schemas"]["FramedValue"] & components["schemas"]["Pose"] & {
-            /** @enum {string} */
-            kind: "pose";
-        };
-        /**
-         * @description The poses of a path in order, all held by one message. A planned route is an example: each message replaces the whole path. A path of one pose is still a path, and a single pose is a `pose` value.
-         * @example {
-         *       "kind": "path",
-         *       "frame_id": "map",
-         *       "items": [
-         *         {
-         *           "position": [
-         *             1,
-         *             2,
-         *             0
-         *           ],
-         *           "orientation": [
-         *             0,
-         *             0,
-         *             0,
-         *             1
-         *           ]
-         *         }
-         *       ]
-         *     }
-         */
-        PathValue: components["schemas"]["FramedValue"] & {
-            /** @enum {string} */
-            kind: "path";
-            /** @description The poses, in order. */
-            items: components["schemas"]["Pose"][];
+            /**
+             * @description The current converter emits color images.
+             * @enum {string}
+             */
+            role?: "color";
         };
         /**
          * @description A point cloud, with one blob per column so that a client can use them as typed arrays directly. Laser scans are converted to these. A server drops points without a position, and may send fewer points or fields than were recorded, to save transfer.
@@ -701,26 +546,7 @@ export interface components {
             }[];
         };
         /**
-         * @description One location on a map. The locations of a topic's history form its trail, so read them from `/views` to draw it.
-         * @example {
-         *       "kind": "geo_location",
-         *       "position": [
-         *         139.76,
-         *         35.68
-         *       ],
-         *       "heading": 1.57
-         *     }
-         */
-        GeoLocationValue: components["schemas"]["StampedValue"] & {
-            /** @enum {string} */
-            kind: "geo_location";
-            /** @description `[longitude, latitude]` in degrees, longitude first, WGS 84. Altitude is not represented. */
-            position: number[];
-            /** @description Radians clockwise from true north. */
-            heading?: number;
-        };
-        /**
-         * @description Shapes on a map, all held by one message. Each message replaces them entirely, and connecting lines or polygons across messages means nothing, so they have no trail. A single location is a `geo_location`.
+         * @description GeoJSON features on a map, held by one message. Each message replaces the previous features. The current converter turns foxglove.LocationFix into a Point feature; the map client connects the history into a trail.
          * @example {
          *       "kind": "geo",
          *       "features": [
@@ -744,7 +570,7 @@ export interface components {
          *       ]
          *     }
          */
-        GeoValue: components["schemas"]["StampedValue"] & {
+        GeoValue: {
             /** @enum {string} */
             kind: "geo";
             /** @description GeoJSON features. */
@@ -760,116 +586,6 @@ export interface components {
                     [key: string]: unknown;
                 };
             }[];
-        };
-        /**
-         * @description A whole scene of shapes, for what no other Hahn type can express. A use that is settled gets its own Hahn type instead, since a client can do more with it than draw shapes: it can draw a trajectory from `pose`, for example. A scene replaces the previous one entirely, so shapes have no id or lifetime.
-         * @example {
-         *       "kind": "scene",
-         *       "frame_id": "map",
-         *       "primitives": [
-         *         {
-         *           "type": "box",
-         *           "color": [
-         *             1,
-         *             0,
-         *             0,
-         *             0.5
-         *           ],
-         *           "pose": {
-         *             "position": [
-         *               5,
-         *               0,
-         *               1
-         *             ],
-         *             "orientation": [
-         *               0,
-         *               0,
-         *               0,
-         *               1
-         *             ]
-         *           },
-         *           "size": [
-         *             4,
-         *             2,
-         *             2
-         *           ]
-         *         },
-         *         {
-         *           "type": "line",
-         *           "points": [
-         *             [
-         *               0,
-         *               0,
-         *               0
-         *             ],
-         *             [
-         *               1,
-         *               0,
-         *               0
-         *             ]
-         *           ]
-         *         }
-         *       ]
-         *     }
-         */
-        SceneValue: components["schemas"]["FramedValue"] & {
-            /** @enum {string} */
-            kind: "scene";
-            primitives: components["schemas"]["ScenePrimitive"][];
-        };
-        ScenePrimitive: {
-            /** @enum {string} */
-            type: "line";
-            color?: components["schemas"]["Color"];
-            /** @description To close a line, repeat its first point at the end. */
-            points: components["schemas"]["Vec3"][];
-        } | {
-            /** @enum {string} */
-            type: "box";
-            color?: components["schemas"]["Color"];
-            /** @description The center of the box. */
-            pose: components["schemas"]["Pose"];
-            /** @description Edge lengths along each axis. */
-            size: components["schemas"]["Vec3"];
-        } | {
-            /** @enum {string} */
-            type: "sphere";
-            color?: components["schemas"]["Color"];
-            /** @description The center of the sphere. */
-            pose: components["schemas"]["Pose"];
-            /** @description Diameters along each axis. */
-            size: components["schemas"]["Vec3"];
-        } | {
-            /** @enum {string} */
-            type: "cylinder";
-            color?: components["schemas"]["Color"];
-            /** @description The center of the cylinder. */
-            pose: components["schemas"]["Pose"];
-            /** @description Diameters along x and y and the height along z. */
-            size: components["schemas"]["Vec3"];
-        } | {
-            /** @enum {string} */
-            type: "arrow";
-            color?: components["schemas"]["Color"];
-            /** @description The start of the arrow. */
-            pose: components["schemas"]["Pose"];
-            /** @description In meters. */
-            length: number;
-        } | {
-            /** @enum {string} */
-            type: "triangles";
-            color?: components["schemas"]["Color"];
-            vertices: components["schemas"]["Vec3"][];
-            /** @description Indices into `vertices`, three per triangle. */
-            indices: number[];
-        } | {
-            /** @enum {string} */
-            type: "text";
-            color?: components["schemas"]["Color"];
-            /** @description Where the text is placed. */
-            pose: components["schemas"]["Pose"];
-            /** @description The text. Its size on screen is up to the client. */
-            text: string;
         };
     };
     responses: {
@@ -1207,7 +923,7 @@ export interface operations {
             query: {
                 /** @description An `id` from `/frames`. An unknown one is 422. */
                 target: string;
-                /** @description When to resolve. To place a value where it was measured, pass its `stamp_ns`, or its frame's `time_ns` without one. To follow the playback position, pass that instead. */
+                /** @description Recording time at which to resolve the graph. The current client uses the point-cloud message time for placement, or the playback position to inspect frames. Measurement-time lookup is not implemented. */
                 time_ns: components["schemas"]["TimeNs"];
             };
             header?: never;
