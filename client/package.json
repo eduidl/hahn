@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
     "gen:api": "openapi-typescript ../protocol/openapi.json -o src/api.gen.ts",
     "check:api": "openapi-typescript ../protocol/openapi.json -o src/api.gen.ts --check",
-    "build": "tsc -b && vite build",
     "test": "npm run check:api && vitest run",
     "conformance": "node scripts/conformance.mjs"
   },
@@ -19,6 +21,7 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.4",
     "@testing-library/react": "^16.3.3",
     "@types/leaflet": "^1.9.22",
     "@types/react": "^19.0.0",

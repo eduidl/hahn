@@ -2,6 +2,8 @@
 /server/target/
 /web/node_modules/
 /web/dist/
+/client/node_modules/
+/client/dist/
 /output/
 /.playwright-cli/
 *.tsbuildinfo
