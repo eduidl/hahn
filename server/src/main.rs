@@ -9,7 +9,7 @@ struct Args {
     data_dir: PathBuf,
     #[arg(long, default_value = "127.0.0.1:3000")]
     listen: SocketAddr,
-    #[arg(long, default_value = "web/dist")]
+    #[arg(long, default_value = "client/dist")]
     web_dir: PathBuf,
     /// Compress API responses for clients that accept gzip. Worthwhile over a network,
     /// but slower than no compression on localhost.
