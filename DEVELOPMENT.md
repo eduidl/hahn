@@ -23,17 +23,19 @@ npm --prefix client run format:check      # Check formatting
 scripts/conformance.sh                   # 合成録画の生成・起動・削除を含む
 ```
 
+Run `npm --prefix client run format` to format the client. Generated API types are excluded.
+
 適合性テストは既定で `127.0.0.1:3918` を使います。使用中なら `CONFORMANCE_PORT=3919 scripts/conformance.sh` のように変更します。
 
 別のサーバを検査する合成録画は、次のコマンドで生成できます。出力先は `data/` 以下かリポジトリ外にしてください。
 
 ```bash
 mkdir -p data/samples
-cargo run --locked --example generate_demo -- data/samples/demo.mcap 2200
-cargo run --locked --example generate_visual -- data/samples/visual.mcap
+cargo run --manifest-path server/Cargo.toml --locked --example generate_demo -- data/samples/demo.mcap 2200
+cargo run --manifest-path server/Cargo.toml --locked --example generate_visual -- data/samples/visual.mcap
 ```
 
-この2つの録画を配信するサーバに対して、`web/` で `BASE_URL=http://host:port npm run conformance` を実行します。実データの比較は任意のローカル確認です。必要な場合だけ `MCAP_TEST_DATA_DIR=/path/to/recordings cargo test --locked --test real_data -- --ignored` を実行し、録画や出力を共有するテストへ持ち込みません。
+この2つの録画を配信するサーバに対して、`client/` で `BASE_URL=http://host:port npm run conformance` を実行します。実データの比較は任意のローカル確認です。必要な場合だけ `MCAP_TEST_DATA_DIR=/path/to/recordings cargo test --manifest-path server/Cargo.toml --locked --test real_data -- --ignored` を実行し、録画や出力を共有するテストへ持ち込みません。
 
 ## Reviewの完了条件
 
