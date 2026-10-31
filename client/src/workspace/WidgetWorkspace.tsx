@@ -331,6 +331,7 @@ function TimeSeriesWindow({
     ) : null;
   // Each widget type draws its own content; the frame, drop target and empty state are shared.
   const views: Record<Widget["type"], () => ReactNode> = {
+    "tf-tree": () => <TfTree runId={props.runId ?? null} info={info} />,
     tabs: () =>
       widget.type === "tabs" ? (
         <>
