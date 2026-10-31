@@ -27,6 +27,20 @@ pub(crate) struct Run {
     tf: OnceLock<Arc<TfIndex>>,
 }
 
+impl Run {
+    /// Reads the transform topics of all groups on first use, wherever the server put
+    /// them. A group that cannot be opened reports that itself, and must not take the
+    /// others' frames with it. Blocks, so call it inside `blocking`.
+    pub(crate) fn tf(&self) -> anyhow::Result<Arc<TfIndex>> {
+        if let Some(tf) = self.tf.get() {
+            return Ok(tf.clone());
+        }
+        let sources = self.groups.iter().filter_map(|group| group.source().ok());
+        let tf = Arc::new(TfIndex::build(sources)?);
+        Ok(self.tf.get_or_init(|| tf).clone())
+    }
+}
+
 #[derive(Serialize)]
 pub(crate) struct Group {
     pub(crate) id: String,

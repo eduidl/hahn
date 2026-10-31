@@ -1616,6 +1616,27 @@ async fn transforms_resolve_the_graph_at_a_time() {
 }
 
 #[tokio::test]
+async fn frames_span_the_groups_of_a_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let run = dir.path().join("drive");
+    std::fs::create_dir(&run).unwrap();
+    // The first group holds no transforms, and another cannot be read at all.
+    support::write_fixture(&run.join("a.mcap"), 1, true).unwrap();
+    std::fs::write(run.join("b.mcap"), b"not a recording").unwrap();
+    support::write_visual_fixture(&run.join("c.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, body) = get(app.clone(), "/r/frames").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["frames"].as_array().unwrap().len(), 3);
+    let url = format!("/r/transforms?target=map&time_ns={}", support::ORIGIN);
+    let (status, body) = get(app.clone(), &url).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["frames"].get("lidar").is_some());
+    let (status, _) = get(app, "/api/runs/no-such-run/frames").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn a_run_without_transforms_has_no_frames() {
     let dir = fixture(1, true);
     let app = hahn::router(dir.path()).unwrap();

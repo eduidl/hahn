@@ -58,6 +58,30 @@ describe("frameIndexAt", () => {
   });
 });
 
+describe("pointBuffers", () => {
+  const ref = (offset: number, length: number) => ({ $blob: { offset, length } });
+  const pose = { position: [0, 0, 0], orientation: [0, 0, 0, 1] };
+  const buffer = new ArrayBuffer(32);
+  new Float32Array(buffer, 0, 6).set([1, 2, 0, 3, 4, 0]);
+  new Uint16Array(buffer, 24, 2).set([10, 20]);
+  const blob = ({ $blob }: { $blob: { offset: number; length: number } }) =>
+    new Uint8Array(buffer, $blob.offset, $blob.length);
+  it("views positions without copying", () => {
+    const value: PointCloudValue = { kind: "pointcloud", frame_id: null, count: 2, pose, positions: ref(0, 24), fields: [] };
+    const { positions, intensities } = pointBuffers(value, blob);
+    expect([...positions]).toEqual([1, 2, 0, 3, 4, 0]);
+    expect(positions.buffer).toBe(buffer);
+    expect(intensities).toBeNull();
+  });
+  it("scales an intensity of any type over the frame's range", () => {
+    const value: PointCloudValue = {
+      kind: "pointcloud", frame_id: null, count: 2, pose, positions: ref(0, 24),
+      fields: [{ name: "intensity", type: "u16", data: ref(24, 4) }],
+    };
+    expect([...pointBuffers(value, blob).intensities!]).toEqual([0, 1]);
+  });
+});
+
 describe("geoPoints", () => {
   it("swaps GeoJSON's longitude first order and skips other geometries", () => {
     const value: GeoValue = { kind: "geo", features: [

@@ -89,9 +89,27 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 | 112 to 116 | The blob |
 | 117 to 119 | Padding, which ends the frame on a boundary |
 
+`openapi.json` lists the values of this version of the protocol, and a later version can add more. A client treats values it does not know like this, so that older clients keep working:
+
+| Unknown value | What a client does |
+|---|---|
+| `kind` | Ignores the view |
+| `type` of a `scene` primitive | Skips the primitive and draws the rest |
+| `format` of an `image` | Shows that it cannot display the image |
+| `distortion.model` in an image's `camera_info` | Does not use the `camera_info`, since assuming no distortion would misplace what is drawn on the image |
+| `fields[].type` of a `pointcloud` | Skips that field without interpreting its blob; continues using positions and supported fields |
+| `FieldType.data_type` | Treats the field as unsupported for typed operations without guessing its type; continues with other fields and topics. Raw message values remain readable |
+| `ViewEvent.type` | Skips the entire binary frame, including its payload, using the framing lengths, and continues reading. It is neither `complete` nor `error`; a stream ending without either known terminal event still fails |
+
 `stamp_ns` determines when a spatial value was measured; the frame's `time_ns` locates its message in the recording. To place an image or point cloud, resolve the transform samples at its measurement stamp, requesting them with its message log time as `log_time_ns` and a range around the stamp. To inspect the graph at a playback position instead, first resolve that position through `/clock`. A missing measurement stamp is not permission to use log time as a measurement timestamp.
 
 ## Coordinate frames
+
+- With several samples of a child frame at the same `stamp_ns`, the last row applies.
+- Translation is interpolated linearly and rotation by slerp, between the samples around the time. Rotations go the short way round, since `q` and `-q` are the same rotation.
+- Between samples with different parents, nothing is interpolated: the earlier sample holds unchanged until the later one, so the frame stays under its earlier parent.
+- Nothing is interpolated across a reset, and nothing is extrapolated. A frame not connected to the chosen target, or reached through a dynamic transform outside its samples, has no transform at that time.
+- A cycle of frames is invalid data. Which way round the frames on it are resolved is unspecified.
 
 An empty query result for an existing readable topic is successful: message history emits `complete` without rows, latest messages return `null`, and views emit only `complete`. Missing values on schema-valid paths remain `null`. For group information only, the existing `422` response is retained for an empty group and identified by `empty_group`. Do not report this code merely because a selected topic or requested range has no messages, or because message-count statistics are unknown. A read or decode failure must report `recording_unreadable` rather than fabricate a successful empty result; the exception is the frame graph, which leaves out a group that cannot be read. A nonexistent topic remains `unknown_topic` even when the group contains no messages.
 

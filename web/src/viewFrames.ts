@@ -104,12 +104,42 @@ export function frameIndexAt(frames: Pick<ViewFrame, "time_ns">[], ns: bigint) {
   return low - 1;
 }
 
+const columns = {
+  u8: Uint8Array,
+  i8: Int8Array,
+  u16: Uint16Array,
+  i16: Int16Array,
+  u32: Uint32Array,
+  i32: Int32Array,
+  f32: Float32Array,
+  f64: Float64Array,
+};
+
 export type PointBuffers = {
   /** x, y, z per point. */
   positions: Float32Array;
   /** Per point, from 0 to 1 over the frame's range, when the cloud has an intensity. */
   intensities: Float32Array | null;
 };
+
+/** Blobs are aligned, so columns are views of the response rather than copies. */
+export function pointBuffers(value: PointCloudValue, blob: ViewFrame["blob"]): PointBuffers {
+  const bytes = blob(value.positions);
+  const positions = new Float32Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength / 4);
+  const intensity = value.fields.find((field) => field.name === "intensity");
+  if (!intensity) return { positions, intensities: null };
+  const Column = columns[intensity.type];
+  const data = blob(intensity.data);
+  const raw = new Column(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength / Column.BYTES_PER_ELEMENT);
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of raw) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const span = max - min || 1;
+  return { positions, intensities: Float32Array.from(raw, (v) => (v - min) / span) };
+}
 
 /** The position of each `Point` of a geo value, as `[latitude, longitude]`. */
 export function geoPoints(value: GeoValue): [number, number][] {
