@@ -128,7 +128,6 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
           {icon("M4 5v14l11-7zM16 5h2v14h-2z")}
         </button>
       </div>
-      {playing && buffering && <span role="status">Buffering…</span>}
       <div className="playback-time" aria-live="off">
         <span title={label}>{disabled ? "—" : `${now.date} ${now.time}`}</span>
         <small>{disabled ? "—" : `${seconds(time)} / ${seconds(fullEnd)} s`}</small>
@@ -213,9 +212,9 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
         {icon("M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z")}
       </button>
       <div className="playback-status">
-        <span>
-          <i className={busy ? "pulse" : ""} />
-          {busy ? "Receiving data" : "READY"}
+        <span role="status">
+          <i className={busy || (playing && buffering) ? "pulse" : ""} />
+          {playing && buffering ? "Buffering…" : busy ? "Receiving data" : "READY"}
         </span>
         {busy && (
           <button className="stop-loading" onClick={stop}>

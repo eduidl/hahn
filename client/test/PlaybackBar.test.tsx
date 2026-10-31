@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlaybackBar } from "../src/workspace/PlaybackBar";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
@@ -73,5 +73,20 @@ describe("PlaybackBar", () => {
     expect((screen.getByRole("button", { name: "Play" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.keyDown(document.body, { key: " " });
     expect(store.getState().playing).toBe(false);
+  });
+
+  it("shows buffering in the existing status area without inserting a playback bar item", () => {
+    const store = renderBar();
+    const status = screen.getByRole("status");
+    const bar = screen.getByLabelText("Playback");
+    const children = [...bar.children];
+    const token = Symbol();
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    act(() => store.setBuffering(token, true));
+    expect(status.textContent).toContain("Buffering…");
+    expect([...bar.children]).toEqual(children);
+    act(() => store.setBuffering(token, false));
+    expect(status.textContent).toContain("READY");
+    expect([...bar.children]).toEqual(children);
   });
 });

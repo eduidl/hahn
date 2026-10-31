@@ -1691,6 +1691,9 @@ header .add-widget {
   gap: 10px;
   white-space: nowrap;
 }
+.playback-status > span {
+  min-width: 14ch;
+}
 @media (max-width: 640px) {
   .playback-bar {
     gap: 8px;
