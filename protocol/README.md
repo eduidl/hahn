@@ -92,6 +92,10 @@ For example, log/simulation sample pairs, in seconds for readability, are `(1, 1
 - If a later reset repeats a simulation timestamp, `log_time_ns` selects the occurrence's interval. Values from another interval do not participate in the query.
 - A sensor message measured at simulation time `11` but recorded 100 ms late is selected for playback by its log time. Its spatial placement uses `stamp_ns=11000000000`, not Clock's simulation time at receipt. At 20 m/s, using the receipt-time pose would introduce a 2 m error when the simulation and log clocks advance at the same rate.
 
+## Streams
+
+`/messages` and `/transforms/dynamic` respond with `application/x-ndjson`, one event per line.
+
 ```json
 {"type":"batch","rows":[{"time_ns":"1760000000123456789","value":14.0}],"scanned_messages":1}
 {"type":"complete","scanned_messages":1}
@@ -191,6 +195,20 @@ Numbers in a value's JSON are finite and never `null`, unlike in `/messages`. A 
 Transforms are not a Hahn type. They are not something to show but the context for reading other values, they have to be merged across topics (`/tf`, `/tf_static`), and a single message may hold only some of the frames. So a run has one graph of frames, merged from all of its groups whether open or not. The server delivers its transforms as samples and the client resolves them. A view of any group refers to the same graph, since how a run divides into groups is up to the server. A group that cannot be read is left out. Which topics feed it is up to the server. Those topics are still readable through `/messages`.
 
 Coordinates are right-handed, in meters and radians. The server converts recordings on other conventions.
+
+### What the server delivers
+
+`/transforms/static` and `/transforms/dynamic` deliver transforms by these rules:
+
+- The server decides which transforms are static. It classifies each child frame as exactly one of static or dynamic, so the two operations never hold the same child.
+- A sample with a non-finite number, or without both of its frames, is left out. So is a dynamic sample without a known timestamp on the run measurement clock or a known reset interval.
+- Dynamic samples are not deduplicated. Samples with the same `stamp_ns` remain separate rows.
+- A static child frame has one transform: the last by log time, then recording order, then the order of the run's groups.
+- `/frames` gives each frame the parent last recorded.
+
+### What the client resolves
+
+The client resolves a tree at a measurement time by these rules, using only samples of one interval:
 
 - With several samples of a child frame at the same `stamp_ns`, the last row applies.
 - Translation is interpolated linearly and rotation by slerp, between the samples around the time. Rotations go the short way round, since `q` and `-q` are the same rotation.
