@@ -369,7 +369,7 @@ function TimeSeriesWindow({
         originNs={info?.start_ns ?? null}
       />
     ),
-    raw: () => <RawMessage widget={widget} info={info} />,
+    raw: () => <RawMessage widget={widget} info={info} index={props.fieldIndex} />,
     image: () => <ImageView widget={widget} info={info} />,
     scene: () => (
       <Suspense fallback={null}>
