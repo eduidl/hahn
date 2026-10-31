@@ -2,7 +2,8 @@ import { memo, useMemo, useRef } from "react";
 import { secondsFrom } from "../data/data";
 import { useCurrentMessage } from "../data/useCurrentMessage";
 import { useTimeFormatter } from "../timeDisplay";
-import { type Info } from "../types";
+import { keyOf, type Info, type Selected } from "../types";
+import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -18,6 +19,10 @@ const Node = memo(function MessageNode({
   name,
   value,
   depth,
+  path,
+  folding,
+  series,
+  index,
 }: {
   name: string;
   value: Json;
@@ -48,11 +53,19 @@ const Node = memo(function MessageNode({
         ? Object.entries(value)
         : [];
   if (!Array.isArray(value) && !isObject(value)) {
+    const type = index.byKey.get(keyOf(series.source, series.topic, [...series.path, ...path]))
+      ?.field.data_type;
+    const integer =
+      typeof value === "string" &&
+      /^-?\d+$/.test(value) &&
+      /^(u?int)(8|16|32|64)$/.test(type ?? "");
     return (
       <div className="raw-leaf">
         <span className="raw-key">{name}</span>
-        <span className={`raw-value raw-${value === null ? "null" : typeof value}`}>
-          {typeof value === "string" ? JSON.stringify(value) : String(value)}
+        <span
+          className={`raw-value raw-${integer ? "number" : value === null ? "null" : typeof value}`}
+        >
+          {typeof value === "string" && !integer ? JSON.stringify(value) : String(value)}
         </span>
       </div>
     );
@@ -98,7 +111,15 @@ const Node = memo(function MessageNode({
 });
 
 /** The selected topic or field as it was at the playback position. */
-export function RawMessage({ widget, info }: { widget: Widget; info: Info | null }) {
+export function RawMessage({
+  widget,
+  info,
+  index,
+}: {
+  widget: Widget;
+  info: Info | null;
+  index: FieldIndex;
+}) {
   const series = widget.series[0];
   const { message, error } = useCurrentMessage(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
