@@ -61,3 +61,55 @@ it("loads the current run and distinguishes empty results from errors", async ()
   await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Unavailable"));
 });
 
+it("shows the selected frame relative to its last recorded parent at playback time", async () => {
+  const fetch = vi.fn(async (url: string) => {
+    if (url.endsWith("/frames"))
+      return new Response(
+        JSON.stringify({
+          frames: [
+            { id: "world", parent: null },
+            { id: "base", parent: "world" },
+          ],
+        }),
+      );
+    const params = new URL(url, "http://x").searchParams;
+    return new Response(
+      JSON.stringify({
+        target: params.get("target"),
+        time_ns: params.get("time_ns"),
+        frames:
+          params.get("time_ns") === "3000000000"
+            ? {}
+            : {
+                base: {
+                  translation: [Number(params.get("time_ns")) / 1e9, 2, 3],
+                  rotation: [0, 0, 0, 1],
+                },
+              },
+      }),
+    );
+  });
+  vi.stubGlobal("fetch", fetch);
+  const store = createPlaybackStore(
+    () => 1,
+    () => {},
+  );
+  store.reset(10);
+  render(
+    <PlaybackContext.Provider value={store}>
+      <TfTree
+        runId="run"
+        info={{ start_ns: "1000000000", end_ns: "11000000000", message_count: 1 }}
+      />
+    </PlaybackContext.Provider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "base, parent world" }));
+  expect(await screen.findByText("Relative to last recorded parent: world")).toBeTruthy();
+  expect(await screen.findByText("Translation (m): 1, 2, 3")).toBeTruthy();
+  act(() => store.seek(1));
+  expect(await screen.findByText("Translation (m): 2, 2, 3")).toBeTruthy();
+  act(() => store.seek(2));
+  expect(await screen.findByText("Transform unavailable at this time")).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole("button", { name: "world" }), { key: "Enter" });
+  expect(screen.getByText("Root frame")).toBeTruthy();
+});
