@@ -149,6 +149,12 @@ it("shows selected topics and field paths in the widget toolbar", () => {
 });
 
 describe("Tab widget interactions", () => {
+  it("adds a TF Tree widget inside a tab", () => {
+    render(<Harness />);
+    fireEvent.click(within(panel()).getByRole("button", { name: "Add TF Tree" }));
+    expect(within(panel()).getByRole("region", { name: "TF Tree" })).toBeDefined();
+    expect(within(panel()).getByText("Open a run from the header")).toBeDefined();
+  });
   it("adds, switches, renames and deletes tabs with keyboard navigation", () => {
     render(<Harness />);
     expect(
@@ -196,13 +202,13 @@ describe("Tab widget interactions", () => {
     const state = reduce(initialWorkspace(), { type: "remove", id: "widget-1" });
     render(<Harness initialState={state} />);
     const catalog = screen.getByLabelText("Widgets to add");
-    expect(within(catalog).getAllByRole("button")).toHaveLength(9);
+    expect(within(catalog).getAllByRole("button")).toHaveLength(10);
     fireEvent.click(within(catalog).getByRole("button", { name: "Add Tab" }));
     const tabPanel = panel("widget-2");
     expect(within(tabPanel).queryByRole("button", { name: "Add Tab" })).toBeNull();
     expect(
       within(tabPanel).getByLabelText("Widgets to add").querySelectorAll("button"),
-    ).toHaveLength(8);
+    ).toHaveLength(9);
     fireEvent.click(within(tabPanel).getByRole("button", { name: "Add Table" }));
     expect(within(tabPanel).getByRole("region", { name: "Table" })).toBeDefined();
     expect(within(tabPanel).queryByLabelText("Widgets to add")).toBeNull();
@@ -251,7 +257,7 @@ describe("Tab widget interactions", () => {
     const child = container.querySelector<HTMLElement>('[data-widget-id="widget-2"]')!;
     fireEvent.click(child.querySelector(".submenu-host > button")!);
     const childTypes = within(child).getAllByRole("menuitemradio", { hidden: true });
-    expect(childTypes).toHaveLength(8);
+    expect(childTypes).toHaveLength(9);
     expect(childTypes.some((item) => item.firstChild?.textContent === "Tab")).toBe(false);
     const root = container.querySelector<HTMLElement>('[data-widget-id="widget-3"]')!;
     fireEvent.click(root.querySelector(".submenu-host > button")!);

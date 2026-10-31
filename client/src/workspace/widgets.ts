@@ -43,7 +43,18 @@ export const defaultTabTitle = "";
 export type WidgetTab = { id: string; title: string; layout: MosaicNode<string> | null };
 export type Widget = WidgetBase &
   (
-    | { type: "time-series" | "state" | "raw" | "log" | "table" | "image" | "scene" | "map" }
+    | {
+        type:
+          | "time-series"
+          | "state"
+          | "raw"
+          | "log"
+          | "table"
+          | "image"
+          | "scene"
+          | "map"
+          | "tf-tree";
+      }
     | { type: "tabs"; tabs: WidgetTab[]; activeTabId: string; nextTabNumber: number }
   );
 export type TabWidget = Extract<Widget, { type: "tabs" }>;
@@ -125,6 +136,17 @@ export type WidgetSpec = {
   viewKinds?: ReadonlySet<string>;
 };
 export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
+  "tf-tree": {
+    label: "TF Tree",
+    titlePrefix: "TF Tree",
+    description: "Show coordinate frame relationships",
+    help: "Drag to pan and use the mouse wheel to zoom.",
+    emptyHint: "No frames",
+    accepts: new Set(),
+    sameKind: false,
+    maxSeries: 0,
+    loadsSeries: false,
+  },
   tabs: {
     label: "Tab",
     titlePrefix: "Tab",

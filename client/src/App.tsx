@@ -599,6 +599,7 @@ export function App() {
                     </div>
                   )}
                   <WidgetWorkspace
+                    runId={runId}
                     state={workspace}
                     dispatch={dispatch}
                     data={plotted}
