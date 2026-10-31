@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { useSourceLabel } from "./sources";
+import { useSourceLabel } from "./data/sources";
 
 /** Allow line breaks only after `/` and `.`, so names wrap between segments. */
 function breakable(text: string) {
@@ -31,9 +31,7 @@ export function SeriesName({
     <span className="series-ref">
       {label && <span className="series-ref-source">{breakable(label)}</span>}
       <span className="series-ref-topic">{breakable(topic)}</span>
-      {path.length > 0 && (
-        <span className="series-ref-path">{breakable(path.join("."))}</span>
-      )}
+      {path.length > 0 && <span className="series-ref-path">{breakable(path.join("."))}</span>}
       {type && <span className="series-ref-type">{breakable(type)}</span>}
     </span>
   );

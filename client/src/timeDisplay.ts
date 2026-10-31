@@ -26,11 +26,7 @@ export function useTimeFormatter(originNs: string | null, mode: TimeDisplay) {
 }
 
 /** Format only the labels; all plotting and hit testing stays relative to the recording. */
-export function timeFormatter(
-  originNs: string | null,
-  mode: TimeDisplay,
-  timeZone?: string,
-) {
+export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZone?: string) {
   const relative = (seconds: number) =>
     Number.isFinite(seconds)
       ? seconds.toLocaleString(undefined, { maximumSignificantDigits: 6 })
@@ -39,7 +35,7 @@ export function timeFormatter(
     return {
       tick: (seconds: number) => ({ time: relative(seconds), date: "" }),
       tooltip: (seconds: number) => `${relative(seconds)} s`,
-      axisLabel: "録画開始からの秒数",
+      axisLabel: "Seconds from recording start",
     };
   const clock = new Intl.DateTimeFormat("en-GB", {
     timeZone,
@@ -57,12 +53,9 @@ export function timeFormatter(
   });
   const zone = clock.resolvedOptions().timeZone;
   const tick = (seconds: number) => {
-    if (originNs === null || !Number.isFinite(seconds * 1e9))
-      return { time: "—", date: "" };
+    if (originNs === null || !Number.isFinite(seconds * 1e9)) return { time: "—", date: "" };
     const date = new Date(
-      Number(
-        (BigInt(originNs) + BigInt(Math.round(seconds * 1e9))) / 1_000_000n,
-      ),
+      Number((BigInt(originNs) + BigInt(Math.round(seconds * 1e9))) / 1_000_000n),
     );
     if (!Number.isFinite(date.getTime())) return { time: "—", date: "" };
     const parts = calendar.formatToParts(date);
@@ -79,6 +72,6 @@ export function timeFormatter(
       const label = tick(seconds);
       return label.date ? `${label.date} ${label.time} (${zone})` : "—";
     },
-    axisLabel: `実時刻（${zone}）`,
+    axisLabel: `Absolute time (${zone})`,
   };
 }

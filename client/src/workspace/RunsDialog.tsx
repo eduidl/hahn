@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { get } from "./sources";
-import { errorMessage, type RunList } from "./types";
+import { get } from "../data/sources";
+import { errorMessage, type RunList } from "../types";
 
 const LIMIT = 50;
 const SEARCH_DELAY_MS = 200;
@@ -67,16 +67,16 @@ export function RunsDialog({
     if (items.length) setActive((active + step + items.length) % items.length);
   };
   return (
-    <dialog ref={dialog} className="runs-dialog" aria-label="走行を選択" onClose={onClose}>
-      <h2>走行を選択</h2>
+    <dialog ref={dialog} className="runs-dialog" aria-label="Select run" onClose={onClose}>
+      <h2>Select run</h2>
       <input
         className="search"
         role="combobox"
         aria-expanded="true"
         aria-controls="runs-list"
         aria-activedescendant={items[active] && `run-option-${active}`}
-        aria-label="走行を検索"
-        placeholder="走行を検索…"
+        aria-label="Search runs"
+        placeholder="Search runs…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
@@ -90,11 +90,11 @@ export function RunsDialog({
       />
       <div className="runs-count">
         {list?.truncated
-          ? `上位 ${items.length} 件を表示中。検索で絞り込んでください`
-          : list && `${items.length} 件`}
+          ? `Showing ${items.length} results. Refine your search.`
+          : list && `${items.length} runs`}
       </div>
       {error && <p role="alert">{error}</p>}
-      <ul ref={listRef} id="runs-list" className="runs-list" role="listbox" aria-label="走行">
+      <ul ref={listRef} id="runs-list" className="runs-list" role="listbox" aria-label="Runs">
         {items.map((run, i) => (
           <li
             key={run.id}
@@ -109,9 +109,9 @@ export function RunsDialog({
           </li>
         ))}
       </ul>
-      {list && !items.length && <p className="muted">該当する走行がありません</p>}
+      {list && !items.length && <p className="muted">No matching runs</p>}
       <button className="runs-close" onClick={onClose}>
-        閉じる
+        Close
       </button>
     </dialog>
   );

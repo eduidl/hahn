@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import type { Info, Selected } from "./types";
-import { fixedFrameOf, useFrames, usePlaybackNs, useTransforms, useViewFrame } from "./useViewData";
-import { pointBuffers, type PointCloudValue, type Transform } from "./viewFrames";
-import type { Widget } from "./widgets";
+import type { Info, Selected } from "../types";
+import {
+  fixedFrameOf,
+  useFrames,
+  usePlaybackNs,
+  useTransforms,
+  useViewFrame,
+} from "../data/useViewData";
+import { pointBuffers, type PointCloudValue, type Transform } from "../data/viewFrames";
+import type { Widget } from "../workspace/widgets";
 
 type Stage = { scene: THREE.Scene; invalidate: () => void; fit: (object: THREE.Object3D) => void };
 
@@ -27,11 +33,25 @@ function intensityColors(intensities: Float32Array) {
 }
 
 /** One point cloud topic. Draws into the stage, and renders only its problems. */
-function PointsLayer({ series, info, target, stage }: { series: Selected; info: Info | null; target: string | null; stage: Stage }) {
+function PointsLayer({
+  series,
+  info,
+  target,
+  stage,
+}: {
+  series: Selected;
+  info: Info | null;
+  target: string | null;
+  stage: Stage;
+}) {
   const { frame, error } = useViewFrame(series, info);
   const value = frame?.value?.kind === "pointcloud" ? (frame.value as PointCloudValue) : undefined;
   // A cloud is placed by where its frame was when it was captured.
-  const { transforms, error: transformError } = useTransforms(series.source, target, frame?.time_ns ?? null);
+  const { transforms, error: transformError } = useTransforms(
+    series.source,
+    target,
+    frame?.time_ns ?? null,
+  );
   const points = useMemo(() => {
     const object = new THREE.Points(
       new THREE.BufferGeometry(),
@@ -55,7 +75,8 @@ function PointsLayer({ series, info, target, stage }: { series: Selected; info: 
     points.geometry.dispose();
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    if (intensities) geometry.setAttribute("color", new THREE.BufferAttribute(intensityColors(intensities), 3));
+    if (intensities)
+      geometry.setAttribute("color", new THREE.BufferAttribute(intensityColors(intensities), 3));
     points.geometry = geometry;
     points.material.vertexColors = !!intensities;
     points.material.color.set(intensities ? "#ffffff" : series.color);
@@ -81,13 +102,29 @@ function PointsLayer({ series, info, target, stage }: { series: Selected; info: 
     stage.invalidate();
   }, [points, value, placement, unresolved, series.hidden, stage, target, frameId]);
   const problem =
-    error || frame?.error || transformError ||
-    (unresolved ? `${frameId} から ${target} への変換がこの時刻にありません` : "");
-  return problem ? <p className="view-error">{series.topic}: {problem}</p> : null;
+    error ||
+    frame?.error ||
+    transformError ||
+    (unresolved ? `No transform from ${frameId} to ${target} at this time` : "");
+  return problem ? (
+    <p className="view-error">
+      {series.topic}: {problem}
+    </p>
+  ) : null;
 }
 
 /** Axes of every frame at the playback position. */
-function FrameAxes({ source, target, info, stage }: { source: string | undefined; target: string | null; info: Info | null; stage: Stage }) {
+function FrameAxes({
+  source,
+  target,
+  info,
+  stage,
+}: {
+  source: string | undefined;
+  target: string | null;
+  info: Info | null;
+  stage: Stage;
+}) {
   const ns = usePlaybackNs(info);
   const { transforms } = useTransforms(source, target, ns === null ? null : String(ns));
   const group = useMemo(() => new THREE.Group(), []);
@@ -187,7 +224,7 @@ export default function Scene3D({ widget, info }: { widget: Widget; info: Info |
       setStage(created.stage);
       return created.dispose;
     } catch (error) {
-      setFailure(`3D表示を開始できません: ${error instanceof Error ? error.message : error}`);
+      setFailure(`Could not start 3D view: ${error instanceof Error ? error.message : error}`);
     }
   }, []);
   const sources = widget.series.map((s) => s.source);
@@ -199,9 +236,16 @@ export default function Scene3D({ widget, info }: { widget: Widget; info: Info |
       {stage && <FrameAxes source={sources[0]} target={target} info={info} stage={stage} />}
       <div className="view-problems">
         {problem && <p className="view-error">{problem}</p>}
-        {stage && widget.series.map((series) => (
-          <PointsLayer key={series.key} series={series} info={info} target={target} stage={stage} />
-        ))}
+        {stage &&
+          widget.series.map((series) => (
+            <PointsLayer
+              key={series.key}
+              series={series}
+              info={info}
+              target={target}
+              stage={stage}
+            />
+          ))}
       </div>
     </div>
   );

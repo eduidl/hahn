@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { secondsFrom } from "./data";
-import { useTimeFormatter } from "./timeDisplay";
-import type { Info } from "./types";
-import { useViewFrame } from "./useViewData";
-import type { ImageValue } from "./viewFrames";
-import type { Widget } from "./widgets";
+import { secondsFrom } from "../data/data";
+import { useTimeFormatter } from "../timeDisplay";
+import type { Info } from "../types";
+import { useViewFrame } from "../data/useViewData";
+import type { ImageValue } from "../data/viewFrames";
+import type { Widget } from "../workspace/widgets";
 
 const mimeTypes: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -29,18 +29,16 @@ export function ImageView({ widget, info }: { widget: Widget; info: Info | null 
   }, [frame, value, mime]);
   if (!series) return null;
   const problem =
-    error ||
-    frame?.error ||
-    (value && !mime ? `未対応の画像形式です: ${value.format}` : "");
+    error || frame?.error || (value && !mime ? `Unsupported image format: ${value.format}` : "");
   return (
     <div className="view-image">
       {url && !problem && <img src={url} alt={series.topic} />}
       {problem ? (
         <p className="view-status view-error">{problem}</p>
       ) : frame === undefined ? (
-        <p className="view-status">読み込み中…</p>
+        <p className="view-status">Loading…</p>
       ) : frame === null ? (
-        <p className="view-status">メッセージがありません</p>
+        <p className="view-status">No messages</p>
       ) : (
         <p className="view-time">{formatter.tooltip(secondsFrom(frame.time_ns, info!.start_ns))}</p>
       )}

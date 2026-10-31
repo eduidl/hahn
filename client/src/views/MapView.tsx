@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { errorMessage, type Info, type Selected } from "./types";
-import { usePlaybackNs } from "./useViewData";
-import { fetchViewHistory, frameIndexAt, geoPoints, type GeoValue, type ViewFrame } from "./viewFrames";
-import type { Widget } from "./widgets";
+import { errorMessage, type Info, type Selected } from "../types";
+import { usePlaybackNs } from "../data/useViewData";
+import {
+  fetchViewHistory,
+  frameIndexAt,
+  geoPoints,
+  type GeoValue,
+  type ViewFrame,
+} from "../data/viewFrames";
+import type { Widget } from "../workspace/widgets";
 
 const osmAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
@@ -26,7 +32,10 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
     return () => controller.abort();
   }, [series.key, series.view, info?.start_ns]);
   const frames = history?.frames;
-  const trail = useMemo(() => frames?.flatMap((frame) => geoPoints(geoValue(frame)!)) ?? [], [frames]);
+  const trail = useMemo(
+    () => frames?.flatMap((frame) => geoPoints(geoValue(frame)!)) ?? [],
+    [frames],
+  );
   const fitted = useRef(false);
   useEffect(() => {
     if (series.hidden || !trail.length) return;
@@ -44,13 +53,24 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
     const layer = L.geoJSON(current.features as unknown as GeoJSON.Feature[], {
       style: { color: series.color },
       pointToLayer: (_, position) =>
-        L.circleMarker(position, { radius: 6, color: "#fff", weight: 2, fillColor: series.color, fillOpacity: 1 }),
+        L.circleMarker(position, {
+          radius: 6,
+          color: "#fff",
+          weight: 2,
+          fillColor: series.color,
+          fillOpacity: 1,
+        }),
     }).addTo(map);
     return () => void layer.remove();
   }, [map, current, series.color, series.hidden]);
-  if (history?.error) return <p className="view-error">{series.topic}: {history.error}</p>;
-  if (!history) return <p className="view-status">{series.topic}: 読み込み中…</p>;
-  if (!frames?.length) return <p className="view-status">{series.topic}: 位置がありません</p>;
+  if (history?.error)
+    return (
+      <p className="view-error">
+        {series.topic}: {history.error}
+      </p>
+    );
+  if (!history) return <p className="view-status">{series.topic}: Loading…</p>;
+  if (!frames?.length) return <p className="view-status">{series.topic}: No location</p>;
   return null;
 }
 
@@ -81,9 +101,10 @@ export default function MapView({ widget, info }: { widget: Widget; info: Info |
     <div className="view-map">
       <div className="view-map-canvas" ref={host} />
       <div className="view-problems">
-        {map && widget.series.map((series) => (
-          <GeoLayer key={series.key} series={series} info={info} map={map} />
-        ))}
+        {map &&
+          widget.series.map((series) => (
+            <GeoLayer key={series.key} series={series} info={info} map={map} />
+          ))}
       </div>
     </div>
   );
