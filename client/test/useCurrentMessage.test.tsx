@@ -85,7 +85,8 @@ it("uses the predecessor for a sparse topic and reports an empty topic", async (
       : new Response('{"type":"complete","scanned_messages":0}\n'),
   );
   vi.stubGlobal("fetch", fetch);
-  const { wrapper } = setup();
+  const { wrapper, playback } = setup();
+  act(() => playback.seek(1.1));
   const { result } = renderHook(() => useCurrentMessage(selected, info), { wrapper });
   await waitFor(() => expect(result.current.message?.value).toBe(7));
 });
@@ -97,6 +98,46 @@ it("shows nothing before a loaded field's first message", async () => {
   expect(result.current.message).toBeNull();
   act(() => playback.seek(1));
   expect(result.current.message?.value).toBe(3);
+});
+it("keeps the last known message while fetching a later window", async () => {
+  let finish: ((response: Response) => void) | undefined;
+  const batch = (time: string, value: number) =>
+    new Response(
+      JSON.stringify({ type: "batch", rows: [{ time_ns: time, value }], scanned_messages: 1 }) +
+        "\n" +
+        JSON.stringify({ type: "complete", scanned_messages: 1 }) +
+        "\n",
+    );
+  const fetch = vi.fn(async (url: string) => {
+    const start = new URL(url, "http://x").searchParams.get("start_ns");
+    if (start === "6000000000")
+      return new Promise<Response>((resolve) => {
+        finish = resolve;
+      });
+    if (start === "0") return batch("1000000000", 1);
+    return batch(start!, 2);
+  });
+  vi.stubGlobal("fetch", fetch);
+  const { wrapper, playback } = setup();
+  const { result } = renderHook(() => useCurrentMessage(selected, info), { wrapper });
+  await waitFor(() => expect(result.current.message?.value).toBe(1));
+  act(() => playback.seek(6));
+  expect(result.current.message?.value).toBe(1);
+  expect(playback.isBuffering()).toBe(true);
+  await waitFor(() => expect(finish).toBeDefined());
+  await act(async () => finish!(batch("6500000000", 3)));
+  await waitFor(() => expect(result.current.message?.value).toBe(3));
+  expect(playback.isBuffering()).toBe(false);
+});
+
+it("does not keep a later message when seeking before the first message", () => {
+  const { cache, playback, wrapper } = setup();
+  cache.putScalar(selected, [{ time_ns: "2000000000", value: 3 }]);
+  act(() => playback.seek(1));
+  const { result } = renderHook(() => useCurrentMessage(selected, info), { wrapper });
+  expect(result.current.message?.value).toBe(3);
+  act(() => playback.seek(0));
+  expect(result.current.message).toBeNull();
 });
 it("releases a buffering consumer when its widget is removed", async () => {
   vi.stubGlobal(

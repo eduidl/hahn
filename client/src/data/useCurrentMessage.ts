@@ -21,6 +21,7 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
   const identity = `${key}:${info?.start_ns}:${start}`;
   const [fallback, setFallback] = useState<{ identity: string; row: MessageRow | null }>();
   const [failure, setFailure] = useState<{ identity: string; error: string }>();
+  const previous = useRef<{ key: string; row: MessageRow }>(undefined);
   const rows = useMemo(() => {
     if (!series || !info) return undefined;
     return cache.read(series, `${start}:${start + windowNs}`);
@@ -79,10 +80,22 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
           : undefined;
   const error = failure?.identity === identity ? failure.error : "";
   const buffering = !!series && !!info && message === undefined && !error;
+  const target = `${key}:${info?.start_ns}`;
+  useEffect(() => {
+    if (message) previous.current = { key: target, row: message };
+  }, [message, target]);
+  const displayed =
+    message ??
+    (series &&
+    info &&
+    previous.current?.key === target &&
+    BigInt(previous.current.row.time_ns) <= ns
+      ? previous.current.row
+      : message);
   useEffect(() => {
     const token = consumer.current;
     playback.setBuffering(token, buffering);
     return () => playback.setBuffering(token, false);
   }, [playback, buffering]);
-  return { message, error };
+  return { message: displayed, error };
 }

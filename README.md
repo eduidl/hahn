@@ -214,6 +214,12 @@ Tableの親履歴は子フィールドを参照するTable・Raw Message・数�
 
 Raw Messageは2秒単位の区間を取得し、次の2区間を先読みします。表示するメッセージはAPIへの定期ポーリングではなく再生時刻から選び、必要な区間が未取得なら再生時計をバッファ待機させます。疎なトピックでは区間開始以前の最新メッセージも取得します。表示中の区間は保持し、それ以外の再生用区間は全体で12区間を目安に、区間開始時の単発検索は32件まで保持し、録画の時間原点が変わるとキャッシュを破棄します。全期間の履歴は録画を開いている間保持します（メモリのバイト数による上限は未導入）。
 
+While the requested interval is loading, Raw Message keeps the last known message if it is not later than the playback position. Playback waits until the requested interval is ready; a backward seek never displays a message from the future.
+
+Raw Message displays scalar integer fields without quotes, including 64-bit integers carried as strings to preserve their exact values. Actual string fields remain quoted.
+
+The widget toolbar lists the selected topics and field paths. Long selections are truncated; hover over them to see the full list.
+
 `GET /api/runs/{run}/groups/{group}/messages` では任意の `start_ns`（以上）・`end_ns`（未満）を指定できます。省略すると従来どおり全期間を返します。
 
 ### Tabウィジェット
