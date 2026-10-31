@@ -89,6 +89,10 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 | 112 to 116 | The blob |
 | 117 to 119 | Padding, which ends the frame on a boundary |
 
+### Rules common to Hahn types
+
+Numbers in a value's JSON are finite and never `null`, unlike in `/messages`. A message with a non-finite or missing required number is a `frame` with `error`, and so is one with a non-finite number in an array, even an optional one, since leaving it out would shift the rest. An optional number outside an array that is not finite is left out. Embedded image calibration is the exception to failing the entire frame: if it cannot form a valid `CameraInfo`, return `camera_info: null` with the valid image.
+
 `openapi.json` lists the values of this version of the protocol, and a later version can add more. A client treats values it does not know like this, so that older clients keep working:
 
 | Unknown value | What a client does |
@@ -104,6 +108,10 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 `stamp_ns` determines when a spatial value was measured; the frame's `time_ns` locates its message in the recording. To place an image or point cloud, resolve the transform samples at its measurement stamp, requesting them with its message log time as `log_time_ns` and a range around the stamp. To inspect the graph at a playback position instead, first resolve that position through `/clock`. A missing measurement stamp is not permission to use log time as a measurement timestamp.
 
 ## Coordinate frames
+
+Transforms are not a Hahn type. They are not something to show but the context for reading other values, they have to be merged across topics (`/tf`, `/tf_static`), and a single message may hold only some of the frames. So a run has one graph of frames, merged from all of its groups whether open or not. The server delivers its transforms as samples and the client resolves them. A view of any group refers to the same graph, since how a run divides into groups is up to the server. A group that cannot be read is left out. Which topics feed it is up to the server. Those topics are still readable through `/messages`.
+
+Coordinates are right-handed, in meters and radians. The server converts recordings on other conventions.
 
 - With several samples of a child frame at the same `stamp_ns`, the last row applies.
 - Translation is interpolated linearly and rotation by slerp, between the samples around the time. Rotations go the short way round, since `q` and `-q` are the same rotation.
