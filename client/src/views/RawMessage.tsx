@@ -22,6 +22,10 @@ const Node = memo(function MessageNode({
   name: string;
   value: Json;
   depth: number;
+  path: string[];
+  folding: Map<string, boolean>;
+  series: Selected;
+  index: FieldIndex;
 }) {
   if (isObject(value) && typeof value.$bytes === "number") {
     const head = Array.isArray(value.head) ? value.head : [];
@@ -55,15 +59,33 @@ const Node = memo(function MessageNode({
   }
   const length = truncated ? Number((value as { length: number }).length) : children.length;
   const summary = Array.isArray(value) || truncated ? `[${length.toLocaleString()}]` : "{…}";
+  const id = JSON.stringify(path);
   return (
-    <details className="raw-node" open={depth < initialDepth} data-depth={depth}>
+    <details
+      className="raw-node"
+      open={folding.get(id) ?? depth < initialDepth}
+      data-depth={depth}
+      data-path={id}
+      onToggle={(event) => {
+        if (event.target === event.currentTarget) folding.set(id, event.currentTarget.open);
+      }}
+    >
       <summary>
         <span className="raw-key">{name}</span>
         <span className="raw-meta">{summary}</span>
       </summary>
       <div className="raw-children">
         {children.map(([key, child]) => (
-          <Node key={key} name={key} value={child} depth={depth + 1} />
+          <Node
+            key={key}
+            name={key}
+            value={child}
+            depth={depth + 1}
+            path={[...path, key]}
+            folding={folding}
+            series={series}
+            index={index}
+          />
         ))}
         {truncated && (
           <div className="raw-meta raw-more">
@@ -81,16 +103,19 @@ export function RawMessage({ widget, info }: { widget: Widget; info: Info | null
   const { message, error } = useCurrentMessage(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
 
-  // Folding state lives in the <details> elements, so new messages keep it.
+  const folding = useMemo(() => new Map<string, boolean>(), [series?.key, info?.start_ns]);
   const tree = useRef<HTMLDivElement>(null);
   const expandAll = () =>
     tree.current?.querySelectorAll("details").forEach((node) => {
       node.open = true;
+      folding.set(node.dataset.path!, true);
     });
-  const resetFolding = () =>
+  const resetFolding = () => {
+    folding.clear();
     tree.current?.querySelectorAll("details").forEach((node) => {
       node.open = Number(node.dataset.depth) < initialDepth;
     });
+  };
 
   if (!series) return null;
   return (
@@ -111,9 +136,14 @@ export function RawMessage({ widget, info }: { widget: Widget; info: Info | null
             <button onClick={resetFolding}>Reset view</button>
           </div>
           <Node
+            key={`${series.key}:${info?.start_ns}`}
             name={series.path.length ? series.path.join(".") : series.topic}
             value={message.value}
             depth={0}
+            path={[]}
+            folding={folding}
+            series={series}
+            index={index}
           />
         </>
       )}
