@@ -1,12 +1,12 @@
 import { TabSettings } from "./TabControls";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { addableFields } from "./drop";
-import { SeriesName } from "./SeriesName";
+import { SeriesName } from "../SeriesName";
 import type { FieldIndex, IndexedField } from "./fieldIndex";
-import type { CachedSeries } from "./useSeries";
-import type { Selected } from "./types";
-import { tableColumns } from "./table";
-import { fixedFrameOf, useFrames } from "./useViewData";
+import type { CachedSeries } from "../data/useSeries";
+import type { Selected } from "../types";
+import { tableColumns } from "../views/table";
+import { fixedFrameOf, useFrames } from "../data/useViewData";
 import {
   addFieldAction,
   legendPositions,
@@ -28,13 +28,12 @@ type PanelProps = {
 const pickerLimit = 100;
 
 function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefined) {
-  if (!record) return "待機中";
-  if (record.status === "loading")
-    return `読み込み中 · ${record.received.toLocaleString()}`;
+  if (!record) return "Waiting";
+  if (record.status === "loading") return `Loading · ${record.received.toLocaleString()}`;
   if (record.status === "complete")
-    return `完了 · ${record.received.toLocaleString()} メッセージ`;
-  if (record.status === "stopped") return "停止 · 部分データ";
-  return "読み込みエラー";
+    return `Complete · ${record.received.toLocaleString()} messages`;
+  if (record.status === "stopped") return "Stopped · partial data";
+  return "Loading error";
 }
 
 const name = (s: Selected) => `${s.topic} ${s.path.join(".")}`;
@@ -44,7 +43,7 @@ function PanelHeader({ widget }: PanelProps) {
     <>
       <div className="field-heading">
         <span className="eyebrow">{widget.title}</span>
-        {widgetSpecs[widget.type].maxSeries !== 1 && <span>{widget.series.length} 系列</span>}
+        {widgetSpecs[widget.type].maxSeries !== 1 && <span>{widget.series.length} series</span>}
       </div>
       <p className="help">{widgetSpecs[widget.type].help}</p>
     </>
@@ -54,7 +53,7 @@ function PanelHeader({ widget }: PanelProps) {
 /** A button opening a searchable list of the fields this widget can take now; picking one closes it. */
 function FieldPicker({ widget, dispatch, index }: PanelProps) {
   const singleTarget = widgetSpecs[widget.type].maxSeries === 1;
-  const label = singleTarget ? "表示対象を指定" : "フィールドを追加";
+  const label = singleTarget ? "Select target" : "Add field";
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const popover = useRef<HTMLDivElement>(null);
@@ -81,12 +80,8 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
   };
   return (
     <>
-      <button
-        className="add-field"
-        popoverTarget="field-picker"
-        disabled={!candidates.length}
-      >
-        {singleTarget ? label : `＋ ${label}`}
+      <button className="add-field" popoverTarget="field-picker" disabled={!candidates.length}>
+        {singleTarget ? label : `+ ${label}`}
       </button>
       <div
         id="field-picker"
@@ -100,8 +95,10 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
           ref={input}
           className="search"
           type="search"
-          aria-label={singleTarget ? "指定するトピック・フィールドを検索" : "追加するフィールドを検索"}
-          placeholder={`${singleTarget ? "トピック・フィールド" : "フィールド"}を検索（${candidates.length.toLocaleString()} 件）`}
+          aria-label={
+            singleTarget ? "Search for a topic or field to select" : "Search for a field to add"
+          }
+          placeholder={`Search ${singleTarget ? "topics and fields" : "fields"} (${candidates.length.toLocaleString()})`}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -120,11 +117,7 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
         />
         <div className="field-picker-results">
           {matches.slice(0, pickerLimit).map((entry) => (
-            <button
-              key={entry.key}
-              className="field-option"
-              onClick={() => pick(entry)}
-            >
+            <button key={entry.key} className="field-option" onClick={() => pick(entry)}>
               <SeriesName
                 source={entry.topic.source}
                 topic={entry.topic.topic}
@@ -135,10 +128,10 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
           ))}
           {matches.length > pickerLimit && (
             <p className="muted">
-              他 {(matches.length - pickerLimit).toLocaleString()} 件。絞り込んでください。
+              {(matches.length - pickerLimit).toLocaleString()} more. Refine your search.
             </p>
           )}
-          {!matches.length && <p className="muted">一致するフィールドがありません。</p>}
+          {!matches.length && <p className="muted">No matching fields.</p>}
         </div>
       </div>
     </>
@@ -146,7 +139,7 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
 }
 
 function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
-  const label = widgetSpecs[widget.type].maxSeries === 1 ? "時刻表示" : "横軸の時刻表示";
+  const label = widgetSpecs[widget.type].maxSeries === 1 ? "Time display" : "X-axis time display";
   return (
     <label className="time-display-setting">
       {label}
@@ -161,8 +154,8 @@ function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
           })
         }
       >
-        <option value="absolute">実時刻</option>
-        <option value="relative">録画開始からの秒数</option>
+        <option value="absolute">Absolute time</option>
+        <option value="relative">Seconds from recording start</option>
       </select>
     </label>
   );
@@ -176,19 +169,17 @@ function SeriesList({
   showPoints = true,
 }: PanelProps & { row: (series: Selected) => ReactNode; showPoints?: boolean }) {
   return (
-    <section className="legend" aria-label="選択した系列">
+    <section className="legend" aria-label="Selected series">
       <div className="legend-heading">
         <span className="eyebrow">SERIES</span>
         <span>
-          {widget.series.length} 系列
-          {showPoints && ` · ${pointCount.toLocaleString()} 点`}
+          {widget.series.length} series
+          {showPoints && ` · ${pointCount.toLocaleString()} points`}
         </span>
       </div>
       {widget.series.map(row)}
       {!widget.series.length && (
-        <p className="legend-empty">
-          選択した系列と読み込み状況がここに表示されます。
-        </p>
+        <p className="legend-empty">Selected series and loading status appear here.</p>
       )}
     </section>
   );
@@ -215,12 +206,10 @@ function SeriesRow({
     <div className="legend-row">
       <button
         className={`series-toggle ${s.hidden ? "dim" : ""}`}
-        aria-label={`${name(s)} の表示切替`}
+        aria-label={`Toggle visibility for ${name(s)}`}
         aria-pressed={!s.hidden}
         onClick={() =>
-          update((list) =>
-            list.map((f) => (f.key === s.key ? { ...f, hidden: !f.hidden } : f)),
-          )
+          update((list) => list.map((f) => (f.key === s.key ? { ...f, hidden: !f.hidden } : f)))
         }
       >
         {marker}
@@ -228,13 +217,11 @@ function SeriesRow({
       </button>
       {children}
       {showStatus && (
-        <span className="series-status">
-          {statusLabel(records.find((r) => r.key === s.key))}
-        </span>
+        <span className="series-status">{statusLabel(records.find((r) => r.key === s.key))}</span>
       )}
       <button
         className="remove"
-        aria-label={`${name(s)} を削除`}
+        aria-label={`Remove ${name(s)}`}
         onClick={() => update((list) => list.filter((f) => f.key !== s.key))}
       >
         ×
@@ -253,20 +240,20 @@ function SeriesStyle({ widget, dispatch, series: s }: PanelProps & { series: Sel
   return (
     <div className="series-style">
       <label>
-        色
+        Color
         <input
           type="color"
-          aria-label={`${name(s)} の色`}
+          aria-label={`${name(s)} color`}
           value={s.color}
           onChange={(e) => restyle({ color: e.target.value })}
         />
       </label>
       <label>
-        線の太さ
+        Line width
         <input
           type="number"
           step="any"
-          aria-label={`${name(s)} の線の太さ`}
+          aria-label={`${name(s)} line width`}
           defaultValue={s.lineWidth}
           onChange={(e) => {
             const width = e.target.valueAsNumber;
@@ -287,17 +274,17 @@ function LegendSetting({ widget, dispatch }: PanelProps) {
     dispatch({ type: "legend", id: widget.id, value });
   return (
     <fieldset className="legend-setting">
-      <legend>凡例</legend>
+      <legend>Legend</legend>
       <label className="checkbox">
         <input
           type="checkbox"
           checked={widget.legend.visible}
           onChange={(event) => set({ visible: event.target.checked })}
         />
-        表示する
+        Show
       </label>
       <select
-        aria-label="凡例の位置"
+        aria-label="Legend position"
         value={widget.legend.position}
         disabled={!widget.legend.visible}
         onChange={(event) => set({ position: event.target.value as LegendPosition })}
@@ -343,10 +330,7 @@ function StatePanel(props: PanelProps) {
       <PanelHeader {...props} />
       <TimeDisplaySetting {...props} />
       <FieldPicker {...props} />
-      <SeriesList
-        {...props}
-        row={(s) => <SeriesRow key={s.key} {...props} series={s} />}
-      />
+      <SeriesList {...props} row={(s) => <SeriesRow key={s.key} {...props} series={s} />} />
     </>
   );
 }
@@ -377,16 +361,18 @@ function LogPanel(props: PanelProps) {
 function SingleTargetPanel(props: PanelProps) {
   const target = props.widget.series[0];
   const columns = useMemo(
-    () => props.widget.type === "table" && target ? tableColumns(props.index, target) : [],
+    () => (props.widget.type === "table" && target ? tableColumns(props.index, target) : []),
     [props.index, props.widget.type, target?.key],
   );
-  const visibleColumns = columns.filter((column) => !props.widget.hiddenColumns.includes(JSON.stringify(column.path))).length;
+  const visibleColumns = columns.filter(
+    (column) => !props.widget.hiddenColumns.includes(JSON.stringify(column.path)),
+  ).length;
   return (
     <>
       <PanelHeader {...props} />
       <TimeDisplaySetting {...props} />
-      <section className="target-setting" aria-label="表示対象">
-        <div className="legend-heading">表示対象</div>
+      <section className="target-setting" aria-label="Target">
+        <div className="legend-heading">Target</div>
         {target ? (
           <div className="target-summary">
             <SeriesName source={target.source} topic={target.topic} path={target.path} />
@@ -396,21 +382,41 @@ function SingleTargetPanel(props: PanelProps) {
               </span>
             )}
           </div>
-        ) : <p className="muted">未指定</p>}
+        ) : (
+          <p className="muted">Not selected</p>
+        )}
         <FieldPicker {...props} />
       </section>
       {props.widget.type === "table" && target && (
-        <section className="target-setting" aria-label="カラムの表示設定">
-          <div className="legend-heading">カラム</div>
-          <div className="table-column-actions" role="group" aria-label="カラムを一括操作">
+        <section className="target-setting" aria-label="Column visibility">
+          <div className="legend-heading">Columns</div>
+          <div className="table-column-actions" role="group" aria-label="Bulk column controls">
             <button
               disabled={visibleColumns === columns.length}
-              onClick={() => props.dispatch({ type: "table-columns", id: props.widget.id, paths: columns.map((column) => column.path), visible: true })}
-            >全表示</button>
+              onClick={() =>
+                props.dispatch({
+                  type: "table-columns",
+                  id: props.widget.id,
+                  paths: columns.map((column) => column.path),
+                  visible: true,
+                })
+              }
+            >
+              Show all
+            </button>
             <button
               disabled={visibleColumns === 0}
-              onClick={() => props.dispatch({ type: "table-columns", id: props.widget.id, paths: columns.map((column) => column.path), visible: false })}
-            >全非表示</button>
+              onClick={() =>
+                props.dispatch({
+                  type: "table-columns",
+                  id: props.widget.id,
+                  paths: columns.map((column) => column.path),
+                  visible: false,
+                })
+              }
+            >
+              Hide all
+            </button>
           </div>
           <div className="table-column-options">
             {columns.map((column) => {
@@ -420,12 +426,14 @@ function SingleTargetPanel(props: PanelProps) {
                   <input
                     type="checkbox"
                     checked={!props.widget.hiddenColumns.includes(key)}
-                    onChange={(event) => props.dispatch({
-                      type: "table-column",
-                      id: props.widget.id,
-                      path: column.path,
-                      visible: event.target.checked,
-                    })}
+                    onChange={(event) =>
+                      props.dispatch({
+                        type: "table-column",
+                        id: props.widget.id,
+                        path: column.path,
+                        visible: event.target.checked,
+                      })
+                    }
                   />
                   <span>{column.label}</span>
                 </label>
@@ -445,7 +453,13 @@ function ViewSeriesList(props: PanelProps) {
       {...props}
       showPoints={false}
       row={(s) => (
-        <SeriesRow key={s.key} {...props} series={s} showStatus={false} marker={<i style={{ background: s.color }} />} />
+        <SeriesRow
+          key={s.key}
+          {...props}
+          series={s}
+          showStatus={false}
+          marker={<i style={{ background: s.color }} />}
+        />
       )}
     />
   );
@@ -459,15 +473,21 @@ function ScenePanel(props: PanelProps) {
     <>
       <PanelHeader {...props} />
       <label className="time-display-setting">
-        固定座標系
+        Fixed frame
         <select
-          aria-label="固定座標系"
+          aria-label="Fixed frame"
           value={fixed ?? ""}
           disabled={!frames.length}
-          onChange={(event) => dispatch({ type: "fixed-frame", id: widget.id, value: event.target.value })}
+          onChange={(event) =>
+            dispatch({ type: "fixed-frame", id: widget.id, value: event.target.value })
+          }
         >
-          {!frames.length && <option value="">{error || "座標系がありません"}</option>}
-          {frames.map((frame) => <option key={frame.id} value={frame.id}>{frame.id}</option>)}
+          {!frames.length && <option value="">{error || "No coordinate frames"}</option>}
+          {frames.map((frame) => (
+            <option key={frame.id} value={frame.id}>
+              {frame.id}
+            </option>
+          ))}
         </select>
       </label>
       <FieldPicker {...props} />
@@ -482,20 +502,26 @@ function MapPanel(props: PanelProps) {
   return (
     <>
       <PanelHeader {...props} />
-      <section className="target-setting" aria-label="地図タイル">
-        <div className="legend-heading">地図タイル</div>
+      <section className="target-setting" aria-label="Map tiles">
+        <div className="legend-heading">Map tiles</div>
         <input
           className="search"
           type="url"
-          aria-label="地図タイルのURL"
+          aria-label="Map tile URL"
           placeholder="https://…/{z}/{x}/{y}.png"
           value={widget.tileUrl}
           onChange={(event) => setTiles(event.target.value.trim())}
         />
-        <p className="help">表示範囲がタイルの配信元に送られます。送りたくない場合は「使わない」を選びます。</p>
+        <p className="help">
+          The visible area is sent to the tile provider. Select None to disable tiles.
+        </p>
         <div className="table-column-actions">
-          <button disabled={widget.tileUrl === osmTiles} onClick={() => setTiles(osmTiles)}>OpenStreetMap を使う</button>
-          <button disabled={!widget.tileUrl} onClick={() => setTiles("")}>使わない</button>
+          <button disabled={widget.tileUrl === osmTiles} onClick={() => setTiles(osmTiles)}>
+            Use OpenStreetMap
+          </button>
+          <button disabled={!widget.tileUrl} onClick={() => setTiles("")}>
+            None
+          </button>
         </div>
       </section>
       <FieldPicker {...props} />
@@ -505,7 +531,10 @@ function MapPanel(props: PanelProps) {
 }
 
 const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
-  tabs: (props) => props.widget.type === "tabs" ? <TabSettings widget={props.widget} dispatch={props.dispatch} /> : null,
+  tabs: (props) =>
+    props.widget.type === "tabs" ? (
+      <TabSettings widget={props.widget} dispatch={props.dispatch} />
+    ) : null,
   "time-series": TimeSeriesPanel,
   state: StatePanel,
   raw: SingleTargetPanel,

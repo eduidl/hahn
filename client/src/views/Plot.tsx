@@ -1,13 +1,6 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type SetStateAction,
-} from "react";
-import { useTimeFormatter, type TimeDisplay } from "./timeDisplay";
-import { lowerBound, nearest, type Point } from "./data";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useTimeFormatter, type TimeDisplay } from "../timeDisplay";
+import { lowerBound, nearest, type Point } from "../data/data";
 import {
   axisRange,
   defaultView,
@@ -20,11 +13,11 @@ import {
   type AxisRange,
   type AxisView,
 } from "./axes";
-import { SeriesName } from "./SeriesName";
+import { SeriesName } from "../SeriesName";
 import { linearTicks } from "./ticks";
-import type { LegendSettings } from "./widgets";
-import { usePlayback } from "./playback";
-import { isDiscreteKind, valueKind, type EnumValue } from "./types";
+import type { LegendSettings } from "../workspace/widgets";
+import { usePlayback } from "../workspace/playback";
+import { isDiscreteKind, valueKind, type EnumValue } from "../types";
 
 export type DragMode = "pan" | "zoom";
 
@@ -77,9 +70,7 @@ function labelWidth(text: string) {
   return measureContext.measureText(text).width;
 }
 const format = (n: number) =>
-  Number.isFinite(n)
-    ? n.toLocaleString(undefined, { maximumSignificantDigits: 6 })
-    : "—";
+  Number.isFinite(n) ? n.toLocaleString(undefined, { maximumSignificantDigits: 6 }) : "—";
 
 /** Isolated so the per-frame playhead updates skip the full canvas redraw. */
 function Playhead({
@@ -98,12 +89,7 @@ function Playhead({
   const time = usePlayback((s) => s.time);
   const ratio = (time - domain[0]) / (domain[1] - domain[0]);
   if (!(ratio >= 0 && ratio <= 1)) return null;
-  return (
-    <div
-      className="playhead"
-      style={{ left: left + ratio * w, top, height: h }}
-    />
-  );
+  return <div className="playhead" style={{ left: left + ratio * w, top, height: h }} />;
 }
 
 export function Plot({
@@ -136,22 +122,25 @@ export function Plot({
   const setPinnedYBase = (action: SetStateAction<AxisRange | null>) =>
     onViewChange((current) => ({
       ...current,
-      pinnedYBase:
-        typeof action === "function" ? action(current.pinnedYBase) : action,
+      pinnedYBase: typeof action === "function" ? action(current.pinnedYBase) : action,
     }));
   // Widgets hold a single value kind, so the first series decides the axis.
-  const kind = series.length
-    ? valueKind(series[0].dataType, series[0].enumValues)
-    : null;
+  const kind = series.length ? valueKind(series[0].dataType, series[0].enumValues) : null;
   const discrete = isDiscreteKind(kind);
   const categories = useMemo(() => discreteYValues(series), [series, revision]);
   const discreteLabel = (value: number) => {
     if (kind?.type === "bool") return value ? "true" : "false";
-    const labels = [...new Set(series.flatMap((item) =>
-      item.hidden ? [] : (item.enumValues ?? [])
-        .filter((entry) => Number(entry.value) === value)
-        .map((entry) => entry.name),
-    ))];
+    const labels = [
+      ...new Set(
+        series.flatMap((item) =>
+          item.hidden
+            ? []
+            : (item.enumValues ?? [])
+                .filter((entry) => Number(entry.value) === value)
+                .map((entry) => entry.name),
+        ),
+      ),
+    ];
     return labels.length ? labels.join(" / ") : format(value);
   };
   const categoryIndex = useMemo(
@@ -159,9 +148,10 @@ export function Plot({
     [categories],
   );
   const dataYBase = useMemo(
-    () => discrete && categories.length
-      ? [-0.5, Math.max(0.5, categories.length - 0.5)] as AxisRange
-      : seriesYRange(series),
+    () =>
+      discrete && categories.length
+        ? ([-0.5, Math.max(0.5, categories.length - 0.5)] as AxisRange)
+        : seriesYRange(series),
     [series, categories, discrete],
   );
   const yBase = pinnedYBase ?? dataYBase;
@@ -178,8 +168,7 @@ export function Plot({
   const canReset =
     !isDefaultView(xView) ||
     !isDefaultView(yView) ||
-    (pinnedYBase !== null &&
-      (pinnedYBase[0] !== dataYBase[0] || pinnedYBase[1] !== dataYBase[1]));
+    (pinnedYBase !== null && (pinnedYBase[0] !== dataYBase[0] || pinnedYBase[1] !== dataYBase[1]));
   useLayoutEffect(() => {
     onCanReset(canReset);
   }, [canReset, onCanReset]);
@@ -187,11 +176,7 @@ export function Plot({
     if (discrete) return;
     if (
       series.some(
-        (s) =>
-          !s.hidden &&
-          s.points.some(
-            (point) => point.y !== null && Number.isFinite(point.y),
-          ),
+        (s) => !s.hidden && s.points.some((point) => point.y !== null && Number.isFinite(point.y)),
       )
     ) {
       setPinnedYBase((base) => base ?? dataYBase);
@@ -230,17 +215,18 @@ export function Plot({
     const node = tooltip.current;
     if (!node || cursor === null || pointerY === null) return;
     const offset = 14;
-    const x = cursor + offset + node.offsetWidth > size.w
-      ? cursor - offset - node.offsetWidth
-      : cursor + offset;
-    const y = pointerY + offset + node.offsetHeight > size.h
-      ? pointerY - offset - node.offsetHeight
-      : pointerY + offset;
+    const x =
+      cursor + offset + node.offsetWidth > size.w
+        ? cursor - offset - node.offsetWidth
+        : cursor + offset;
+    const y =
+      pointerY + offset + node.offsetHeight > size.h
+        ? pointerY - offset - node.offsetHeight
+        : pointerY + offset;
     node.style.left = `${Math.max(0, x)}px`;
     node.style.top = `${Math.max(0, y)}px`;
   });
-  const xAt = (x: number) =>
-    domain[0] + ((x - left) / w) * (domain[1] - domain[0]);
+  const xAt = (x: number) => domain[0] + ((x - left) / w) * (domain[1] - domain[0]);
   const clearDrag = () => {
     dragRef.current = null;
     setDrag(null);
@@ -270,14 +256,13 @@ export function Plot({
     ctx.clearRect(0, 0, size.w, size.h);
     const visible = series.filter((s) => !s.hidden);
     const [min, max] = yDomain;
-    const px = (x: number) =>
-      left + ((x - domain[0]) / (domain[1] - domain[0])) * w;
+    const px = (x: number) => left + ((x - domain[0]) / (domain[1] - domain[0])) * w;
     const py = (y: number) => top + h - ((y - min) / (max - min)) * h;
-    const yOf = (value: number) =>
-      py(discrete ? categoryIndex.get(value)! : value);
+    const yOf = (value: number) => py(discrete ? categoryIndex.get(value)! : value);
     ctx.font = axisFont;
     const yTicks = discrete
-      ? categories.map((value, index) => ({ coordinate: index, label: discreteLabel(value) }))
+      ? categories
+          .map((value, index) => ({ coordinate: index, label: discreteLabel(value) }))
           .filter((tick) => tick.coordinate >= yDomain[0] && tick.coordinate <= yDomain[1])
           .filter((_, index, all) => index % Math.max(1, Math.ceil(all.length / 6)) === 0)
           .map((tick) => ({ y: py(tick.coordinate), label: tick.label }))
@@ -299,10 +284,7 @@ export function Plot({
       ctx.textAlign = "right";
       ctx.fillText(tick.label, left - 12, y + 4);
     }
-    const ticks = Math.max(
-      1,
-      Math.min(6, Math.floor(w / (timeDisplay === "absolute" ? 135 : 85))),
-    );
+    const ticks = Math.max(1, Math.min(6, Math.floor(w / (timeDisplay === "absolute" ? 135 : 85))));
     for (let i = 0; i <= ticks; i++) {
       const x = left + (w * i) / ticks;
       ctx.strokeStyle = "#202020";
@@ -311,9 +293,7 @@ export function Plot({
       ctx.lineTo(x, top + h);
       ctx.stroke();
       ctx.textAlign = i === 0 ? "left" : i === ticks ? "right" : "center";
-      const label = time.tick(
-        domain[0] + ((domain[1] - domain[0]) * i) / ticks,
-      );
+      const label = time.tick(domain[0] + ((domain[1] - domain[0]) * i) / ticks);
       ctx.fillStyle = "#a0a0a0";
       ctx.fillText(label.time, x, top + h + 24);
       if (label.date) {
@@ -350,8 +330,7 @@ export function Plot({
           } else {
             ctx.lineTo(x, y);
           }
-        }
-        else ctx.moveTo(x, y);
+        } else ctx.moveTo(x, y);
         connected = true;
         previousY = y;
         if (p.x > domain[1]) break;
@@ -390,12 +369,7 @@ export function Plot({
     }
     if (drag && !drag.pan) {
       ctx.fillStyle = "#91b8ff25";
-      ctx.fillRect(
-        Math.min(drag.start, drag.end),
-        top,
-        Math.abs(drag.end - drag.start),
-        h,
-      );
+      ctx.fillRect(Math.min(drag.start, drag.end), top, Math.abs(drag.end - drag.start), h);
     }
     ctx.restore();
   }, [
@@ -420,7 +394,7 @@ export function Plot({
     <div className="plot-wrap">
       <canvas
         ref={canvas}
-        aria-label={`時系列プロット。ドラッグで${mode === "pan" ? "パン" : "横軸の範囲ズーム"}。ホイールで横軸、Shift＋ホイールで縦軸をズーム。ダブルクリックでリセット。`}
+        aria-label={`Time series plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis. Double-click to reset.`}
         style={{
           cursor: mode === "pan" ? (drag ? "grabbing" : "grab") : "crosshair",
         }}
@@ -433,8 +407,7 @@ export function Plot({
         data-y-scale={discrete ? "discrete" : "linear"}
         role="img"
         onPointerMove={(e) => {
-          const pointerX =
-            e.clientX - e.currentTarget.getBoundingClientRect().left;
+          const pointerX = e.clientX - e.currentTarget.getBoundingClientRect().left;
           const x = Math.max(left, Math.min(left + w, pointerX));
           setCursor(x);
           setPointerY(e.clientY - e.currentTarget.getBoundingClientRect().top);
@@ -446,10 +419,7 @@ export function Plot({
               end: active.pan ? pointerX : x,
               moved:
                 active.moved ||
-                Math.hypot(
-                  (active.pan ? pointerX : x) - active.start,
-                  y - active.startY,
-                ) > 4,
+                Math.hypot((active.pan ? pointerX : x) - active.start, y - active.startY) > 4,
             };
             dragRef.current = next;
             setDrag(next);
@@ -484,11 +454,7 @@ export function Plot({
         }}
         onPointerUp={() => {
           const active = dragRef.current;
-          if (
-            active &&
-            !active.pan &&
-            Math.abs(active.end - active.start) > 4
-          ) {
+          if (active && !active.pan && Math.abs(active.end - active.start) > 4) {
             pinY();
             setXView(
               selectAxis(
@@ -510,20 +476,14 @@ export function Plot({
           if (e.shiftKey) {
             const y = Math.max(
               top,
-              Math.min(
-                top + h,
-                e.clientY - e.currentTarget.getBoundingClientRect().top,
-              ),
+              Math.min(top + h, e.clientY - e.currentTarget.getBoundingClientRect().top),
             );
             setYView((view) => zoomAxis(view, zoomFactor, 1 - (y - top) / h));
             return;
           }
           const x = Math.max(
             left,
-            Math.min(
-              left + w,
-              e.clientX - e.currentTarget.getBoundingClientRect().left,
-            ),
+            Math.min(left + w, e.clientX - e.currentTarget.getBoundingClientRect().left),
           );
           setXView((view) => zoomAxis(view, zoomFactor, (x - left) / w));
         }}
@@ -534,7 +494,7 @@ export function Plot({
         <div className="plot-legend" style={legendStyle}>
           {!hasVisible && (
             <span className="plot-legend-empty">
-              {selectedCount ? "表示中の系列がありません" : "フィールドを追加してください"}
+              {selectedCount ? "No visible series" : "Add a field"}
             </span>
           )}
           {series

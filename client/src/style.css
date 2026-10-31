@@ -67,16 +67,10 @@ header {
   text-decoration: none;
 }
 .brand-mark {
-  background: #91b8ff;
-  color: #101010;
+  display: block;
   width: 29px;
   height: 29px;
-  text-align: center;
-  font-style: italic;
-  line-height: 27px;
-  font-family: Georgia, serif;
-  font-size: 29px;
-  border-radius: 6px;
+  flex: none;
 }
 .brand-detail {
   font:
@@ -1702,8 +1696,8 @@ header .add-widget {
     gap: 8px;
     padding: 0 10px;
   }
-  .playback-controls button[aria-label="先頭へ"],
-  .playback-controls button[aria-label="末尾へ"],
+  .playback-controls button[aria-label="Go to start"],
+  .playback-controls button[aria-label="Go to end"],
   .playback-status > span,
   .playback-time > span {
     display: none;
