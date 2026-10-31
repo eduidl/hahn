@@ -163,7 +163,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    fn children(&self, name: &str) -> anyhow::Result<Vec<Message<'a>>> {
+    pub(crate) fn children(&self, name: &str) -> anyhow::Result<Vec<Message<'a>>> {
         let (data_type, value) = self.field(name)?;
         let element = match data_type {
             DataTypeDef::List(element)

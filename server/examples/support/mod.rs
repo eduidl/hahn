@@ -277,6 +277,12 @@ pub struct FrameTransform {
     pub rotation: Option<Quaternion>,
 }
 
+#[derive(Clone, PartialEq, Message)]
+pub struct FrameTransforms {
+    #[prost(message, repeated, tag = "1")]
+    pub transforms: Vec<FrameTransform>,
+}
+
 /// A 1x1 PNG, so that an image taken from a response can be opened.
 pub const PNG: [u8; 70] = [
     137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
@@ -550,6 +556,123 @@ pub fn write_visual_fixture(path: &Path) -> anyhow::Result<()> {
             .encode_to_vec(),
         )?;
     }
+    writer.finish()?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn write_duplicate_images(path: &Path) -> anyhow::Result<()> {
+    let mut writer = mcap::Writer::new(File::create(path)?)?;
+    let schema = writer.add_schema(
+        "foxglove.CompressedImage",
+        "protobuf",
+        &foxglove_descriptor(),
+    )?;
+    for id in [50, 51] {
+        let channel =
+            writer.add_channel_with_id(id, schema, "/camera", "protobuf", &Default::default())?;
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id: channel,
+                sequence: 0,
+                log_time: u64::from(id),
+                publish_time: u64::from(id),
+            },
+            &CompressedImage {
+                frame_id: format!("camera-{id}"),
+                data: PNG.to_vec(),
+                format: "png".into(),
+            }
+            .encode_to_vec(),
+        )?;
+    }
+    writer.finish()?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn write_batch_tf_fixture(path: &Path) -> anyhow::Result<()> {
+    let mut writer = mcap::Writer::new(File::create(path)?)?;
+    let mut descriptor = FileDescriptorSet::decode(foxglove_descriptor().as_slice())?;
+    descriptor.file[0].message_type.push(message(
+        "FrameTransforms",
+        vec![repeated(field(
+            "transforms",
+            1,
+            Type::Message,
+            Some(".foxglove.FrameTransform"),
+        ))],
+    ));
+    let schema = writer.add_schema(
+        "foxglove.FrameTransforms",
+        "protobuf",
+        &descriptor.encode_to_vec(),
+    )?;
+    let static_first =
+        writer.add_channel_with_id(50, schema, "/tf-static", "protobuf", &Default::default())?;
+    let static_channel =
+        writer.add_channel_with_id(51, schema, "/tf-static", "protobuf", &Default::default())?;
+    writer.add_channel_with_id(52, schema, "/tf-static", "protobuf", &Default::default())?;
+    let single_schema = writer.add_schema(
+        "foxglove.FrameTransform",
+        "protobuf",
+        &foxglove_descriptor(),
+    )?;
+    let single_channel = writer.add_channel_with_id(
+        53,
+        single_schema,
+        "/tf-static",
+        "protobuf",
+        &Default::default(),
+    )?;
+    let dynamic_channel = writer.add_channel(schema, "/arm-tf", "protobuf", &Default::default())?;
+    let transform = |parent: &str, child: &str, x: f64| FrameTransform {
+        parent_frame_id: parent.into(),
+        child_frame_id: child.into(),
+        translation: Some(Vector3 {
+            x,
+            ..Default::default()
+        }),
+        rotation: Some(Quaternion {
+            w: 1.,
+            ..Default::default()
+        }),
+    };
+    let mut write = |channel_id, time, transforms| {
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id,
+                sequence: 0,
+                log_time: time,
+                publish_time: time,
+            },
+            &FrameTransforms { transforms }.encode_to_vec(),
+        )
+    };
+    write(
+        static_first,
+        1,
+        vec![transform("base", "camera", 2.), transform("", "broken", 0.)],
+    )?;
+    write(
+        static_channel,
+        2,
+        vec![
+            transform("base", "camera", 3.),
+            transform("base", "lidar", 4.),
+        ],
+    )?;
+    write(dynamic_channel, 10, vec![transform("map", "base", 10.)])?;
+    write(dynamic_channel, 20, vec![transform("map", "base", 20.)])?;
+    writer.write_to_known_channel(
+        &mcap::records::MessageHeader {
+            channel_id: single_channel,
+            sequence: 0,
+            log_time: 2,
+            publish_time: 2,
+        },
+        &transform("base", "imu", 5.).encode_to_vec(),
+    )?;
     writer.finish()?;
     Ok(())
 }

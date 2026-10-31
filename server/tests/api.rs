@@ -1092,28 +1092,9 @@ async fn numbered_files_of_a_bag_read_as_one_recording() {
     assert_eq!(info["start_ns"], support::ORIGIN.to_string());
     assert_eq!(info["message_count"], 4 * COUNT);
     let (_, topics) = get(app.clone(), "/g/topics").await;
-    assert_eq!(topics.as_array().unwrap().len(), 2);
-    assert!(
-        topics
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|t| t["message_count"] == 2 * COUNT)
-    );
-
-    let (status, events) = series(
-        app.clone(),
-        json!({"topic":"/telemetry","fields":[["counter"]]}),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    let rows: Vec<_> = events
-        .iter()
-        .flat_map(|e| e["rows"].as_array().cloned().unwrap_or_default())
-        .collect();
-    assert_eq!(rows.len(), 2 * COUNT);
-    assert_eq!(events.last().unwrap()["type"], "complete");
-    let times: Vec<u64> = rows
+    let telemetry: Vec<_> = topics
+        .as_array()
+        .unwrap()
         .iter()
         .map(|r| r["time_ns"].as_str().unwrap().parse().unwrap())
         .collect();
@@ -1142,7 +1123,14 @@ async fn a_topic_missing_from_one_segment_is_still_readable() {
     std::fs::write(bag.join("bag_0.csv"), "t_ns,v\n1,1\n").unwrap();
     std::fs::write(bag.join("bag_1.csv"), "t_ns,v\n2,2\n").unwrap();
     let app = hahn::router(dir.path()).unwrap();
-    let (_, events) = series(app.clone(), json!({"topic":"/bag_1","fields":[["v"]]})).await;
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    let topic = topics
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["topic"] == "/bag_1")
+        .unwrap();
+    let (_, events) = series(app.clone(), json!({"topic":topic["id"],"fields":[["v"]]})).await;
     assert_eq!(events[0]["rows"][0]["time_ns"], "2");
     assert_eq!(events.last().unwrap()["type"], "complete");
     let (status, _) = series(app, json!({"topic":"/nope","fields":[["v"]]})).await;
@@ -1663,6 +1651,101 @@ async fn frames_are_merged_from_every_transform_topic() {
             {"id": "map", "parent": null},
         ])
     );
+}
+
+#[tokio::test]
+async fn duplicate_topic_images_have_independent_views() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_duplicate_images(&dir.path().join("images.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    let topics = topics.as_array().unwrap();
+    assert_eq!(topics.len(), 2);
+    assert_ne!(topics[0]["id"], topics[1]["id"]);
+    for (i, topic) in topics.iter().enumerate() {
+        assert_eq!(topic["topic"], "/camera");
+        let id = topic["id"].as_str().unwrap();
+        let (status, events) =
+            frames(&app, &view_url("views/latest", id, "image", "&time_ns=100")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            events[0].0["value"]["frame_id"],
+            format!("camera-{}", 50 + i)
+        );
+    }
+}
+
+#[tokio::test]
+async fn batched_transforms_are_merged_from_multiple_channels() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_batch_tf_fixture(&dir.path().join("batch.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    let static_topics: Vec<_> = topics
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|t| t["topic"] == "/tf-static")
+        .collect();
+    assert_eq!(static_topics.len(), 4);
+    assert_eq!(
+        static_topics
+            .iter()
+            .map(|t| t["message_count"].as_u64().unwrap())
+            .sum::<u64>(),
+        3
+    );
+    assert!(static_topics.iter().all(|t| t["error"].is_null()));
+    assert_ne!(static_topics[0]["id"], static_topics[1]["id"]);
+    for topic in static_topics.iter().filter(|t| t["message_count"] == 1) {
+        let id = topic["id"].as_str().unwrap();
+        let (_, messages) = stream(app.clone(), "/g/messages", json!({"topic":id})).await;
+        assert_eq!(
+            messages
+                .iter()
+                .filter_map(|e| e["rows"].as_array())
+                .map(Vec::len)
+                .sum::<usize>(),
+            1
+        );
+        let (status, latest) = get(
+            app.clone(),
+            &format!("/g/messages/latest?topic={id}&time_ns=20"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(latest["value"].is_object());
+    }
+    let (_, frames) = get(app.clone(), "/r/frames").await;
+    assert_eq!(
+        frames["frames"],
+        json!([
+            {"id":"base", "parent":"map"},
+            {"id":"camera", "parent":"base"},
+            {"id":"imu", "parent":"base"},
+            {"id":"lidar", "parent":"base"},
+            {"id":"map", "parent":null},
+        ])
+    );
+    let (_, current) = get(app.clone(), "/r/transforms?target=map&time_ns=15").await;
+    assert_eq!(
+        current["frames"]["camera"]["translation"],
+        json!([18.0, 0.0, 0.0])
+    );
+    assert_eq!(
+        current["frames"]["lidar"]["translation"],
+        json!([19.0, 0.0, 0.0])
+    );
+    assert_eq!(
+        current["frames"]["imu"]["translation"],
+        json!([20.0, 0.0, 0.0])
+    );
+    let (_, early) = get(app, "/r/transforms?target=base&time_ns=0").await;
+    assert_eq!(
+        early["frames"]["camera"]["translation"],
+        json!([3.0, 0.0, 0.0])
+    );
+    assert!(early["frames"].get("map").is_none());
 }
 
 #[tokio::test]

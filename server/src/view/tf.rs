@@ -12,7 +12,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
 };
-use mcapdecode::core::FieldDefs;
+use mcapdecode::core::{DataTypeDef, FieldDefs};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
@@ -119,20 +119,33 @@ fn slerp(a: [f64; 4], b: [f64; 4], ratio: f64) -> [f64; 4] {
 }
 
 /// Types read as transforms, chosen like the converters of views.
-fn accepts(schema_name: &str, defs: &FieldDefs) -> bool {
-    schema_name == "foxglove.FrameTransform"
-        && has(defs, "parent_frame_id", is_string)
+fn transform_fields(defs: &FieldDefs) -> bool {
+    has(defs, "parent_frame_id", is_string)
         && has(defs, "child_frame_id", is_string)
         && has(defs, "translation", is_struct)
         && has(defs, "rotation", is_struct)
 }
 
+fn transform_list(data_type: &DataTypeDef) -> bool {
+    let element = match data_type {
+        DataTypeDef::List(element)
+        | DataTypeDef::BoundedList(element, _)
+        | DataTypeDef::Array(element, _) => element,
+        _ => return false,
+    };
+    matches!(&element.data_type, DataTypeDef::Struct(defs) if transform_fields(&defs.fields))
+}
+
+fn accepts(schema_name: &str, defs: &FieldDefs) -> bool {
+    match schema_name {
+        "foxglove.FrameTransform" => transform_fields(defs),
+        "foxglove.FrameTransforms" => has(defs, "transforms", transform_list),
+        _ => false,
+    }
+}
+
 /// The parent, child and transform of a message, if it holds a usable one.
-fn sample<'a>(
-    defs: &'a FieldDefs,
-    value: &'a mcapdecode::core::Value,
-) -> anyhow::Result<(&'a str, &'a str, Transform)> {
-    let message = Message::new(defs, value)?;
+fn sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str, Transform)> {
     let (parent, child) = (
         message.string("parent_frame_id")?,
         message.string("child_frame_id")?,
@@ -148,9 +161,9 @@ fn sample<'a>(
     Ok((parent, child, transform))
 }
 
-/// Topics of latched, time-independent transforms, by the ROS convention.
+/// Topics of latched, time-independent transforms.
 fn is_static_topic(topic: &str) -> bool {
-    topic.rsplit('/').next() == Some("tf_static")
+    matches!(topic.rsplit('/').next(), Some("tf_static" | "tf-static"))
 }
 
 struct Sample {
@@ -220,8 +233,23 @@ impl TfIndex {
                 let from_static_topic = is_static_topic(&meta.topic);
                 source.read(&meta.topic, TimeRange::default(), &mut |times, value| {
                     // One bad sample must not take every frame of the run with it.
-                    if let Ok((parent, child, transform)) = sample(defs, &value) {
-                        index.add(child, parent, times.log_time, transform, from_static_topic);
+                    if let Ok(message) = Message::new(defs, &value) {
+                        let messages = if schema_name == "foxglove.FrameTransforms" {
+                            message.children("transforms").unwrap_or_default()
+                        } else {
+                            vec![message]
+                        };
+                        for message in messages {
+                            if let Ok((parent, child, transform)) = sample(message) {
+                                index.add(
+                                    child,
+                                    parent,
+                                    times.log_time,
+                                    transform,
+                                    from_static_topic,
+                                );
+                            }
+                        }
                     }
                     Ok(())
                 })?;
