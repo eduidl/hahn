@@ -24,6 +24,7 @@ import { TableView } from "../views/TableView";
 import type { MessageRecord } from "../data/useMessages";
 import type { FieldIndex } from "./fieldIndex";
 import { RawMessage } from "../views/RawMessage";
+import { TfTree } from "../views/TfTree";
 import { ImageView } from "../views/ImageView";
 import { SeriesName } from "../SeriesName";
 import { SourceNames } from "../data/sources";
@@ -57,6 +58,7 @@ const MoveContext = createContext<{ id: string | null; setId: (id: string | null
 });
 
 type Props = {
+  runId?: string | null;
   state: WorkspaceState;
   dispatch: Dispatch<WorkspaceAction>;
   data: Series[];
@@ -677,7 +679,7 @@ function TimeSeriesWindow({
                       : verdict.reason}
                   </div>
                 )}
-                {!widget.series.length && !verdict && (
+                {widget.type !== "tf-tree" && !widget.series.length && !verdict && (
                   <div className="empty">
                     <p>
                       {info ? widgetSpecs[widget.type].emptyHint : "Open a run from the header"}

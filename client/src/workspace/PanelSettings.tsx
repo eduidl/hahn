@@ -531,6 +531,7 @@ function MapPanel(props: PanelProps) {
 }
 
 const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
+  "tf-tree": () => <p className="help">Drag to pan and use the mouse wheel to zoom.</p>,
   tabs: (props) =>
     props.widget.type === "tabs" ? (
       <TabSettings widget={props.widget} dispatch={props.dispatch} />

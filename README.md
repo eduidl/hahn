@@ -1,5 +1,9 @@
 # Hahn
 
+The TF Tree widget shows the coordinate-frame hierarchy for the open run. Drag to pan, use the mouse wheel or buttons to zoom, and select Fit to show the whole tree. It displays each frame's last recorded parent; the hierarchy does not change with playback time.
+
+Select a frame to see its translation and quaternion relative to that displayed parent at the playback time. The timestamp shown with the pose identifies the response currently displayed. A transform unavailable at that time is reported instead of extrapolated.
+
 ローカルの録画（MCAP・CSV・Parquet）をRustでデコードし、ブラウザへ逐次配信するプロットビューワ。複数の録画を共通の時間軸に並べて表示できます。
 
 ## Public sample recording
@@ -79,7 +83,7 @@ cargo run --manifest-path server/Cargo.toml --release
 - 読み取り不可トピックは初期状態で非表示。「エラーのあるトピックを表示」のチェックボックス1つで一括表示を切り替え、理由はトピックの展開部分とエラータブに表示します。
 - 受信中は画面下部の再生バー右端の「停止」で全ウィジェットの受信を中断できます。
 - 画面最下部の再生バーは全ウィジェット共通の再生時刻を操作します。再生／一時停止、先頭・末尾への移動、0.1秒ステップ、倍速（0.1〜10×）、ループ再生を備え、トラックのクリック・ドラッグでシークします（再生中のドラッグ後は再生を続けます）。録画の末尾で再生すると先頭から再生します。キーボードはSpaceで再生／一時停止、←/→で0.1秒、Shift＋←/→で1秒移動します（入力欄にフォーカスがあるときは無効）。録画を切り替えると先頭で停止した状態に戻り、倍速とループの設定は維持します。
-- IMAGEは画像トピックを1つ指定し、再生位置の時点の画像を表示します。3Dは点群トピックを重ねて表示し（ドラッグで回転、右ドラッグで移動、ホイールで拡大縮小）、各座標系の軸も描きます。点群は取得時刻の変換で固定座標系に置き、固定座標系はパネル設定で選びます。MAPは位置トピックの軌跡と再生位置を表示します。これらはトピック単位で指定し、サーバが変換に対応している型だけを受け付けます（トピック一覧の型名の後に表示します）。現在の対応は `foxglove.CompressedImage`・`foxglove.PointCloud`・`foxglove.LocationFix` で、座標系は `foxglove.FrameTransform` から読みます。
+- IMAGEは画像トピックを1つ指定し、再生位置の時点の画像を表示します。3Dは点群トピックを重ねて表示し（ドラッグで回転、右ドラッグで移動、ホイールで拡大縮小）、各座標系の軸も描きます。点群は取得時刻の変換で固定座標系に置き、固定座標系はパネル設定で選びます。MAPは位置トピックの軌跡と再生位置を表示します。これらはトピック単位で指定し、サーバが変換に対応している型だけを受け付けます（トピック一覧の型名の後に表示します）。現在の対応は `foxglove.CompressedImage`・`foxglove.PointCloud`・`foxglove.LocationFix` で、座標系は `foxglove.FrameTransform` と `foxglove.FrameTransforms` から読みます。
 - MAPの背景タイルは既定でOpenStreetMapから取得するため、表示範囲がその配信元に送られます。パネル設定でURLの変更や「使わない」を選べます。
 - TIME SERIES・STATE TRANSITIONは再生時刻に縦線を表示します。縦線は表示範囲を動かさず、横軸の外にあるときは表示しません。ズーム・パン・系列の表示切替では通信せず、取得済みデータを使います。
 
@@ -168,7 +172,7 @@ runは1回の走行を表し、その走行で記録したデータの種類をg
 
 `GET /api/runs/{run}/groups/{group}` は `start_ns`・`end_ns`・`message_count` を返します。`end_ns` は最後のタイムスタンプで、その時刻も範囲に含みます。録画に統計情報がない場合、`message_count` はnullです。
 
-`GET /api/runs/{run}/groups/{group}/topics` はトピック名・スキーマ名・メッセージ数・デコードできない理由と、各フィールドのツリーを返します。フィールドは `name`・`data_type`・`type_name` を持ち、該当する型では `enum_values`、structの `fields`、list・arrayの `element` も持ちます。
+`GET /api/runs/{run}/groups/{group}/topics` はトピック ID・トピック名・スキーマ名・メッセージ数・デコードできない理由と、各フィールドのツリーを返します。フィールドは `name`・`data_type`・`type_name` を持ち、該当する型では `enum_values`、structの `fields`、list・arrayの `element` も持ちます。
 
 ### Rustサーバの走行とグループ
 

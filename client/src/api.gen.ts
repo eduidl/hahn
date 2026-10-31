@@ -260,6 +260,8 @@ export interface components {
             start_ns: components["schemas"]["TimeNs"];
         };
         Topic: {
+            /** @description Opaque identifier unique within the group. Use as the topic parameter in requests. */
+            id: string;
             /** @description Why the topic cannot be decoded. Such a topic is still listed, with empty `fields`. */
             error: string | null;
             /** @description The fields of a message, as a tree. */
@@ -269,7 +271,7 @@ export interface components {
             schema_encoding: string | null;
             /** @description The name of the user type. */
             schema_name: string | null;
-            /** @description Unique only within its group. */
+            /** @description Topic name for display; multiple items may share the same name. */
             topic: string;
             /** @description Values recorded separately from the message rather than inside it, in the same shape as `fields`. For MCAP it has `log_time` and `publish_time`. The server decides which exist, and it is empty if there are none. */
             meta_fields: components["schemas"]["Field"][];
@@ -638,7 +640,7 @@ export interface components {
     parameters: {
         Run: components["schemas"]["Id"];
         Group: components["schemas"]["Id"];
-        /** @description The topic's name. */
+        /** @description The topic ID returned in the group topic list. */
         Topic: string;
         /** @description The `id` of a view of the topic. */
         ViewId: string;
@@ -764,7 +766,7 @@ export interface operations {
     messages: {
         parameters: {
             query: {
-                /** @description The topic's name. */
+                /** @description The topic ID returned in the group topic list. */
                 topic: components["parameters"]["Topic"];
                 /** @description The field to read, as a JSON array of field names in a string, for example `["pose","x"]`, so that names containing dots stay unambiguous. Without it, the whole topic. */
                 path?: components["parameters"]["FieldPath"];
@@ -804,7 +806,7 @@ export interface operations {
     latestMessage: {
         parameters: {
             query: {
-                /** @description The topic's name. */
+                /** @description The topic ID returned in the group topic list. */
                 topic: components["parameters"]["Topic"];
                 /** @description The field to read, as a JSON array of field names in a string, for example `["pose","x"]`, so that names containing dots stay unambiguous. Without it, the whole topic. */
                 path?: components["parameters"]["FieldPath"];
@@ -840,7 +842,7 @@ export interface operations {
     views: {
         parameters: {
             query: {
-                /** @description The topic's name. */
+                /** @description The topic ID returned in the group topic list. */
                 topic: components["parameters"]["Topic"];
                 /** @description The `id` of a view of the topic. */
                 view: components["parameters"]["ViewId"];
@@ -868,7 +870,7 @@ export interface operations {
     latestView: {
         parameters: {
             query: {
-                /** @description The topic's name. */
+                /** @description The topic ID returned in the group topic list. */
                 topic: components["parameters"]["Topic"];
                 /** @description The `id` of a view of the topic. */
                 view: components["parameters"]["ViewId"];
