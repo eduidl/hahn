@@ -10,6 +10,17 @@ This document describes the concepts of the HTTP protocol between the shared cli
 - There is one client and several servers. The protocol contains nothing that depends on how a server is built.
 - Files are not exposed. The client deals in runs and groups. Layouts such as numbered files stay inside the server.
 
+## Terms
+
+| Term | Meaning |
+|---|---|
+| Run | One drive. The client opens only one at a time |
+| Group | A kind of data in a run. The server decides how to divide them |
+| Topic | A series of messages in a group. Names are unique only within a group |
+| Field | A value in a message |
+| User type | A type defined by the user: the schema of a recording's topic, named by `schema_name` |
+| Hahn type | A type defined by Hahn, such as `image` or `pose`, named by `kind` |
+
 ```json
 {"type":"batch","rows":[{"time_ns":"1760000000123456789","value":14.0}],"scanned_messages":1}
 {"type":"complete","scanned_messages":1}
@@ -38,6 +49,14 @@ At present, a shortened string can only be recognized by the trailing `…`.
 
 For example, with `enum_values` equal to `[{"name":"RUN","value":"1"},{"name":"ACTIVE","value":"1"}]`, numeric value `1` is returned as `"RUN"`, not `"ACTIVE"` or `"1"`. Undefined values `123` and `-1` are returned as `"123"` and `"-1"`; a missing value is `null`. A list containing these values is `["RUN","123","-1",null]`. The same strings are used when reading a single enum field with `preview=false`.
 
+## Views
+
+Time Series and Table can show a topic from its schema alone, since a number is simply plotted as a number. Images and point clouds cannot: where an image keeps its data, for example, differs from one user type to another.
+
+So Hahn defines common types for images, point clouds and the like (Hahn types), and the server converts messages of user types to them. This conversion is called a view. The client deals only in Hahn types and does not need to know user types.
+
+Messages converted to Hahn types are read through `/views` and `/views/latest`, with the views of a topic listed in `/topics`.
+
 **In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example.
 
 ### Wire format
@@ -47,6 +66,28 @@ Both operations respond with `application/vnd.hahn.frames`, a sequence of frames
 ```
 u32 header_len | u32 payload_len | header (UTF-8 JSON) | padding | payload
 ```
+
+- `header_len` is the size of the JSON header in bytes.
+- `payload_len` is the size of the payload in bytes, including the padding after each blob.
+- `padding` brings the payload to an 8-byte boundary of the frame: `-(8 + header_len) mod 8` bytes of zeros.
+- `payload` holds the frame's blobs. Each starts on an 8-byte boundary, so a client holding a frame in one `ArrayBuffer` can view blobs as typed arrays without copying.
+
+Every frame therefore ends on an 8-byte boundary too.
+
+The header is a `ViewEvent`, with the same shape as the events of `/messages`. As with `/messages`, **a response that ends without `complete` or `error` has failed**.
+
+A value refers to binary data with a `BlobRef`, which holds no data itself. Only the fields a Hahn type defines as binary hold one: `data` in `image`, and `positions` and `fields[].data` in `pointcloud`. Anything else with the same shape is plain data, such as a `$blob` key in the free `properties` of `geo`, so a client finds references by field and does not scan values for `$blob`. What the bytes mean is defined by the Hahn type, and they are little endian.
+
+For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is laid out like this:
+
+| Bytes | Content |
+|---|---|
+| 0 to 3 | `header_len` = 100 |
+| 4 to 7 | `payload_len` = 8 |
+| 8 to 107 | The JSON header, holding `{"$blob": {"offset": 0, "length": 5}}` |
+| 108 to 111 | Padding, which brings the payload to byte 112 |
+| 112 to 116 | The blob |
+| 117 to 119 | Padding, which ends the frame on a boundary |
 
 `stamp_ns` determines when a spatial value was measured; the frame's `time_ns` locates its message in the recording. To place an image or point cloud, resolve the transform samples at its measurement stamp, requesting them with its message log time as `log_time_ns` and a range around the stamp. To inspect the graph at a playback position instead, first resolve that position through `/clock`. A missing measurement stamp is not permission to use log time as a measurement timestamp.
 
