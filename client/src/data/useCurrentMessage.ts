@@ -26,6 +26,25 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
     if (!series || !info) return undefined;
     return cache.read(series, `${start}:${start + windowNs}`);
   }, [cache, revision, key, info?.start_ns, String(start)]);
+  const index = rows ? messageAt(rows, ns) : -1;
+  const previousStart = start - windowNs;
+  const previousRows =
+    series && start >= windowNs ? cache.read(series, `${previousStart}:${start}`) : undefined;
+  const previousIdentity = `${key}:${info?.start_ns}:${previousStart}`;
+  const predecessor =
+    info && start <= BigInt(info.start_ns)
+      ? null
+      : previousRows
+        ? (previousRows.at(-1) ??
+          (fallback?.identity === previousIdentity
+            ? fallback.row
+            : info && previousStart <= BigInt(info.start_ns)
+              ? null
+              : undefined))
+        : undefined;
+  const seed = rows ? (fallback?.identity === identity ? fallback.row : predecessor) : undefined;
+  const needsSeed =
+    !!series && !!info && !!rows && index < 0 && seed === undefined && !cache.hasHistory(series);
 
   useEffect(() => {
     if (!series || !info) return;
@@ -39,12 +58,6 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
         end_ns: String(start + windowNs),
       });
       if (controller.signal.aborted) return;
-      const current = cache.read(series, `${start}:${start + windowNs}`) ?? [];
-      // Sparse topics need the preceding message, even if it is outside this window.
-      if (!current.length || BigInt(current[0].time_ns) > ns) {
-        const body = await cache.seed(series, String(start));
-        if (!controller.signal.aborted) setFallback({ identity, row: body });
-      }
       for (let i = 1n; i <= 2n; i++) {
         if (controller.signal.aborted || start + i * windowNs > BigInt(info.end_ns)) break;
         await cache.load(series, controller.signal, () => {}, {
@@ -61,6 +74,26 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
       release();
     };
   }, [cache, identity]);
+  useEffect(() => {
+    if (!series || !needsSeed) return;
+    let active = true;
+    cache.seed(series, String(start)).then(
+      (row) => {
+        if (active) setFallback({ identity, row });
+      },
+      (error) => {
+        if (active) setFailure({ identity, error: errorMessage(error) });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [cache, identity, needsSeed]);
+  useEffect(() => {
+    if (rows && index < 0 && predecessor !== undefined && fallback?.identity !== identity) {
+      setFallback({ identity, row: predecessor });
+    }
+  }, [identity, rows, index, predecessor, fallback?.identity]);
   useEffect(
     () => () => {
       if (!shared) local.clear();
@@ -68,8 +101,6 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
     [local, shared],
   );
 
-  const index = rows ? messageAt(rows, ns) : -1;
-  const seed = fallback?.identity === identity ? fallback.row : undefined;
   const message =
     index >= 0
       ? rows![index]

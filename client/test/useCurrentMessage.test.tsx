@@ -110,7 +110,7 @@ it("uses a cached preceding window at a boundary without buffering", async () =>
 it("uses the predecessor for a sparse topic and reports an empty topic", async () => {
   const fetch = vi.fn(async (url) =>
     String(url).includes("/messages/latest?")
-      ? new Response(JSON.stringify({ time_ns: "500000000", value: 7 }))
+      ? new Response(JSON.stringify({ time_ns: "1500000000", value: 7 }))
       : new Response('{"type":"complete","scanned_messages":0}\n'),
   );
   vi.stubGlobal("fetch", fetch);
