@@ -543,10 +543,10 @@ function TimeSeriesWindow({
               }}
             >
               <button role="menuitem" onClick={() => action("row")}>
-                Split left/right
+                Split right
               </button>
               <button role="menuitem" onClick={() => action("column")}>
-                Split top/bottom
+                Split down
               </button>
               <div
                 className={`submenu-host ${changingType ? "open" : ""}`}
@@ -623,37 +623,39 @@ function TimeSeriesWindow({
             views.tabs()
           ) : (
             <>
-              <div className="widget-plot-toolbar">
-                <span className="widget-selection" title={selection || undefined}>
-                  {selection || "No topic selected"}
-                </span>
-                <div className="toolbar">
-                  {widget.type === "time-series" && (
-                    <div className="drag-mode" role="group" aria-label="Drag mode">
+              {widget.type !== "tf-tree" && (
+                <div className="widget-plot-toolbar">
+                  <span className="widget-selection" title={selection || undefined}>
+                    {selection || "No topic selected"}
+                  </span>
+                  <div className="toolbar">
+                    {widget.type === "time-series" && (
+                      <div className="drag-mode" role="group" aria-label="Drag mode">
+                        <button
+                          aria-pressed={widget.mode === "pan"}
+                          onClick={() => dispatch({ type: "mode", id: widget.id, mode: "pan" })}
+                        >
+                          Pan
+                        </button>
+                        <button
+                          aria-pressed={widget.mode === "zoom"}
+                          onClick={() => dispatch({ type: "mode", id: widget.id, mode: "zoom" })}
+                        >
+                          Box zoom
+                        </button>
+                      </div>
+                    )}
+                    {widget.type === "time-series" && (
                       <button
-                        aria-pressed={widget.mode === "pan"}
-                        onClick={() => dispatch({ type: "mode", id: widget.id, mode: "pan" })}
+                        disabled={!info || !canReset}
+                        onClick={() => onViewChange(() => defaultPlotView())}
                       >
-                        Pan
+                        Reset
                       </button>
-                      <button
-                        aria-pressed={widget.mode === "zoom"}
-                        onClick={() => dispatch({ type: "mode", id: widget.id, mode: "zoom" })}
-                      >
-                        Box zoom
-                      </button>
-                    </div>
-                  )}
-                  {widget.type === "time-series" && (
-                    <button
-                      disabled={!info || !canReset}
-                      onClick={() => onViewChange(() => defaultPlotView())}
-                    >
-                      Reset
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
               <div
                 className={`chart-area ${verdict ? (verdict.ok ? "drop-ready" : "drop-rejected") : ""}`}
                 onDragOver={(event) => {
