@@ -1,5 +1,5 @@
 // Checks a running server against protocol/openapi.json over HTTP, independent of its language.
-// The server must serve the recordings in data/samples/.
+// The server must serve synthetic demo.mcap and visual.mcap from the example generators.
 import { readFileSync } from "node:fs";
 import Ajv from "ajv/dist/2020.js";
 
@@ -102,8 +102,8 @@ for (const run of runs) {
   const recorded = detail.groups.find((g) => g.name.includes("visual"));
   if (recorded) visual = `/api/runs/${run.id}/groups/${recorded.id}`;
 }
-if (!root) throw new Error("data/samples/demo.mcap is not being served");
-if (!visual) throw new Error("data/samples/visual.mcap is not being served");
+if (!root) throw new Error("Synthetic demo.mcap is not being served");
+if (!visual) throw new Error("Synthetic visual.mcap is not being served");
 const runRoot = root.slice(0, root.indexOf("/groups/"));
 
 const info = "/api/runs/{run}/groups/{group}";
