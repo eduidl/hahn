@@ -36,7 +36,7 @@ function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefin
   return "Loading error";
 }
 
-const name = (s: Selected) => `${s.topic} ${s.path.join(".")}`;
+const name = (s: Selected) => `${s.topicName ?? s.topic} ${s.path.join(".")}`;
 
 function PanelHeader({ widget }: PanelProps) {
   return (
@@ -120,7 +120,7 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
             <button key={entry.key} className="field-option" onClick={() => pick(entry)}>
               <SeriesName
                 source={entry.topic.source}
-                topic={entry.topic.topic}
+                topic={entry.topic.topicName ?? entry.topic.topic}
                 path={entry.field.path}
                 type={entry.typeLabel}
               />
@@ -213,7 +213,7 @@ function SeriesRow({
         }
       >
         {marker}
-        <SeriesName source={s.source} topic={s.topic} path={s.path} />
+        <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
       </button>
       {children}
       {showStatus && (
@@ -375,7 +375,11 @@ function SingleTargetPanel(props: PanelProps) {
         <div className="legend-heading">Target</div>
         {target ? (
           <div className="target-summary">
-            <SeriesName source={target.source} topic={target.topic} path={target.path} />
+            <SeriesName
+              source={target.source}
+              topic={target.topicName ?? target.topic}
+              path={target.path}
+            />
             {props.widget.type === "table" && (
               <span className="series-status">
                 {statusLabel(props.records.find((record) => record.key === target.key))}

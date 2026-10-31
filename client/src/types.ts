@@ -67,7 +67,9 @@ export function kindsMatch(a: ValueKind | null, b: ValueKind | null) {
   return a.type !== "enum" || enumDefinitionsMatch(a.values, (b as typeof a).values);
 }
 export const isDiscreteKind = (kind: ValueKind | null) => kind !== null && kind.type !== "numeric";
-export type Topic = Omit<Schemas["Topic"], "fields" | "meta_fields"> & {
+export type Topic = Omit<Schemas["Topic"], "fields" | "meta_fields" | "id"> & {
+  id?: string;
+  topicName?: string;
   /** Message fields, then meta fields under `metaPrefix`. */
   fields: Field[];
   /** The open group the topic belongs to (see `sourceOf`); added by the client. */
@@ -77,6 +79,7 @@ export type Selected = {
   key: string;
   source: string;
   topic: string;
+  topicName?: string;
   path: string[];
   color: string;
   lineWidth: number;

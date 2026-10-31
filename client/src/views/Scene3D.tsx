@@ -108,7 +108,7 @@ function PointsLayer({
     (unresolved ? `No transform from ${frameId} to ${target} at this time` : "");
   return problem ? (
     <p className="view-error">
-      {series.topic}: {problem}
+      {series.topicName ?? series.topic}: {problem}
     </p>
   ) : null;
 }

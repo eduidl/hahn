@@ -110,7 +110,7 @@ export function LogView({
                 key={index}
                 className={`log-row ${index === current ? "current" : ""}`}
                 style={{ top: index * rowHeight, height: rowHeight }}
-                title={`${s.topic} · ${s.path.join(".")}`}
+                title={`${s.topicName ?? s.topic} · ${s.path.join(".")}`}
                 onClick={() => store.seek(row.x)}
               >
                 <span className="log-time">{formatter.tick(row.x).time}</span>

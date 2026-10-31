@@ -699,6 +699,7 @@
       "Topic": {
         "type": "object",
         "required": [
+          "id",
           "topic",
           "schema_name",
           "schema_encoding",
@@ -709,6 +710,10 @@
           "views"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier unique within the group. Use as the topic parameter in requests."
+          },
           "error": {
             "description": "Why the topic cannot be decoded. Such a topic is still listed, with empty `fields`.",
             "type": [
@@ -748,7 +753,7 @@
             ]
           },
           "topic": {
-            "description": "Unique only within its group.",
+            "description": "Topic name for display; multiple items may share the same name.",
             "type": "string"
           },
           "meta_fields": {
@@ -1564,7 +1569,7 @@
         "name": "topic",
         "in": "query",
         "required": true,
-        "description": "The topic's name.",
+        "description": "The topic ID returned in the group topic list.",
         "schema": {
           "type": "string"
         }

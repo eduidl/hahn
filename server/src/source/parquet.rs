@@ -108,6 +108,7 @@ impl Source for ParquetSource {
 
     fn topics(&self) -> anyhow::Result<Vec<TopicMeta>> {
         Ok(vec![TopicMeta {
+            id: self.topic.clone(),
             topic: self.topic.clone(),
             schema_name: None,
             schema_encoding: Some("parquet".into()),

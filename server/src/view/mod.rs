@@ -106,7 +106,7 @@ impl ViewIndex {
                 .collect();
             if !converters.is_empty() {
                 let defs = Arc::new(defs);
-                topics.insert(meta.topic, TopicViews { defs, converters });
+                topics.insert(meta.id, TopicViews { defs, converters });
             }
         }
         Ok(Self { topics })

@@ -216,6 +216,7 @@ struct RecordingInfo {
 
 #[derive(Serialize)]
 struct Topic {
+    id: String,
     topic: String,
     schema_name: Option<String>,
     /// Lets the client name types in the schema's own language (ROS 2, protobuf, ...).
@@ -357,6 +358,7 @@ async fn topics(
                     Err(e) => (Vec::new(), Vec::new(), Vec::new(), Some(e)),
                 };
                 Topic {
+                    id: meta.id,
                     topic: meta.topic,
                     schema_name: meta.schema_name,
                     schema_encoding: meta.schema_encoding,
