@@ -1,9 +1,9 @@
 import { memo, useMemo, useRef } from "react";
-import { secondsFrom } from "./data";
-import { useCurrentMessage } from "./useCurrentMessage";
-import { useTimeFormatter } from "./timeDisplay";
-import { type Info } from "./types";
-import type { Widget } from "./widgets";
+import { secondsFrom } from "../data/data";
+import { useCurrentMessage } from "../data/useCurrentMessage";
+import { useTimeFormatter } from "../timeDisplay";
+import { type Info } from "../types";
+import type { Widget } from "../workspace/widgets";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -14,7 +14,15 @@ const isObject = (value: Json): value is { [key: string]: Json } =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** One node of the message tree; containers fold, the first level starts open. */
-const Node = memo(function MessageNode({ name, value, depth }: { name: string; value: Json; depth: number }) {
+const Node = memo(function MessageNode({
+  name,
+  value,
+  depth,
+}: {
+  name: string;
+  value: Json;
+  depth: number;
+}) {
   if (isObject(value) && typeof value.$bytes === "number") {
     const head = Array.isArray(value.head) ? value.head : [];
     return (
@@ -59,7 +67,7 @@ const Node = memo(function MessageNode({ name, value, depth }: { name: string; v
         ))}
         {truncated && (
           <div className="raw-meta raw-more">
-            … 先頭 {children.length} 件のみ（全 {length.toLocaleString()} 件）
+            … showing {children.length} of {length.toLocaleString()} items
           </div>
         )}
       </div>
@@ -68,13 +76,7 @@ const Node = memo(function MessageNode({ name, value, depth }: { name: string; v
 });
 
 /** The selected topic or field as it was at the playback position. */
-export function RawMessage({
-  widget,
-  info,
-}: {
-  widget: Widget;
-  info: Info | null;
-}) {
+export function RawMessage({ widget, info }: { widget: Widget; info: Info | null }) {
   const series = widget.series[0];
   const { message, error } = useCurrentMessage(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
@@ -96,17 +98,17 @@ export function RawMessage({
       {error ? (
         <p className="raw-status raw-error">{error}</p>
       ) : message === undefined ? (
-        <p className="raw-status">読み込み中…</p>
+        <p className="raw-status">Loading…</p>
       ) : message === null ? (
-        <p className="raw-status">メッセージがありません</p>
+        <p className="raw-status">No messages</p>
       ) : (
         <>
           <div className="raw-toolbar">
             <span className="raw-status">
               {formatter.tooltip(secondsFrom(message.time_ns, info!.start_ns))}
             </span>
-            <button onClick={expandAll}>すべて展開</button>
-            <button onClick={resetFolding}>初期表示に戻す</button>
+            <button onClick={expandAll}>Expand all</button>
+            <button onClick={resetFolding}>Reset view</button>
           </div>
           <Node
             name={series.path.length ? series.path.join(".") : series.topic}

@@ -7,7 +7,7 @@ import {
   topicKey,
   type TopicDrag,
   type ValueKind,
-} from "./types";
+} from "../types";
 import {
   acceptsField,
   maxFieldsPerTopic,
@@ -21,29 +21,30 @@ export type DropVerdict =
   | { ok: false; reason: string };
 
 const kindLabel = (kind: ValueKind["type"] | undefined) =>
-  kind === "numeric" ? "数値" : (kind ?? "未対応");
+  kind === "numeric" ? "numeric" : (kind ?? "Unsupported");
 
 function mismatchReason(current: ValueKind | null, added: ValueKind | null) {
   if (current?.type === "enum" && added?.type === "enum")
-    return "定義の異なる enum は重ねられません。";
-  return `${kindLabel(current?.type)} の系列に ${kindLabel(added?.type)} は重ねられません。`;
+    return "Enums with different definitions cannot be combined.";
+  return `Cannot combine ${kindLabel(added?.type)} with ${kindLabel(current?.type)} series.`;
 }
 
 /** Checks that depend on the widget's current series; null when the field fits. */
 function widgetReason(entry: IndexedField, widget: Widget, spec: WidgetSpec) {
-  if (widget.series.some((s) => s.key === entry.key)) return "追加済みです。";
+  if (widget.series.some((s) => s.key === entry.key)) return "Already added.";
   // A single-series widget replaces its series, so nothing else constrains it.
   if (spec.maxSeries === 1) return null;
   const current = seriesKind(widget.series);
   if (spec.sameKind && current !== null && !kindsMatch(current, entry.kind))
     return mismatchReason(current, entry.kind);
-  if (widget.series.length >= spec.maxSeries) return `${spec.maxSeries}系列までです。`;
+  if (widget.series.length >= spec.maxSeries)
+    return `A maximum of ${spec.maxSeries} series is allowed.`;
   const { source, topic } = entry.topic;
   if (
     widget.series.filter((s) => s.source === source && s.topic === topic).length >=
     maxFieldsPerTopic
   )
-    return `1トピック${maxFieldsPerTopic}フィールドまでです。`;
+    return `A maximum of ${maxFieldsPerTopic} fields per topic is allowed.`;
   return null;
 }
 
@@ -59,25 +60,25 @@ export function dropVerdict(
   spec: WidgetSpec = widgetSpecs[widget.type],
 ): DropVerdict {
   const topic = index.topics.get(topicKey(drag.source, drag.topic));
-  if (!topic) return { ok: false, reason: "トピックが見つかりません。" };
-  if (topic.error) return { ok: false, reason: "読み込めないトピックです。" };
-  if (topic.message_count === 0) return { ok: false, reason: "メッセージがありません。" };
-  const accepted = [...spec.accepts].map(kindLabel).join("・");
+  if (!topic) return { ok: false, reason: "Topic not found." };
+  if (topic.error) return { ok: false, reason: "This topic cannot be read." };
+  if (topic.message_count === 0) return { ok: false, reason: "No messages." };
+  const accepted = [...spec.accepts].map(kindLabel).join(", ");
   // A dragged topic stands for its root message (empty path).
   const entry = index.byKey.get(keyOf(drag.source, drag.topic, drag.path ?? []));
-  if (!entry) return { ok: false, reason: "フィールドが見つかりません。" };
+  if (!entry) return { ok: false, reason: "Field not found." };
   if (spec.viewKinds && !acceptsField(spec, topic, entry.field.path, entry.kind))
     return {
       ok: false,
       reason: entry.field.path.length
-        ? "フィールドではなくトピックを指定してください。"
-        : `${topic.schema_name ?? "この型"} は表示できません。`,
+        ? "Select a topic rather than a field."
+        : `${topic.schema_name ?? "This type"} cannot be displayed.`,
     };
   if (!spec.viewKinds && !acceptsField(spec, topic, entry.field.path, entry.kind))
     return {
       ok: false,
       // The primitive name (`struct`, `uint32`, ...) keeps the reason short.
-      reason: `${displayType(entry.field.data_type, topic.schema_encoding)} は扱えません。${accepted} を指定してください。`,
+      reason: `${displayType(entry.field.data_type, topic.schema_encoding)} is not supported. Select ${accepted}.`,
     };
   const reason = widgetReason(entry, widget, spec);
   if (reason) return { ok: false, reason };

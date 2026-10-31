@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
-import { useTimeFormatter } from "./timeDisplay";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent,
+} from "react";
+import { useTimeFormatter } from "../timeDisplay";
 import { playbackSpeeds, usePlayback, usePlaybackStore } from "./playback";
-import type { Info } from "./types";
+import type { Info } from "../types";
 
 type Props = {
   info: Info | null;
@@ -23,9 +30,10 @@ function ownsKey(target: EventTarget | null, key: string) {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   // The seek slider handles its own keys; buttons activate on Space natively.
-  const owners = key === " "
-    ? "input, select, textarea, button, [role=slider]"
-    : "input, select, textarea, [role=slider]";
+  const owners =
+    key === " "
+      ? "input, select, textarea, button, [role=slider]"
+      : "input, select, textarea, [role=slider]";
   return target.closest(owners) !== null;
 }
 
@@ -67,10 +75,7 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
 
   const timeAt = (event: PointerEvent<HTMLDivElement>) => {
     const rect = track.current!.getBoundingClientRect();
-    const ratio = Math.max(
-      0,
-      Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width)),
-    );
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width)));
     return ratio * fullEnd;
   };
   const percent = (value: number) =>
@@ -79,19 +84,19 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
   const now = clock.tick(time);
 
   return (
-    <footer className="playback-bar" aria-label="再生">
+    <footer className="playback-bar" aria-label="Playback">
       <div className="playback-controls">
         <button
-          aria-label="先頭へ"
-          title="先頭へ"
+          aria-label="Go to start"
+          title="Go to start"
           disabled={disabled}
           onClick={() => store.seek(0)}
         >
           {icon("M6 5h2v14H6zM20 5v14L9 12z")}
         </button>
         <button
-          aria-label="戻る"
-          title={`${stepSeconds}秒戻る（←、Shift＋←で${largeStepSeconds}秒）`}
+          aria-label="Back"
+          title={`Back ${stepSeconds}s (Left; Shift+Left: ${largeStepSeconds}s)`}
           disabled={disabled}
           onClick={() => store.step(-stepSeconds)}
         >
@@ -99,43 +104,41 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
         </button>
         <button
           className="playback-toggle"
-          aria-label={playing ? "一時停止" : "再生"}
-          title={`${playing ? "一時停止" : "再生"}（Space）`}
+          aria-label={playing ? "Pause" : "Play"}
+          title={`${playing ? "Pause" : "Play"} (Space)`}
           disabled={disabled}
           onClick={store.toggle}
         >
           {playing ? icon("M6 5h4v14H6zM14 5h4v14h-4z") : icon("M7 4v16l13-8z")}
         </button>
         <button
-          aria-label="進む"
-          title={`${stepSeconds}秒進む（→、Shift＋→で${largeStepSeconds}秒）`}
+          aria-label="Forward"
+          title={`Forward ${stepSeconds}s (Right; Shift+Right: ${largeStepSeconds}s)`}
           disabled={disabled}
           onClick={() => store.step(stepSeconds)}
         >
           {icon("M4 5v14l7-7zM13 5v14l7-7z")}
         </button>
         <button
-          aria-label="末尾へ"
-          title="末尾へ"
+          aria-label="Go to end"
+          title="Go to end"
           disabled={disabled}
           onClick={() => store.seek(fullEnd)}
         >
           {icon("M4 5v14l11-7zM16 5h2v14h-2z")}
         </button>
       </div>
-      {playing && buffering && <span role="status">バッファ中…</span>}
+      {playing && buffering && <span role="status">Buffering…</span>}
       <div className="playback-time" aria-live="off">
         <span title={label}>{disabled ? "—" : `${now.date} ${now.time}`}</span>
-        <small>
-          {disabled ? "—" : `${seconds(time)} / ${seconds(fullEnd)} s`}
-        </small>
+        <small>{disabled ? "—" : `${seconds(time)} / ${seconds(fullEnd)} s`}</small>
       </div>
       <div
         ref={track}
         className={`playback-track ${disabled ? "disabled" : ""}`}
         role="slider"
         tabIndex={disabled ? -1 : 0}
-        aria-label="再生位置"
+        aria-label="Playback position"
         aria-valuemin={0}
         aria-valuemax={fullEnd}
         aria-valuenow={time}
@@ -186,7 +189,7 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
         )}
       </div>
       <label className="playback-speed">
-        <span className="sr-only">再生速度</span>
+        <span className="sr-only">Playback speed</span>
         <select
           value={speed}
           disabled={disabled}
@@ -201,24 +204,22 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
       </label>
       <button
         className="playback-loop"
-        aria-label="ループ再生"
+        aria-label="Loop playback"
         aria-pressed={loop}
-        title="ループ再生"
+        title="Loop playback"
         disabled={disabled}
         onClick={() => store.setLoop(!loop)}
       >
-        {icon(
-          "M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z",
-        )}
+        {icon("M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z")}
       </button>
       <div className="playback-status">
         <span>
           <i className={busy ? "pulse" : ""} />
-          {busy ? "データを受信中" : "READY"}
+          {busy ? "Receiving data" : "READY"}
         </span>
         {busy && (
           <button className="stop-loading" onClick={stop}>
-            停止
+            Stop
           </button>
         )}
       </div>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { stateLabel } from "./data";
+import { stateLabel } from "../data/data";
 import type { Series } from "./Plot";
-import { usePlayback, usePlaybackStore } from "./playback";
-import { useTimeFormatter } from "./timeDisplay";
-import type { Widget } from "./widgets";
+import { usePlayback, usePlaybackStore } from "../workspace/playback";
+import { useTimeFormatter } from "../timeDisplay";
+import type { Widget } from "../workspace/widgets";
 
 type Row = { x: number; ns: string; series: number; value: string };
 
@@ -91,16 +91,16 @@ export function LogView({
   return (
     <div className="log-view">
       <div className="log-header">
-        <span>時刻</span>
-        <span>系列</span>
-        <span>値</span>
+        <span>Time</span>
+        <span>series</span>
+        <span>Value</span>
       </div>
       <div
         className="log-rows"
         ref={list}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        {!rows.length && <p className="log-empty">値がありません</p>}
+        {!rows.length && <p className="log-empty">No values</p>}
         <div style={{ height: rows.length * rowHeight, position: "relative" }}>
           {rows.slice(first, last).map((row, offset) => {
             const index = first + offset;
@@ -119,7 +119,7 @@ export function LogView({
                   {s.path.join(".")}
                 </span>
                 <span className={`log-value ${row.value === "" ? "empty" : ""}`}>
-                  {row.value === "" ? "（空文字列）" : row.value}
+                  {row.value === "" ? "(empty string)" : row.value}
                 </span>
               </button>
             );

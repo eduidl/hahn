@@ -1,5 +1,5 @@
 import { sourceUrl } from "./sources";
-import type { Schemas, Selected } from "./types";
+import type { Schemas, Selected } from "../types";
 
 export type ViewValue = Schemas["ViewValue"];
 export type ImageValue = Schemas["ImageValue"];
@@ -32,11 +32,12 @@ export function parseFrames(buffer: ArrayBuffer): ViewResponse {
   let unchanged = false;
   let ended = false;
   for (let at = 0; at < buffer.byteLength; ) {
-    if (at + lengths > buffer.byteLength) throw new Error("応答が途中で切れました");
+    if (at + lengths > buffer.byteLength) throw new Error("The response ended prematurely");
     const headerLength = view.getUint32(at, true);
     const payloadLength = view.getUint32(at + 4, true);
     const payload = (at + lengths + headerLength + 7) & ~7;
-    if (payload + payloadLength > buffer.byteLength) throw new Error("応答が途中で切れました");
+    if (payload + payloadLength > buffer.byteLength)
+      throw new Error("The response ended prematurely");
     const header = JSON.parse(
       decoder.decode(new Uint8Array(buffer, at + lengths, headerLength)),
     ) as Header;
@@ -52,7 +53,7 @@ export function parseFrames(buffer: ArrayBuffer): ViewResponse {
       });
     at = payload + payloadLength;
   }
-  if (!ended) throw new Error("応答が途中で切れました");
+  if (!ended) throw new Error("The response ended prematurely");
   return { frames, unchanged };
 }
 
@@ -125,12 +126,20 @@ export type PointBuffers = {
 /** Blobs are aligned, so columns are views of the response rather than copies. */
 export function pointBuffers(value: PointCloudValue, blob: ViewFrame["blob"]): PointBuffers {
   const bytes = blob(value.positions);
-  const positions = new Float32Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength / 4);
+  const positions = new Float32Array(
+    bytes.buffer as ArrayBuffer,
+    bytes.byteOffset,
+    bytes.byteLength / 4,
+  );
   const intensity = value.fields.find((field) => field.name === "intensity");
   if (!intensity) return { positions, intensities: null };
   const Column = columns[intensity.type];
   const data = blob(intensity.data);
-  const raw = new Column(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength / Column.BYTES_PER_ELEMENT);
+  const raw = new Column(
+    data.buffer as ArrayBuffer,
+    data.byteOffset,
+    data.byteLength / Column.BYTES_PER_ELEMENT,
+  );
   let min = Infinity;
   let max = -Infinity;
   for (const v of raw) {
