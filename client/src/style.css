@@ -1269,6 +1269,12 @@ header .add-widget {
 .widget-plot-toolbar .toolbar {
   gap: 6px;
 }
+.widget-selection {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .widget-plot-toolbar button {
   font-size: 10px;
   padding: 4px 6px;

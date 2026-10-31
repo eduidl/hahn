@@ -118,6 +118,36 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it("shows selected topics and field paths in the widget toolbar", () => {
+  const state = initialWorkspace();
+  state.widgets["widget-1"].series = [
+    {
+      key: "first",
+      source: "r/0",
+      topic: "/robot/pose",
+      path: ["position", "x"],
+      color: "red",
+      lineWidth: 1,
+      hidden: false,
+    },
+    {
+      key: "second",
+      source: "r/0",
+      topic: "/robot/status",
+      path: [],
+      color: "blue",
+      lineWidth: 1,
+      hidden: false,
+    },
+  ];
+  render(<Harness initialState={state} />);
+  const label = screen.getByText("/robot/pose · position.x, /robot/status");
+  expect(label.getAttribute("title")).toBe("/robot/pose · position.x, /robot/status");
+  expect(
+    within(label.closest(".widget-plot-toolbar") as HTMLElement).queryByText("2 series"),
+  ).toBeNull();
+});
+
 describe("Tab widget interactions", () => {
   it("adds, switches, renames and deletes tabs with keyboard navigation", () => {
     render(<Harness />);
