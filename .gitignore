@@ -1,4 +1,5 @@
 /target/
+/server/target/
 /web/node_modules/
 /web/dist/
 /output/

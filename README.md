@@ -93,11 +93,11 @@ cargo test --test real_data -- --ignored
 
 ```bash
 mkdir -p /tmp/hahn-demo
-cargo run --example generate_demo -- /tmp/hahn-demo/demo.mcap 30000
-cargo run -- --data-dir /tmp/hahn-demo
-cargo test
-cargo clippy --all-targets -- -D warnings
-cd web
+cargo run --manifest-path server/Cargo.toml --example generate_demo -- /tmp/hahn-demo/demo.mcap 30000
+cargo run --manifest-path server/Cargo.toml -- --data-dir /tmp/hahn-demo
+cargo test --manifest-path server/Cargo.toml
+cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings
+cd client
 npm test
 npm run build
 ```
@@ -106,7 +106,7 @@ npm run build
 
 ## 対応形式
 
-録画の形式は `src/source/mod.rs` の `Source` trait（時間範囲・トピック一覧・スキーマ・時間範囲指定の読み出し）を実装して追加します。値とスキーマは `mcapdecode-core` の `Value`・`FieldDefs` で表し、HTTPハンドラは形式に依存しません。拡張子で形式を判定し、録画は最初のリクエストで開いて保持します。
+録画の形式は `server/src/source/mod.rs` の `Source` trait（時間範囲・トピック一覧・スキーマ・時間範囲指定の読み出し）を実装して追加します。値とスキーマは `mcapdecode-core` の `Value`・`FieldDefs` で表し、HTTPハンドラは形式に依存しません。拡張子で形式を判定し、録画は最初のリクエストで開いて保持します。
 
 - MCAP（`.mcap`）: `src/source/mcap.rs`。mmapしたSummaryのStatisticsまたはChunkIndexから時間範囲を取得し、インデックス付き・チャンク化された録画だけを受け付けます。
 - CSV（`.csv`）: `src/source/csv.rs`。1ファイルが1トピック（`/ファイル名`）、1行が1メッセージです。全体をメモリに読み込み、時刻順に並べ替えます。
@@ -132,13 +132,13 @@ npm run build
 
 現行のクライアントとRustサーバが使うHTTP仕様は、操作と各フィールドを [`protocol/openapi.json`](protocol/openapi.json)、全体にまたがる概念とバイナリ形式を [`protocol/README.md`](protocol/README.md) に記録します。未実装の案は [`protocol/drafts/README.md`](protocol/drafts/README.md) に保存しており、現行仕様や互換性保証には含めません。
 
-APIを変更するときは、実装・利用側・テスト・仕様を同じ変更でそろえ、`web/` で `npm run gen:api` を実行します。仕様の完成を実装開始の条件にはしません。生成した型が古いままだと `npm test` が失敗します。開発とレビューの完了条件は [`DEVELOPMENT.md`](DEVELOPMENT.md) を参照してください。
+APIを変更するときは、実装・利用側・テスト・仕様を同じ変更でそろえ、`client/` で `npm run gen:api` を実行します。仕様の完成を実装開始の条件にはしません。生成した型が古いままだと `npm test` が失敗します。開発とレビューの完了条件は [`DEVELOPMENT.md`](DEVELOPMENT.md) を参照してください。
 
 適合性テストは起動中のサーバをHTTP経由で検査するため、どの実装にも使えます。`scripts/conformance.sh` は一時ディレクトリに合成録画を生成し、専用のRustサーバを起動して、終了時に削除します。普段の `data/` は読みません。現行仕様にある操作を1つでも検査しなかった場合は失敗します。
 
 ```bash
 scripts/conformance.sh                                   # the Rust server
-cd web && BASE_URL=http://host:port npm run conformance  # any other server
+cd client && BASE_URL=http://host:port npm run conformance  # any other server
 ```
 
 別のサーバを検査する場合も、`generate_demo` と `generate_visual` の出力をそれぞれ `demo.mcap` と `visual.mcap` というグループ名で配信してください。生成方法と通常の検証コマンドは [`DEVELOPMENT.md`](DEVELOPMENT.md) にあります。
@@ -184,7 +184,7 @@ python3 scripts/measure_stream.py http://127.0.0.1:3000/api/runs/$RUN/groups/$GR
 ```
 
 スクリプトは最初のバッチまでの秒数、完了までの秒数、転送バイト数、行数を表示します。
-サーバの最大RSSは `/usr/bin/time -v target/release/hahn --data-dir ...` で起動して終了時に確認できます。
+サーバの最大RSSは `/usr/bin/time -v server/target/release/hahn --data-dir ...` で起動して終了時に確認できます。
 ブラウザでは開発者ツールのPerformance/Memoryで、全期間読み込み・ズーム・中断時の操作性とメモリを確認します。初回とOSキャッシュが効いた2回目を分けて測定してください。
 
 mmapで触れたファイルページもRSSに含まれるため、4バッチの配信キューだけでプロセス全体のRSSが制限されるわけではありません。
