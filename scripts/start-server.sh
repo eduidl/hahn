@@ -10,10 +10,10 @@ if ! command -v cargo-watch >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -d web/node_modules ]]; then
-  npm --prefix web ci
+if [[ ! -d client/node_modules ]]; then
+  npm --prefix client ci
 fi
-npm --prefix web run build
+npm --prefix client run build
 
 # The IANA name of this machine's timezone, if it can be determined.
 local_timezone() {
@@ -48,7 +48,7 @@ trap 'exit 143' TERM
 
 # Keep the files served on the same port up to date.
 (
-  cd web
+  cd client
   exec node node_modules/vite/bin/vite.js build --watch
 ) &
 watch_pids+=("$!")

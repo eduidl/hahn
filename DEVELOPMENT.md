@@ -4,7 +4,7 @@
 
 ## 実装と仕様
 
-- 実装・利用側・テスト・現行仕様を同じ変更で更新します。APIの変更後は `npm --prefix web run gen:api` で型を生成します。
+- 実装・利用側・テスト・現行仕様を同じ変更で更新します。APIの変更後は `npm --prefix client run gen:api` で型を生成します。
 - `protocol/openapi.json` と `protocol/README.md` が現行契約です。安定版の互換性保証はまだ設けません。
 - `protocol/drafts/` は未実装案の保存場所です。案の完成を現在の変更の条件にせず、必要になった部分だけ実装と合成データのテストを伴って取り込みます。
 
@@ -15,10 +15,11 @@
 通常の確認には、READMEに記載のRust・Node.jsとローカルの `mcapdecode` 依存が必要です。
 
 ```bash
-npm --prefix web ci                       # 初回のみ
-cargo test --locked                      # 実録画テストは既定でignore
-npm --prefix web test                    # 生成型の一致も検査
-npm --prefix web run build
+npm --prefix client ci                       # 初回のみ
+cargo test --manifest-path server/Cargo.toml --locked                      # 実録画テストは既定でignore
+npm --prefix client test                    # 生成型の一致も検査
+npm --prefix client run build
+npm --prefix client run format:check      # Check formatting
 scripts/conformance.sh                   # 合成録画の生成・起動・削除を含む
 ```
 
