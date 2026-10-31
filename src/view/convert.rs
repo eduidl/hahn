@@ -384,6 +384,13 @@ struct Numeric {
     read: fn(&[u8]) -> f64,
 }
 
+impl Numeric {
+    /// Reads from the start of `bytes`, little endian as the schema defines.
+    fn read(&self, bytes: &[u8]) -> f64 {
+        (self.read)(bytes)
+    }
+}
+
 /// The type of a `foxglove.PackedElementField`.
 fn numeric_type(field: &Message) -> anyhow::Result<Numeric> {
     macro_rules! numeric {
