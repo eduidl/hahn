@@ -22,10 +22,6 @@ use std::{fs::File, path::Path, sync::Arc};
 pub(super) struct Parquet;
 
 impl Format for Parquet {
-    fn name(&self) -> &'static str {
-        "parquet"
-    }
-
     fn accepts(&self, path: &Path) -> bool {
         has_extension(path, "parquet")
     }
