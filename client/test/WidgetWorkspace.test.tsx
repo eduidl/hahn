@@ -5,7 +5,7 @@ import { useReducer, useState, type ReactNode } from "react";
 import type { MosaicNode } from "react-mosaic-component";
 import { createPlaybackStore, PlaybackContext } from "../src/workspace/playback";
 import { WidgetWorkspace } from "../src/workspace/WidgetWorkspace";
-import { PanelSettings } from "../src/workspace/PanelSettings";
+import { WidgetSettings } from "../src/workspace/WidgetSettings";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import {
   initialWorkspace,
@@ -90,7 +90,7 @@ function Harness({
       />
       {selected && (
         <aside aria-label="設定">
-          <PanelSettings
+          <WidgetSettings
             widget={selected}
             dispatch={dispatch}
             index={index}
@@ -165,8 +165,8 @@ it("shows selected topics and field paths in the widget toolbar", () => {
 describe("Tab widget interactions", () => {
   it("adds a TF Tree widget inside a tab", () => {
     render(<Harness />);
-    fireEvent.click(within(panel()).getByRole("button", { name: "Add TF Tree" }));
-    expect(within(panel()).getByRole("region", { name: "TF Tree" })).toBeDefined();
+    fireEvent.click(within(panel()).getByRole("button", { name: "Add TF tree" }));
+    expect(within(panel()).getByRole("region", { name: "TF tree" })).toBeDefined();
     expect(within(panel()).getByText("Open a run from the header")).toBeDefined();
   });
   it("adds, switches, renames and deletes tabs with keyboard navigation", () => {

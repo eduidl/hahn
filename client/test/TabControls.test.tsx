@@ -19,7 +19,7 @@ const filled = widgetWith(
 
 const renderers = {
   "tab bar": {
-    label: "Close Camera",
+    label: "Delete tab Camera",
     show: (widget: TabWidget, dispatch: (action: WorkspaceAction) => void) =>
       render(
         <TabBar
@@ -31,7 +31,7 @@ const renderers = {
       ),
   },
   "tab settings": {
-    label: "Delete Camera",
+    label: "Delete tab Camera",
     show: (widget: TabWidget, dispatch: (action: WorkspaceAction) => void) =>
       render(<TabSettings widget={widget} dispatch={dispatch} />),
   },

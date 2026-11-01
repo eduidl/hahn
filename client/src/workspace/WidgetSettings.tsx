@@ -20,7 +20,7 @@ import {
   type WorkspaceAction,
 } from "./widgets";
 
-type PanelProps = {
+type WidgetSettingsProps = {
   widget: Widget;
   dispatch: Dispatch<WorkspaceAction>;
   records: Pick<CachedSeries, "key" | "status" | "received">[];
@@ -41,7 +41,7 @@ function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefin
 
 const name = (s: Selected) => `${s.topicName ?? s.topic} ${s.path.join(".")}`;
 
-function PanelHeader({ widget }: PanelProps) {
+function SettingsHeader({ widget }: WidgetSettingsProps) {
   return (
     <>
       <div className="field-heading">
@@ -61,7 +61,7 @@ function FieldPicker({
   dispatch,
   index,
   kind,
-}: PanelProps & { kind?: "image" | "pointcloud" }) {
+}: WidgetSettingsProps & { kind?: "image" | "pointcloud" }) {
   const singleTarget = widgetSpecs[widget.type].maxSeries === 1 || kind === "image";
   const label =
     kind === "image"
@@ -73,7 +73,9 @@ function FieldPicker({
           : "Add field";
   const pickerId = useId();
   const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const results = useRef<HTMLDivElement>(null);
   const popover = useRef<HTMLDivElement>(null);
   const candidates = useMemo(
     () =>
@@ -86,6 +88,12 @@ function FieldPicker({
   const matches = needle
     ? candidates.filter((entry) => entry.label.toLowerCase().includes(needle))
     : candidates;
+  const shown = matches.slice(0, pickerLimit);
+  // Candidates can shrink while the list is open, so never point past the end.
+  const activeIndex = Math.min(active, shown.length - 1);
+  useEffect(() => {
+    results.current?.children[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex]);
   useEffect(() => {
     // The popover focuses its `autofocus` descendant when shown; React's
     // autoFocus prop only focuses on mount and emits no attribute.
@@ -93,7 +101,9 @@ function FieldPicker({
     // React's onToggle does not cover popovers, so listen to the native event.
     const node = popover.current;
     const onToggle = (event: Event) => {
-      if ((event as ToggleEvent).newState === "closed") setQuery("");
+      if ((event as ToggleEvent).newState !== "closed") return;
+      setQuery("");
+      setActive(0);
     };
     node?.addEventListener("toggle", onToggle);
     return () => node?.removeEventListener("toggle", onToggle);
@@ -104,8 +114,13 @@ function FieldPicker({
   };
   return (
     <>
-      <button className="add-field" popoverTarget={pickerId} disabled={!candidates.length}>
-        {singleTarget ? label : `+ ${label}`}
+      <button
+        className="add-field"
+        aria-label={label}
+        popoverTarget={pickerId}
+        disabled={!candidates.length}
+      >
+        {singleTarget ? label : label === "Add topic" ? "+ Topic" : "+ Field"}
       </button>
       <div
         id={pickerId}
@@ -119,29 +134,58 @@ function FieldPicker({
           ref={input}
           className="search"
           type="search"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls={`${pickerId}-results`}
+          aria-activedescendant={shown.length ? `${pickerId}-${activeIndex}` : undefined}
           aria-label={
             singleTarget ? "Search for a topic or field to select" : "Search for a field to add"
           }
-          placeholder={`Search ${singleTarget ? "topics and fields" : "fields"} (${candidates.length.toLocaleString()})`}
+          placeholder={`Search ${candidates.length.toLocaleString()} ${singleTarget ? "topics and fields" : "fields"}…`}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActive(0);
+          }}
           onKeyDown={(event) => {
+            if ((event.key === "ArrowDown" || event.key === "ArrowUp") && shown.length) {
+              event.preventDefault();
+              const step = event.key === "ArrowDown" ? 1 : -1;
+              setActive((activeIndex + step + shown.length) % shown.length);
+              return;
+            }
             // A search input's native Escape only clears the text; close instead.
             if (event.key === "Escape") {
               event.preventDefault();
               popover.current?.hidePopover();
               return;
             }
-            if (event.key !== "Enter" || !matches.length) return;
+            if (event.key !== "Enter" || !shown.length) return;
             // Closing returns focus to the opener; without this the same
             // Enter would press it and reopen the list.
             event.preventDefault();
-            pick(matches[0]);
+            pick(shown[activeIndex]);
           }}
         />
-        <div className="field-picker-results">
-          {matches.slice(0, pickerLimit).map((entry) => (
-            <button key={entry.key} className="field-option" onClick={() => pick(entry)}>
+        <div
+          ref={results}
+          id={`${pickerId}-results`}
+          className="field-picker-results"
+          role="listbox"
+          aria-label={label}
+        >
+          {shown.map((entry, i) => (
+            <button
+              key={entry.key}
+              id={`${pickerId}-${i}`}
+              className="field-option"
+              role="option"
+              aria-selected={i === activeIndex}
+              // Focus stays in the search box; the arrow keys move the selection.
+              tabIndex={-1}
+              onMouseMove={() => setActive(i)}
+              onClick={() => pick(entry)}
+            >
               <SeriesName
                 source={entry.topic.source}
                 topic={entry.topic.topicName ?? entry.topic.topic}
@@ -155,14 +199,14 @@ function FieldPicker({
               {(matches.length - pickerLimit).toLocaleString()} more. Refine your search.
             </p>
           )}
-          {!matches.length && <p className="muted">No matching fields.</p>}
+          {!matches.length && <p className="muted">No matching fields</p>}
         </div>
       </div>
     </>
   );
 }
 
-function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
+function TimeDisplaySetting({ widget, dispatch }: WidgetSettingsProps) {
   const label =
     widget.type === "image" || widgetSpecs[widget.type].maxSeries === 1
       ? "Time display"
@@ -182,23 +226,23 @@ function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
         }
       >
         <option value="absolute">Absolute time</option>
-        <option value="relative">Seconds from recording start</option>
+        <option value="relative">Seconds from run start</option>
       </select>
     </label>
   );
 }
 
-/** Series list shared by all panels; each panel supplies the per-series row. */
+/** Series list shared by all settings; each widget type supplies the per-series row. */
 function SeriesList({
   widget,
   pointCount,
   row,
   showPoints = true,
-}: PanelProps & { row: (series: Selected) => ReactNode; showPoints?: boolean }) {
+}: WidgetSettingsProps & { row: (series: Selected) => ReactNode; showPoints?: boolean }) {
   return (
     <section className="legend" aria-label="Selected series">
       <div className="legend-heading">
-        <span className="eyebrow">SERIES</span>
+        <span className="eyebrow">Series</span>
         <span>
           {widget.series.length} series
           {showPoints && ` · ${pointCount.toLocaleString()} points`}
@@ -220,7 +264,7 @@ function SeriesRow({
   marker,
   children,
   showStatus = true,
-}: PanelProps & {
+}: WidgetSettingsProps & {
   series: Selected;
   marker?: ReactNode;
   children?: ReactNode;
@@ -257,7 +301,7 @@ function SeriesRow({
   );
 }
 
-function SeriesStyle({ widget, dispatch, series: s }: PanelProps & { series: Selected }) {
+function SeriesStyle({ widget, dispatch, series: s }: WidgetSettingsProps & { series: Selected }) {
   const restyle = (change: Partial<Selected>) =>
     dispatch({
       type: "series",
@@ -296,7 +340,7 @@ function SeriesStyle({ widget, dispatch, series: s }: PanelProps & { series: Sel
   );
 }
 
-function LegendSetting({ widget, dispatch }: PanelProps) {
+function LegendSetting({ widget, dispatch }: WidgetSettingsProps) {
   const set = (value: Partial<Widget["legend"]>) =>
     dispatch({ type: "legend", id: widget.id, value });
   return (
@@ -326,10 +370,10 @@ function LegendSetting({ widget, dispatch }: PanelProps) {
   );
 }
 
-function TimeSeriesPanel(props: PanelProps) {
+function TimeSeriesSettings(props: WidgetSettingsProps) {
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <TimeDisplaySetting {...props} />
       <LegendSetting {...props} />
       <FieldPicker {...props} />
@@ -351,10 +395,10 @@ function TimeSeriesPanel(props: PanelProps) {
 }
 
 /** State rows are colored per value, so series color and width do not apply. */
-function StatePanel(props: PanelProps) {
+function StateSettings(props: WidgetSettingsProps) {
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <TimeDisplaySetting {...props} />
       <FieldPicker {...props} />
       <SeriesList {...props} row={(s) => <SeriesRow key={s.key} {...props} series={s} />} />
@@ -363,10 +407,10 @@ function StatePanel(props: PanelProps) {
 }
 
 /** Values change over time as rows; the dot color tells the series apart. */
-function LogPanel(props: PanelProps) {
+function LogSettings(props: WidgetSettingsProps) {
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <TimeDisplaySetting {...props} />
       <FieldPicker {...props} />
       <SeriesList
@@ -385,7 +429,7 @@ function LogPanel(props: PanelProps) {
 }
 
 /** A single display target is specified, rather than managed as a series list. */
-function SingleTargetPanel(props: PanelProps) {
+function SingleTargetSettings(props: WidgetSettingsProps) {
   const target = props.widget.series[0];
   const columns = useMemo(
     () => (props.widget.type === "table" && target ? tableColumns(props.index, target) : []),
@@ -396,7 +440,7 @@ function SingleTargetPanel(props: PanelProps) {
   ).length;
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <TimeDisplaySetting {...props} />
       <section className="target-setting" aria-label="Target">
         <div className="legend-heading">Target</div>
@@ -478,7 +522,7 @@ function SingleTargetPanel(props: PanelProps) {
 }
 
 /** Series of a view have nothing to load in advance, and take no line width. */
-function ViewSeriesList(props: PanelProps) {
+function ViewSeriesList(props: WidgetSettingsProps) {
   return (
     <SeriesList
       {...props}
@@ -554,13 +598,13 @@ function ViewSeriesList(props: PanelProps) {
   );
 }
 
-function ImagePanel(props: PanelProps) {
+function ImageSettings(props: WidgetSettingsProps) {
   const { widget, index, dispatch } = props;
   const image = widget.series.find((item) => selectedViewKind(index, item) === "image");
   const additional = widget.series.filter((item) => selectedViewKind(index, item) !== "image");
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <TimeDisplaySetting {...props} />
       <section className="target-setting" aria-label="Image topic">
         <div className="legend-heading">Image topic</div>
@@ -602,13 +646,13 @@ function ImagePanel(props: PanelProps) {
   );
 }
 
-function ScenePanel(props: PanelProps) {
+function SceneSettings(props: WidgetSettingsProps) {
   const { widget, dispatch } = props;
   const { frames, error } = useFrames(widget.series.map((s) => s.source));
   const fixed = fixedFrameOf(widget.fixedFrame, frames);
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <label className="time-display-setting">
         Fixed frame
         <select
@@ -633,12 +677,12 @@ function ScenePanel(props: PanelProps) {
   );
 }
 
-function MapPanel(props: PanelProps) {
+function MapSettings(props: WidgetSettingsProps) {
   const { widget, dispatch } = props;
   const setTiles = (value: string) => dispatch({ type: "tile-url", id: widget.id, value });
   return (
     <>
-      <PanelHeader {...props} />
+      <SettingsHeader {...props} />
       <section className="target-setting" aria-label="Map tiles">
         <div className="legend-heading">Map tiles</div>
         <input
@@ -667,7 +711,7 @@ function MapPanel(props: PanelProps) {
   );
 }
 
-const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
+const settingsByType: Record<Widget["type"], (props: WidgetSettingsProps) => ReactNode> = {
   "tf-tree": () => <p className="help">Drag to pan and use the mouse wheel to zoom.</p>,
   "source-info": () => (
     <p className="help">Shows the open groups. There is nothing to configure.</p>
@@ -676,19 +720,19 @@ const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
     props.widget.type === "tabs" ? (
       <TabSettings widget={props.widget} dispatch={props.dispatch} />
     ) : null,
-  "time-series": TimeSeriesPanel,
-  state: StatePanel,
-  raw: SingleTargetPanel,
-  log: LogPanel,
-  table: SingleTargetPanel,
-  image: ImagePanel,
-  scene: ScenePanel,
-  map: MapPanel,
+  "time-series": TimeSeriesSettings,
+  state: StateSettings,
+  raw: SingleTargetSettings,
+  log: LogSettings,
+  table: SingleTargetSettings,
+  image: ImageSettings,
+  scene: SceneSettings,
+  map: MapSettings,
 };
 
 /** Settings for the selected widget, chosen wholesale by widget type. */
-export function PanelSettings(props: PanelProps) {
-  const Panel = panels[props.widget.type];
+export function WidgetSettings(props: WidgetSettingsProps) {
+  const Settings = settingsByType[props.widget.type];
   // Keyed by widget so uncontrolled inputs do not carry over between widgets.
-  return <Panel key={props.widget.id} {...props} />;
+  return <Settings key={props.widget.id} {...props} />;
 }

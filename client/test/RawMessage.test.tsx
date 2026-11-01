@@ -96,7 +96,7 @@ it("preserves folding when a message temporarily disappears while loading", () =
   expect(container.querySelectorAll("details")[1].open).toBe(true);
   expect(screen.getByText("2")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "Reset view" }));
+  fireEvent.click(screen.getByRole("button", { name: "Reset" }));
   expect(container.querySelectorAll("details")[1].open).toBe(false);
   current.message = undefined;
   rerender(<RawMessage widget={widget} info={info} index={emptyIndex} />);
