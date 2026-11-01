@@ -138,6 +138,12 @@ function StatePlot({
   originNs: string | null;
 }) {
   const formatter = useTimeFormatter(originNs, widget.timeDisplay);
+  const playback = usePlaybackStore();
+  useEffect(() => () => playback.setPreview(null), [playback]);
+  const timeAt = (event: MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return ((event.clientX - rect.left) / rect.width) * fullEnd;
+  };
   const visible = series.filter((s) => !s.hidden);
   const segments = useMemo(
     () => new Map(visible.map((item) => [item.key, stateSegments(item, fullEnd)])),
@@ -150,7 +156,12 @@ function StatePlot({
           <div className="state-label">
             <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
           </div>
-          <div className="state-track">
+          <div
+            className="state-track"
+            onClick={(event) => playback.seek(timeAt(event))}
+            onPointerMove={(event) => playback.setPreview(timeAt(event))}
+            onPointerLeave={() => playback.setPreview(null)}
+          >
             {(segments.get(s.key) ?? []).map((segment, i) => {
               const left = Math.max(0, Math.min(100, (segment.start / fullEnd) * 100));
               const right = Math.max(left, Math.min(100, (segment.end / fullEnd) * 100));
@@ -224,12 +235,12 @@ function WidgetDropTarget({
       bottom: "bottom",
     };
     return (
-      <div className="widget-drop tab-frame-drop" aria-label="Tab widget drop target">
+      <div className="widget-drop tab-frame-drop" aria-label="Tabs widget drop target">
         {(Object.keys(sides) as DropEdge[]).map((side) => (
           <div
             key={side}
             className={`widget-drop-edge ${side}`}
-            aria-label={`Drop on the ${sides[side]} of the tab widget`}
+            aria-label={`Drop on the ${sides[side]} of the Tabs widget`}
             onDragOver={(event) => accept(event, side)}
             onDragLeave={() => setEdge(null)}
             onDrop={(event) => place(event, side)}
@@ -237,7 +248,7 @@ function WidgetDropTarget({
         ))}
         {edge && (
           <div className={`widget-drop-preview ${edge}`}>
-            <span className="widget-drop-label">Drop on the {sides[edge]} of the tab widget</span>
+            <span className="widget-drop-label">Drop on the {sides[edge]} of the Tabs widget</span>
           </div>
         )}
       </div>
@@ -344,7 +355,7 @@ function TimeSeriesWindow({
           {widget.tabs.map((tab) => (
             <div
               key={tab.id}
-              className="widget-tab-panel"
+              className="widget-tab-settings"
               role="tabpanel"
               id={`${widget.id}-${tab.id}-panel`}
               aria-labelledby={`${widget.id}-${tab.id}`}
@@ -435,8 +446,8 @@ function TimeSeriesWindow({
             <div
               className="mosaic-window-title"
               draggable={!state.expandedId}
-              aria-label={widget.type === "tabs" ? "Move tab widget" : undefined}
-              title={widget.type === "tabs" ? "Move tab widget" : widget.title}
+              aria-label={widget.type === "tabs" ? "Move Tabs widget" : undefined}
+              title={widget.type === "tabs" ? "Move Tabs widget" : widget.title}
               onDragStart={(event) => {
                 event.stopPropagation();
                 event.dataTransfer.setData(widgetMoveMime, widget.id);
@@ -509,7 +520,7 @@ function TimeSeriesWindow({
             <button
               className="widget-icon"
               aria-label={`${widget.title} settings`}
-              title="Panel settings"
+              title="Settings"
               onClick={() => {
                 dispatch({ type: "select", id: widget.id });
                 openSettings();

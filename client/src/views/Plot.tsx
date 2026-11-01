@@ -16,7 +16,7 @@ import {
 import { SeriesName } from "../SeriesName";
 import { linearTicks } from "./ticks";
 import type { LegendSettings } from "../workspace/widgets";
-import { usePlayback } from "../workspace/playback";
+import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { isDiscreteKind, valueKind, type EnumValue } from "../types";
 
 export type DragMode = "pan" | "zoom";
@@ -108,6 +108,7 @@ export function Plot({
 }: Props) {
   const bottom = timeDisplay === "absolute" ? 70 : 52;
   const time = useTimeFormatter(originNs, timeDisplay);
+  const playback = usePlaybackStore();
   const canvas = useRef<HTMLCanvasElement>(null);
   const { x: xView, y: yView, pinnedYBase } = view;
   const setXView = (action: SetStateAction<AxisView>) =>
@@ -455,6 +456,9 @@ export function Plot({
         }}
         onPointerUp={() => {
           const active = dragRef.current;
+          // A press without a drag is a click. Double-click also lands here, so it moves the
+          // playback position as well as resetting the view.
+          if (active && !active.moved) playback.seek(xAt(active.start));
           if (active && !active.pan && Math.abs(active.end - active.start) > 4) {
             pinY();
             setXView(
