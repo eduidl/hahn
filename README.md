@@ -17,6 +17,15 @@ curl -fL -o data/wirefishing-cable-3.mcap 'https://huggingface.co/datasets/harpr
 
 Restart the server after adding the recording and select the `wirefishing-cable-3.mcap` run. For an image view, select `/camera/global/image_raw`; for a time series, try `/robot/ee_position` → `x`.
 
+[CANOE Multimodal](https://huggingface.co/datasets/Voxel51/canoe-multimodal) is a public recording of an uncrewed boat, repackaged by Harpreet Sahota from the CANOE dataset by UTIAS ASRL and distributed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). This 30-second, approximately 1.97 GB recording includes camera images, LiDAR, GPS and transforms:
+
+```bash
+mkdir -p data
+curl -fL -o data/canoe-2025-08-20-16-07.mcap 'https://huggingface.co/datasets/Voxel51/canoe-multimodal/resolve/fedc018d2163661f696a4485d40e96bb84148ec8/data/canoe-2025-08-20-16-07_ep000.mcap'
+```
+
+Restart the server, select `canoe-2025-08-20-16-07.mcap`, and try `/cam_left` in Image, `/lidar` in 3D, `/gps` in Map or Time Series, and TF Tree. The recording also includes JSON-encoded IMU, motor, and velocity topics and raw radar and sonar images; the current server cannot decode JSON topics or convert raw images to views.
+
 ## Custom image converters
 
 Rust applications embedding Hahn can implement `hahn::ImageConverter` and pass it to `hahn::router_with_image_converters`. The built-in converters remain available. Each converter needs a unique, nonempty ID and must check the schema name and fields in `accepts`. Its `convert` method reads the decoded `Message` and returns an `ImageView`; Hahn validates the image format and handles framing and delivery. See `external_image_converter_is_declared_and_served` in [`server/tests/api.rs`](server/tests/api.rs) for a complete example.
