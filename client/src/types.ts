@@ -86,6 +86,8 @@ export type Selected = {
   hidden: boolean;
   dataType?: string;
   enumValues?: EnumValue[];
+  /** Distance in meters of an image plane in a 3D view. */
+  imageDistance?: number;
   /** The view of the topic to read, in widgets that show converted values. */
   view?: string;
 };

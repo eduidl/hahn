@@ -1,11 +1,12 @@
 import { TabSettings } from "./TabControls";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { addableFields } from "./drop";
 import { SeriesName } from "../SeriesName";
 import type { FieldIndex, IndexedField } from "./fieldIndex";
 import type { CachedSeries } from "../data/useSeries";
 import type { Selected } from "../types";
 import { tableColumns } from "../views/table";
+import { defaultImageDistance } from "../views/camera";
 import { fixedFrameOf, useFrames } from "../data/useViewData";
 import {
   addFieldAction,
@@ -489,7 +490,35 @@ function ViewSeriesList(props: PanelProps) {
           series={s}
           showStatus={false}
           marker={<i style={{ background: s.color }} />}
-        />
+        >
+          {props.widget.type === "scene" && selectedViewKind(props.index, s) === "image" && (
+            <label className="series-style">
+              Image distance (m)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                aria-label={`Image distance for ${name(s)}`}
+                defaultValue={s.imageDistance ?? defaultImageDistance}
+                onChange={(event) => {
+                  const distance = event.currentTarget.valueAsNumber;
+                  if (Number.isFinite(distance) && distance > 0)
+                    props.dispatch({
+                      type: "series",
+                      id: props.widget.id,
+                      update: (list) =>
+                        list.map((item) =>
+                          item.key === s.key ? { ...item, imageDistance: distance } : item,
+                        ),
+                    });
+                }}
+                onBlur={(event) => {
+                  event.currentTarget.value = String(s.imageDistance ?? defaultImageDistance);
+                }}
+              />
+            </label>
+          )}
+        </SeriesRow>
       )}
     />
   );
