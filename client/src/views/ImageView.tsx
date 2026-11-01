@@ -9,6 +9,8 @@ import { useTimeFormatter } from "../timeDisplay";
 import { topicKey, type Info, type Schemas, type Selected } from "../types";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
+import { cameraDistortionError, cloudToCameraMatrix, projectCameraPoint } from "./camera";
+import { cameraCandidates } from "./useCameraCalibration";
 
 const mimeTypes: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -63,21 +65,141 @@ function Projection({ cloud, calibration }: { cloud: Cloud; calibration: Calibra
   );
 }
 
-/** The selected image topic as it was at the playback position. */
-export function ImageView({ widget, info }: { widget: Widget; info: Info | null }) {
-  const series = widget.series[0];
+/** The image and its projections advance together after all are ready. */
+export function ImageView({
+  widget,
+  info,
+  index,
+}: {
+  widget: Widget;
+  info: Info | null;
+  index: FieldIndex;
+}) {
+  const kind = (series: Selected) =>
+    index.topics
+      .get(topicKey(series.source, series.topic))
+      ?.views.find((view) => view.id === series.view)?.kind;
+  const series = widget.series.find((item) => kind(item) === "image");
+  const clouds = widget.series.filter((item) => kind(item) === "pointcloud" && !item.hidden);
   const { frame, error } = useViewFrame(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
-  const [url, setUrl] = useState<string>();
-  const value = frame?.value?.kind === "image" ? (frame.value as ImageValue) : undefined;
-  const mime = value && mimeTypes[value.format];
+  const candidates = useMemo(() => cameraCandidates(index, series), [index, series?.source]);
+  const identity =
+    series && info
+      ? JSON.stringify([series.key, info.start_ns, candidates, clouds.map((c) => [c.key, c.view])])
+      : null;
+  const loaded = useLatestOnly<Bundle>(
+    identity,
+    frame?.value?.kind === "image" ? frame.time_ns : null,
+    async (time, known, signal) => {
+      const imageFrame = frame!;
+      const image = imageFrame.value;
+      if (!image || image.kind !== "image") throw new Error("Image is unavailable");
+      if (!clouds.length) return { frame: imageFrame, clouds: [] };
+      if (!image.frame_id) return { frame: imageFrame, clouds: [], error: "Image has no frame ID" };
+      const calibrations = await Promise.all(
+        candidates.map((candidate) => fetchLatestFrame(candidate, time, null, signal)),
+      );
+      const matches = calibrations.flatMap((item) =>
+        item?.value?.kind === "camera_calibration" && item.value.frame_id === image.frame_id
+          ? [item.value]
+          : [],
+      );
+      if (matches.length !== 1)
+        return {
+          frame: imageFrame,
+          clouds: [],
+          error: matches.length
+            ? "Multiple camera calibrations match this frame"
+            : calibrations.find((item) => item?.error)?.error ||
+              "No camera calibration for this frame",
+        };
+      const resolved = await Promise.all(
+        clouds.map(async (series) => {
+          const previous = known?.clouds.find((item) => item.series.key === series.key)?.frame;
+          const cloud = await fetchLatestFrame(series, time, previous, signal);
+          const frameId = cloud?.value?.kind === "pointcloud" ? cloud.value.frame_id : null;
+          if (!frameId || frameId === image.frame_id) return { series, frame: cloud };
+          const transforms = await get<Schemas["Transforms"]>(
+            `${runUrl(series.source)}/transforms?${new URLSearchParams({ target: image.frame_id!, time_ns: time })}`,
+            signal,
+          );
+          const placement = transforms.frames[frameId];
+          return {
+            series,
+            frame: cloud,
+            placement,
+            error: placement
+              ? undefined
+              : `No transform from ${frameId} to ${image.frame_id} at this time`,
+          };
+        }),
+      );
+      return { frame: imageFrame, calibration: matches[0], clouds: resolved };
+    },
+  );
+  const [decodeError, setDecodeError] = useState("");
+  const [display, setDisplay] = useState<{
+    bundle: Bundle;
+    url?: string;
+    bitmap?: ImageBitmap;
+    width: number;
+    height: number;
+    identity: string;
+  }>();
   useEffect(() => {
-    if (!frame || !value || !mime) return setUrl(undefined);
-    const next = URL.createObjectURL(new Blob([frame.blob(value.data).slice()], { type: mime }));
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
-  }, [frame, value, mime]);
-  if (!series) return null;
+    const bundle = loaded?.value;
+    const value = bundle?.frame.value;
+    if (!bundle || !value || value.kind !== "image" || !identity) return;
+    if (value.format === "raw") {
+      let cancelled = false;
+      setDecodeError("");
+      void decodeImage(bundle.frame, value)
+        .then((bitmap) => {
+          if (cancelled) {
+            bitmap.close();
+            return;
+          }
+          setDisplay({ bundle, bitmap, width: bitmap.width, height: bitmap.height, identity });
+        })
+        .catch((error) => {
+          if (!cancelled)
+            setDecodeError(error instanceof Error ? error.message : "Could not decode image");
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    const mime = mimeTypes[value.format];
+    if (!mime) return;
+    const url = URL.createObjectURL(
+      new Blob([bundle.frame.blob(value.data).slice()], { type: mime }),
+    );
+    const image = new Image();
+    setDecodeError("");
+    let shown = false;
+    image.onload = () => {
+      shown = true;
+      setDisplay({ bundle, url, width: image.naturalWidth, height: image.naturalHeight, identity });
+    };
+    image.onerror = () => setDecodeError("Could not decode image");
+    image.src = url;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+      if (!shown) URL.revokeObjectURL(url);
+    };
+  }, [loaded?.value, identity]);
+  useEffect(
+    () => () => {
+      if (display?.url) URL.revokeObjectURL(display.url);
+      display?.bitmap?.close();
+    },
+    [display],
+  );
+  const shown = frame !== null && display?.identity === identity ? display : undefined;
+  const value = shown?.bundle.frame.value;
+  const calibration = shown?.bundle.calibration;
   const problem =
     error ||
     frame?.error ||
