@@ -97,7 +97,7 @@ describe("Plot legend", () => {
     render(
       <PlaybackContext.Provider value={store}>
         <Plot
-          series={[series("a", false), series("b", true)]}
+          series={list}
           fullEnd={10}
           originNs="0"
           revision={0}
@@ -124,6 +124,10 @@ describe("Plot legend", () => {
     expect(a.getAttribute("aria-pressed")).toBe("true");
     expect(b.getAttribute("aria-pressed")).toBe("false");
     expect(a.textContent).toBe("/a · x");
+  });
+  it("shows nothing at all without series", () => {
+    show(() => {}, []);
+    expect(document.querySelector(".plot-legend")).toBeNull();
   });
   it("toggles the clicked series", () => {
     const toggle = vi.fn();
