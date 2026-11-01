@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import type { Schemas } from "../types";
 
+/** The default image distance in Foxglove's published 3D renderer. */
+export const defaultImageDistance = 1;
+
 /** Image corners in the camera optical frame, one meter from its origin. */
 export function cameraCorners(calibration: Schemas["CameraCalibrationValue"]) {
   const [fx, , cx, , fy, cy] = calibration.intrinsics;
