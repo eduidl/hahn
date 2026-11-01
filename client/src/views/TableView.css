@@ -5,7 +5,7 @@
   color: var(--text);
   font: 12px var(--font-mono);
 }
-.table-status { padding: 6px 12px; color: var(--text-faint); flex-shrink: 0; }
+.table-status { font-family: var(--font-ui); font-variant-numeric: tabular-nums; padding: 6px 12px; color: var(--text-faint); flex-shrink: 0; }
 .table-scroll { min-height: 0; flex: 1; overflow: auto; }
 .table-scroll table { table-layout: fixed; border-spacing: 0; }
 .table-scroll th, .table-scroll td {

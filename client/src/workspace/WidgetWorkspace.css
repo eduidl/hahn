@@ -1,31 +1,9 @@
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex-shrink: 0;
-}
 .chart-area {
   position: relative;
   margin-top: 22px;
   min-height: 320px;
   height: clamp(350px, 52vh, 650px);
   border-top: 1px solid var(--line);
-}
-.chart-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0 22px;
-  color: var(--text-faint);
-  font: 12px var(--font-mono);
-}
-@media (max-width: 900px) {
-  .chart-meta {
-    flex-direction: column;
-  }
-  .toolbar {
-    align-self: flex-end;
-  }
 }
 @media (max-width: 640px) {
   .chart-area {

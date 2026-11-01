@@ -129,6 +129,7 @@ export function TabSettings({ widget, dispatch }: Props) {
             tab={tab}
             dispatch={dispatch}
             label={`Delete tab ${tabLabel(tab)}`}
+            className="small-button"
           />
         </div>
       ))}

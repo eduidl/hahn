@@ -12,6 +12,8 @@
 }
 .raw-status {
   flex: 1;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
   color: var(--text-faint);
   font-size: 12px;
 }
