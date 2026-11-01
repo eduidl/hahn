@@ -518,7 +518,7 @@ function FrameAxes({
   stage: Stage;
 }) {
   const ns = usePlaybackNs(info);
-  const { transforms } = useTransforms(source, target, ns === null ? null : String(ns));
+  const { transforms } = useTransforms(source, target, ns === null ? null : String(ns), true);
   const group = useMemo(() => new THREE.Group(), []);
   useEffect(() => {
     stage.scene.add(group);
