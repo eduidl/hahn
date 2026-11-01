@@ -92,7 +92,7 @@ export function LogView({
     <div className="log-view">
       <div className="log-header">
         <span>Time</span>
-        <span>series</span>
+        <span>Series</span>
         <span>Value</span>
       </div>
       <div

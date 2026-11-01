@@ -123,7 +123,6 @@ export const widgetDragMime = "application/x-hahn-widget";
 /** What a widget type shows and which series it takes. */
 export type WidgetSpec = {
   label: string;
-  titlePrefix: string;
   description: string;
   help: string;
   /** Shown in an empty widget. */
@@ -141,8 +140,7 @@ export type WidgetSpec = {
 };
 export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   "tf-tree": {
-    label: "TF Tree",
-    titlePrefix: "TF Tree",
+    label: "TF tree",
     description: "Show coordinate frame relationships",
     help: "Drag to pan and use the mouse wheel to zoom.",
     emptyHint: "No frames",
@@ -152,8 +150,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: false,
   },
   "source-info": {
-    label: "Data Source Info",
-    titlePrefix: "Data Source Info",
+    label: "Data source info",
     description: "Show the time range and topics of the open groups",
     help: "Shows the open groups. There is nothing to configure.",
     emptyHint: "No data source",
@@ -163,8 +160,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: false,
   },
   tabs: {
-    label: "Tab",
-    titlePrefix: "Tab",
+    label: "Tabs",
     description: "Switch between widget layouts using tabs",
     help: "Place widgets in each tab. Edit tab names and order.",
     emptyHint: "Drop a widget",
@@ -174,8 +170,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: false,
   },
   "time-series": {
-    label: "Time Series",
-    titlePrefix: "Time series",
+    label: "Time series",
     description: "Overlay numeric, bool, or enum time series",
     help: "Add numeric, bool, or enum fields. Only fields matching the first series can be combined.",
     emptyHint: "Drop a numeric, bool, or enum field",
@@ -185,8 +180,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: true,
   },
   state: {
-    label: "State Transition",
-    titlePrefix: "State",
+    label: "State transition",
     description: "Show bool, enum, or string state transitions in separate rows",
     help: "Add bool, enum, or string fields. Series may have different types or enum definitions.",
     emptyHint: "Drop a bool, enum, or string field",
@@ -197,7 +191,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   log: {
     label: "Log",
-    titlePrefix: "Log",
     description: "List string, enum, or bool value changes in time order",
     help: "Add string, enum, or bool fields. Changes are listed in time order.",
     emptyHint: "Drop a string, enum, or bool field",
@@ -208,7 +201,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   table: {
     label: "Table",
-    titlePrefix: "Table",
     description: "Show topic or field history in a table",
     help: "Select one topic or field. Its contents are expanded into columns.",
     emptyHint: "Drop a topic or field",
@@ -218,8 +210,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: false,
   },
   raw: {
-    label: "Raw Message",
-    titlePrefix: "Raw",
+    label: "Raw message",
     description: "Show a topic or field at the playback position",
     help: "Select one topic or field.",
     emptyHint: "Drop a topic or field",
@@ -230,7 +221,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   image: {
     label: "Image",
-    titlePrefix: "Image",
     description: "Show an image and projected point clouds",
     help: "Select an image and point cloud topics.",
     emptyHint: "Drop an image topic",
@@ -242,7 +232,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   scene: {
     label: "3D",
-    titlePrefix: "3D",
     description: "Show point clouds, cameras, poses and coordinate frames in 3D",
     help: "Add point cloud, image or pose topics. Drag to rotate, right-drag to pan, and scroll to zoom.",
     emptyHint: "Drop a point cloud, image or pose topic",
@@ -254,9 +243,8 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   map: {
     label: "Map",
-    titlePrefix: "Map",
     description: "Show location history and playback position on a map",
-    help: "Add location topics. Change map tiles in panel settings.",
+    help: "Add location topics. Change map tiles in settings.",
     emptyHint: "Drop a location topic",
     accepts: new Set(),
     sameKind: false,
@@ -375,7 +363,7 @@ export const widget = (number: number, type: Widget["type"] = "time-series"): Wi
         nextTabNumber: 2,
       }
     : { type }),
-  title: widgetSpecs[type].titlePrefix,
+  title: widgetSpecs[type].label,
   series: [],
   mode: "pan",
   timeDisplay: "absolute",
