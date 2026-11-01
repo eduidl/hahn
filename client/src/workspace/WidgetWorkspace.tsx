@@ -808,35 +808,6 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                   <span className="widget-selection" title={selection}>
                     {selection}
                   </span>
-                  <div className="toolbar">
-                    {widget.type === "plot" && (
-                      <div className="drag-mode" role="group" aria-label="Drag mode">
-                        <button
-                          aria-pressed={widget.mode === "pan"}
-                          onClick={() => dispatch({ type: "mode", id: widget.id, mode: "pan" })}
-                        >
-                          Pan
-                        </button>
-                        <button
-                          aria-pressed={widget.mode === "zoom"}
-                          onClick={() => dispatch({ type: "mode", id: widget.id, mode: "zoom" })}
-                        >
-                          Box zoom
-                        </button>
-                      </div>
-                    )}
-                    {(widget.type === "plot" || widget.type === "state") && (
-                      <button
-                        disabled={
-                          !info ||
-                          !(widget.type === "state" ? !isDefaultView(widget.view.x) : canReset)
-                        }
-                        onClick={() => onViewChange(() => defaultPlotView())}
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
                 </div>
               )}
               <div
