@@ -29,7 +29,7 @@ export function TabName({
   };
   return (
     <input
-      className="tab-name-input"
+      className="text-input tab-name-input"
       autoFocus={autoFocus}
       aria-label={`${tabLabel(tab)} name`}
       placeholder="Enter tab name"
@@ -86,6 +86,7 @@ export function TabSettings({ widget, dispatch }: Props) {
       {widget.tabs.map((tab, i) => (
         <div className="tab-settings-row" key={tab.id}>
           <button
+            className="small-button"
             aria-label={`Show ${tabLabel(tab)}`}
             aria-pressed={widget.activeTabId === tab.id}
             onClick={() => dispatch({ type: "tab-select", id: widget.id, tabId: tab.id })}
@@ -94,6 +95,7 @@ export function TabSettings({ widget, dispatch }: Props) {
           </button>
           <TabName widget={widget} tab={tab} dispatch={dispatch} />
           <button
+            className="small-button"
             aria-label={`Move ${tabLabel(tab)} earlier`}
             disabled={i === 0}
             onClick={() =>
@@ -108,6 +110,7 @@ export function TabSettings({ widget, dispatch }: Props) {
             ↑
           </button>
           <button
+            className="small-button"
             aria-label={`Move ${tabLabel(tab)} later`}
             disabled={i === widget.tabs.length - 1}
             onClick={() =>

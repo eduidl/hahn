@@ -29,7 +29,6 @@
 .tab-settings { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
 .tab-settings-row { display: flex; align-items: center; gap: 4px; }
 .tab-settings-row input { min-width: 0; width: 100%; flex: 1; }
-.tab-settings-row button { padding: 4px 6px; }
 .tab-settings-row button[aria-pressed="true"] { border-color: var(--accent); color: var(--text); }
 .widget-tab-item[data-active="true"] {
   background: var(--bg-accent);
@@ -42,14 +41,8 @@
 }
 .widget-tab-item > .widget-tab-close { padding: 6px; font-size: 13px; }
 .tab-name-input {
-  padding: 6px 8px;
-  background: var(--bg-raised);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  font-size: 12px;
   line-height: 1.5;
 }
 .tab-name-input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 .widget-tab-bar .tab-name-input { height: 28px; margin: 2px 0; padding: 3px 8px; }
-.tab-name-placeholder, .tab-name-input::placeholder { color: var(--text-faint); }
+.tab-name-placeholder { color: var(--text-faint); }

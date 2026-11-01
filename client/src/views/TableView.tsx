@@ -165,7 +165,7 @@ export function TableView({
         ? `Loading error · ${record.error}`
         : "Complete";
   return (
-    <div className="table-view">
+    <div className="widget-fill table-view">
       <div className="table-status" role="status">
         {status} · {rows.length.toLocaleString()} messages
       </div>

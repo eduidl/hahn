@@ -91,7 +91,7 @@ export function ValueChangesView({
   const first = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
   const last = Math.min(rows.length, Math.ceil((scrollTop + height) / rowHeight) + overscan);
   return (
-    <div className="value-changes-view">
+    <div className="widget-fill value-changes-view">
       <div className="value-changes-header">
         <span>Time</span>
         <span>Series</span>

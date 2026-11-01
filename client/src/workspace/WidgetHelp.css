@@ -2,19 +2,10 @@
   font-size: 13px;
 }
 .widget-help-list {
-  position: fixed;
-  /* Override the popover UA centering; the anchor decides the position. */
-  inset: auto;
   margin: 4px 0;
   position-area: bottom span-left;
-  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
   padding: 6px 10px;
   width: max-content;
   font-size: 12px;
   line-height: 1.7;
-  color: var(--text);
-  background: var(--bg-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  box-shadow: var(--shadow);
 }

@@ -152,7 +152,7 @@ export function RawMessage({
 
   if (!series) return null;
   return (
-    <div className="raw-message" ref={tree}>
+    <div className="widget-fill raw-message" ref={tree}>
       {error ? (
         <p className="widget-status widget-status-error">{error}</p>
       ) : message === undefined ? (
@@ -165,8 +165,12 @@ export function RawMessage({
             <span className="raw-status">
               {formatter.tooltip(secondsFrom(message.time_ns, info!.start_ns))}
             </span>
-            <button onClick={expandAll}>Expand all</button>
-            <button onClick={resetFolding}>Reset</button>
+            <button className="small-button" onClick={expandAll}>
+              Expand all
+            </button>
+            <button className="small-button" onClick={resetFolding}>
+              Reset
+            </button>
           </div>
           <Node
             key={`${series.key}:${info?.start_ns}`}

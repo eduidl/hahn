@@ -68,10 +68,15 @@ export function RunsDialog({
     if (items.length) setActive((active + step + items.length) % items.length);
   };
   return (
-    <dialog ref={dialog} className="runs-dialog" aria-label="Select run" onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className="dialog-surface runs-dialog"
+      aria-label="Select run"
+      onClose={onClose}
+    >
       <h2>Select run</h2>
       <input
-        className="search"
+        className="text-input search"
         role="combobox"
         aria-expanded="true"
         aria-controls="runs-list"

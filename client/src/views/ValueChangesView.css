@@ -1,7 +1,5 @@
 /* Value changes: in time order, one fixed-height row each. */
 .value-changes-view {
-  position: absolute;
-  inset: 0;
   display: flex;
   flex-direction: column;
   font: 12px var(--font-mono);

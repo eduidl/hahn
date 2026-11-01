@@ -28,7 +28,7 @@ export function WidgetHelp({ title, controls }: { title: string; controls: reado
       <div
         id={id}
         ref={popover}
-        className="widget-help-list"
+        className="popover-surface widget-help-list"
         popover="manual"
         role="tooltip"
         style={{ positionAnchor: anchor }}

@@ -1,18 +1,8 @@
 .confirm-dialog {
   width: min(420px, calc(100vw - 32px));
-  padding: 20px;
-  color: var(--text);
-  background: var(--bg-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-}
-.confirm-dialog::backdrop {
-  background: rgb(0 0 0 / 60%);
 }
 .confirm-dialog h2 {
   margin: 0 0 8px;
-  font-size: 15px;
-  font-weight: 500;
 }
 .confirm-dialog p {
   margin: 0;

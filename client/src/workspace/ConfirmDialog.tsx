@@ -36,7 +36,7 @@ export function ConfirmDialog({
   return createPortal(
     <dialog
       ref={dialog}
-      className="confirm-dialog"
+      className="dialog-surface confirm-dialog"
       aria-labelledby={`${id}-title`}
       aria-describedby={`${id}-message`}
       onClose={onClose}

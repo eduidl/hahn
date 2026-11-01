@@ -12,12 +12,8 @@
 /* Hover tooltip (placed next to the pointer from Plot.tsx) and the legend share the box. */
 .tooltip,
 .plot-legend {
-  position: absolute;
   max-height: 60%;
   overflow: hidden;
-  background: var(--bg-overlay);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
   padding: 10px 13px;
   pointer-events: none;
   max-width: 85%;
@@ -32,7 +28,6 @@
   padding: 6px;
   overflow-y: auto;
   pointer-events: auto;
-  background: var(--bg-overlay);
 }
 .plot-legend-item {
   display: flex;

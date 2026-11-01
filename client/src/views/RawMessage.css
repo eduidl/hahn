@@ -1,8 +1,6 @@
 /* Raw Message: a folding tree of the message at the playback position. */
 /* Fills the chart area and scrolls on its own; the toolbar stays on top. */
 .raw-message {
-  position: absolute;
-  inset: 0;
   overflow: auto;
   padding: 8px 12px 12px;
   font: 12px var(--font-mono);
@@ -28,11 +26,6 @@
   padding: 6px 12px;
   background: var(--bg-base);
   border-bottom: 1px solid var(--line);
-}
-.raw-toolbar button {
-  padding: 3px 7px;
-  font-family: var(--font-ui);
-  font-size: 12px;
 }
 .raw-node > summary {
   font-family: var(--font-mono);
