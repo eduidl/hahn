@@ -18,6 +18,7 @@ import { timeTicks } from "../views/ticks";
 import { axisRange, clampAxis, isDefaultView, zoomAxis, type AxisRange } from "../views/axes";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
+import { WidgetHelp } from "./WidgetHelp";
 import { Plot, defaultPlotView, wheelZoomFactor, type PlotView, type Series } from "../views/Plot";
 import { useTimeFormatter } from "../timeDisplay";
 import type { DropVerdict } from "./drop";
@@ -187,7 +188,7 @@ export function StatePlot({
   originNs: string | null;
   onViewChange: (update: (view: PlotView) => PlotView) => void;
 }) {
-  const formatter = useTimeFormatter(originNs, widget.timeDisplay);
+  const formatter = useTimeFormatter(originNs);
   const playback = usePlaybackStore();
   const domain = axisRange([0, fullEnd], widget.view.x);
   const plot = useRef<HTMLDivElement>(null);
@@ -563,6 +564,84 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
         onDragStart={() => dispatch({ type: "select", id: widget.id })}
         toolbarControls={
           <>
+            {widget.type === "plot" && (
+              <div className="widget-drag-mode" role="group" aria-label="Drag mode">
+                <button
+                  className="widget-icon"
+                  aria-label="Pan"
+                  title="Pan"
+                  aria-pressed={widget.mode === "pan"}
+                  onClick={() => dispatch({ type: "mode", id: widget.id, mode: "pan" })}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 3v18M3 12h18M12 3l-3 3m3-3 3 3M12 21l-3-3m3 3 3-3M3 12l3-3m-3 3 3 3M21 12l-3-3m3 3-3 3" />
+                  </svg>
+                </button>
+                <button
+                  className="widget-icon"
+                  aria-label="Box zoom"
+                  title="Box zoom"
+                  aria-pressed={widget.mode === "zoom"}
+                  onClick={() => dispatch({ type: "mode", id: widget.id, mode: "zoom" })}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 9v6M9 12h6" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {hasViewControls && (
+              <>
+                <button
+                  className="widget-icon"
+                  aria-label="Reset view"
+                  title="Reset view"
+                  disabled={
+                    !info || !(widget.type === "state" ? !isDefaultView(widget.view.x) : canReset)
+                  }
+                  onClick={() => onViewChange(() => defaultPlotView())}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 4v6h6" />
+                    <path d="M4.5 10a8 8 0 1 1-.5 4" />
+                  </svg>
+                </button>
+                <span className="widget-toolbar-separator" role="separator" />
+              </>
+            )}
+            {widgetSpecs[widget.type].controls && (
+              <WidgetHelp title={widget.title} controls={widgetSpecs[widget.type].controls!} />
+            )}
             <button
               className="widget-icon"
               aria-label={`${state.expandedId === widget.id ? "Restore" : "Maximize"} ${widget.title}`}
