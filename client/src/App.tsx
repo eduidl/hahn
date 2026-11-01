@@ -61,7 +61,11 @@ export function App() {
   // Keep one object per range, so dependents only react to real changes.
   const mergedKey = JSON.stringify(merged);
   const info = useMemo(() => merged, [mergedKey]);
-  const [workspace, dispatch] = useReducer(workspaceReducer, undefined, initialWorkspace);
+  const [workspace, dispatch] = useReducer(
+    workspaceReducer,
+    undefined,
+    () => saved?.workspace ?? initialWorkspace(),
+  );
   const activeWidget = workspace.activeId ? workspace.widgets[workspace.activeId] : undefined;
   const demand = requestedSeries(workspace.widgets);
   const [showErrorTopics, setShowErrorTopics] = useState(false);
