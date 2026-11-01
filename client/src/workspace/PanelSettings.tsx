@@ -11,6 +11,8 @@ import {
   addFieldAction,
   legendPositions,
   osmTiles,
+  selectedViewKind,
+  viewFor,
   widgetSpecs,
   type LegendPosition,
   type Widget,
@@ -43,7 +45,9 @@ function PanelHeader({ widget }: PanelProps) {
     <>
       <div className="field-heading">
         <span className="eyebrow">{widget.title}</span>
-        {widgetSpecs[widget.type].maxSeries !== 1 && <span>{widget.series.length} series</span>}
+        {widget.type !== "image" && widgetSpecs[widget.type].maxSeries !== 1 && (
+          <span>{widget.series.length} series</span>
+        )}
       </div>
       <p className="help">{widgetSpecs[widget.type].help}</p>
     </>
@@ -51,9 +55,22 @@ function PanelHeader({ widget }: PanelProps) {
 }
 
 /** A button opening a searchable list of the fields this widget can take now; picking one closes it. */
-function FieldPicker({ widget, dispatch, index }: PanelProps) {
-  const singleTarget = widgetSpecs[widget.type].maxSeries === 1;
-  const label = singleTarget ? "Select target" : "Add field";
+function FieldPicker({
+  widget,
+  dispatch,
+  index,
+  kind,
+}: PanelProps & { kind?: "image" | "pointcloud" }) {
+  const singleTarget = widgetSpecs[widget.type].maxSeries === 1 || kind === "image";
+  const label =
+    kind === "image"
+      ? "Select image topic"
+      : kind === "pointcloud"
+        ? "Add topic"
+        : singleTarget
+          ? "Select target"
+          : "Add field";
+  const pickerId = useId();
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const popover = useRef<HTMLDivElement>(null);
@@ -81,16 +98,16 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
     return () => node?.removeEventListener("toggle", onToggle);
   }, []);
   const pick = (entry: IndexedField) => {
-    dispatch(addFieldAction(widget, entry.topic, entry.field));
+    dispatch(addFieldAction(widget, entry.topic, entry.field, index));
     popover.current?.hidePopover();
   };
   return (
     <>
-      <button className="add-field" popoverTarget="field-picker" disabled={!candidates.length}>
+      <button className="add-field" popoverTarget={pickerId} disabled={!candidates.length}>
         {singleTarget ? label : `+ ${label}`}
       </button>
       <div
-        id="field-picker"
+        id={pickerId}
         ref={popover}
         className="field-picker"
         popover="auto"
@@ -145,7 +162,10 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
 }
 
 function TimeDisplaySetting({ widget, dispatch }: PanelProps) {
-  const label = widgetSpecs[widget.type].maxSeries === 1 ? "Time display" : "X-axis time display";
+  const label =
+    widget.type === "image" || widgetSpecs[widget.type].maxSeries === 1
+      ? "Time display"
+      : "X-axis time display";
   return (
     <label className="time-display-setting">
       {label}
@@ -475,6 +495,54 @@ function ViewSeriesList(props: PanelProps) {
   );
 }
 
+function ImagePanel(props: PanelProps) {
+  const { widget, index, dispatch } = props;
+  const image = widget.series.find((item) => selectedViewKind(index, item) === "image");
+  const additional = widget.series.filter((item) => selectedViewKind(index, item) !== "image");
+  return (
+    <>
+      <PanelHeader {...props} />
+      <TimeDisplaySetting {...props} />
+      <section className="target-setting" aria-label="Image topic">
+        <div className="legend-heading">Image topic</div>
+        {image ? (
+          <div className="target-summary">
+            <SeriesName
+              source={image.source}
+              topic={image.topicName ?? image.topic}
+              path={image.path}
+            />
+            <button
+              className="remove"
+              aria-label="Remove image topic"
+              onClick={() => dispatch({ type: "series", id: widget.id, update: () => [] })}
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <p className="muted">Not selected</p>
+        )}
+        <FieldPicker {...props} kind="image" />
+      </section>
+      <section className="legend" aria-label="Additional topics">
+        <div className="legend-heading">Additional topics</div>
+        {!image && <p className="muted">Select an image topic first.</p>}
+        {additional.map((series) => (
+          <SeriesRow
+            key={series.key}
+            {...props}
+            series={series}
+            showStatus={false}
+            marker={<i style={{ background: series.color }} />}
+          />
+        ))}
+        <FieldPicker {...props} kind="pointcloud" />
+      </section>
+    </>
+  );
+}
+
 function ScenePanel(props: PanelProps) {
   const { widget, dispatch } = props;
   const { frames, error } = useFrames(widget.series.map((s) => s.source));
@@ -551,7 +619,7 @@ const panels: Record<Widget["type"], (props: PanelProps) => ReactNode> = {
   raw: SingleTargetPanel,
   log: LogPanel,
   table: SingleTargetPanel,
-  image: SingleTargetPanel,
+  image: ImagePanel,
   scene: ScenePanel,
   map: MapPanel,
 };

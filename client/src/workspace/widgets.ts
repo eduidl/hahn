@@ -1,3 +1,4 @@
+import type { FieldIndex } from "./fieldIndex";
 import type { MosaicDirection, MosaicNode } from "react-mosaic-component";
 import type { DragMode, PlotView } from "../views/Plot";
 import { defaultPlotView } from "../views/Plot";
@@ -6,6 +7,7 @@ import { clampColumnWidth } from "../views/table";
 import {
   colors,
   keyOf,
+  topicKey,
   kindsMatch,
   seriesKind,
   type Field,
@@ -312,7 +314,20 @@ export const addFieldAction = (
 ): WorkspaceAction => ({
   type: "series",
   id: widget.id,
-  update: (list) => addSeries(list, topic, field, widgetSpecs[widget.type]),
+  update: (list) => {
+    if (widget.type !== "image") return addSeries(list, topic, field, widgetSpecs[widget.type]);
+    const kind = viewFor(widgetSpecs.image, topic)?.kind;
+    const image = list.find((item) => selectedViewKind(index, item) === "image");
+    if (kind !== "image" && !image) return list;
+    if (kind === "image" && image && image.key !== keyOf(topic.source, topic.topic, field.path))
+      return addSeries(
+        list.filter((item) => item.key !== image.key),
+        topic,
+        field,
+        widgetSpecs.image,
+      );
+    return addSeries(list, topic, field, widgetSpecs.image);
+  },
 });
 export type DropEdge = "left" | "right" | "top" | "bottom";
 /** The tile edge nearest to a pointer, given its position relative to the tile. */

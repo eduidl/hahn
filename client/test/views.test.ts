@@ -97,7 +97,7 @@ describe("widgets showing views", () => {
     )!;
     const next = workspaceReducer(
       state,
-      addFieldAction(state.widgets["widget-1"], entry.topic, entry.field),
+      addFieldAction(state.widgets["widget-1"], entry.topic, entry.field, index),
     );
     expect(next.widgets["widget-1"].series[0].view).toBe("v-pointcloud");
   });
