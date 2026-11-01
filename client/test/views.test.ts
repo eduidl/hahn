@@ -40,8 +40,41 @@ describe("widgets showing views", () => {
     const image = widgetOf("image").widgets["widget-1"];
     expect(addableFields(index, image).map((entry) => entry.topic.topic)).toEqual(["/camera"]);
     expect(addableFields(index, widgetOf("map").widgets["widget-1"])).toEqual([]);
+    expect(
+      addableFields(index, widgetOf("scene").widgets["widget-1"]).map((entry) => entry.topic.topic),
+    ).toEqual(["/camera", "/lidar"]);
     const plot = widgetOf("time-series").widgets["widget-1"];
     expect(addableFields(index, plot).map((entry) => entry.label)).toContain("/camera · x");
+  });
+  it("requires an image before adding point clouds and replaces the image", () => {
+    const imageIndex = buildFieldIndex([
+      topic("/camera", ["image"]),
+      topic("/camera2", ["image"]),
+      topic("/lidar", ["pointcloud"]),
+    ]);
+    let state = widgetOf("image");
+    const add = (name: string) => {
+      const entry = imageIndex.candidates.image.find((item) => item.topic.topic === name)!;
+      state = workspaceReducer(
+        state,
+        addFieldAction(state.widgets["widget-1"], entry.topic, entry.field, imageIndex),
+      );
+    };
+    expect(
+      dropVerdict(imageIndex, { source: "r/0", topic: "/lidar" }, state.widgets["widget-1"]),
+    ).toMatchObject({ ok: false, reason: "Select an image topic first." });
+    add("/lidar");
+    expect(state.widgets["widget-1"].series).toEqual([]);
+    add("/camera");
+    add("/lidar");
+    expect(
+      dropVerdict(imageIndex, { source: "r/0", topic: "/camera2" }, state.widgets["widget-1"]),
+    ).toMatchObject({ ok: true, replaces: true });
+    add("/camera2");
+    expect(state.widgets["widget-1"].series.map((item) => item.topic).sort()).toEqual([
+      "/camera2",
+      "/lidar",
+    ]);
   });
   it("explain what they reject", () => {
     const image = widgetOf("image").widgets["widget-1"];
@@ -59,7 +92,9 @@ describe("widgets showing views", () => {
   });
   it("remember which view of the topic they read", () => {
     const state = widgetOf("scene");
-    const entry = addableFields(index, state.widgets["widget-1"])[0];
+    const entry = addableFields(index, state.widgets["widget-1"]).find(
+      (item) => item.topic.topic === "/lidar",
+    )!;
     const next = workspaceReducer(
       state,
       addFieldAction(state.widgets["widget-1"], entry.topic, entry.field),

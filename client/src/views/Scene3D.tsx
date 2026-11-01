@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import type { Info, Selected } from "../types";
+import { errorMessage, topicKey, type Info, type Schemas, type Selected } from "../types";
+import { get, runUrl } from "../data/sources";
+import { decodeImage } from "../data/imagePixels";
+import { usePlaybackStore } from "../workspace/playback";
+import type { FieldIndex } from "../workspace/fieldIndex";
 import {
   fixedFrameOf,
   useFrames,
@@ -87,25 +91,188 @@ function PointsLayer({
   const placement = target && frameId ? transforms?.frames[frameId] : undefined;
   // Without a graph the cloud can only be shown where it was recorded.
   const unresolved = !!target && !!frameId && !!transforms && !placement;
-  const fitted = useRef(false);
   useEffect(() => {
     points.visible = !series.hidden && !!value && !unresolved;
     if (value) {
       const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
       points.matrix.copy(placement ? matrixOf(placement).multiply(pose) : pose);
       points.matrixWorldNeedsUpdate = true;
-      if (!fitted.current && points.visible && (!target || !frameId || placement)) {
-        fitted.current = true;
-        stage.fit(points);
-      }
     }
     stage.invalidate();
-  }, [points, value, placement, unresolved, series.hidden, stage, target, frameId]);
+  }, [points, value, placement, unresolved, series.hidden, stage]);
   const problem =
     error ||
     frame?.error ||
     transformError ||
     (unresolved ? `No transform from ${frameId} to ${target} at this time` : "");
+  return problem ? (
+    <p className="view-error">
+      {series.topicName ?? series.topic}: {problem}
+    </p>
+  ) : null;
+}
+
+/** An image on its camera's pinhole image plane, one meter from the origin. */
+export function CameraLayer({
+  series,
+  info,
+  target,
+  stage,
+  index,
+}: {
+  series: Selected;
+  info: Info | null;
+  target: string | null;
+  stage: Stage;
+  index: FieldIndex;
+}) {
+  const { frame, error } = useViewFrame(series, info);
+  const [imageError, setImageError] = useState("");
+  const image = frame?.value?.kind === "image" ? frame.value : undefined;
+  const { calibration, error: calibrationError } = useCameraCalibration(
+    series,
+    frame,
+    image,
+    index,
+  );
+  const geometryKey =
+    calibration &&
+    JSON.stringify([
+      calibration.width,
+      calibration.height,
+      calibration.intrinsics,
+      calibration.distortion_model,
+      calibration.distortion,
+    ]);
+  const { transforms, error: transformError } = useTransforms(
+    series.source,
+    target,
+    frame?.time_ns ?? null,
+  );
+  const placement = target && image?.frame_id ? transforms?.frames[image.frame_id] : undefined;
+  const unresolved = !!target && !!image?.frame_id && !!transforms && !placement;
+  const group = useMemo(() => {
+    const group = new THREE.Group();
+    group.matrixAutoUpdate = false;
+    return group;
+  }, []);
+  const fitted = useRef(false);
+  const latest = useRef({ frame, image });
+  latest.current = { frame, image };
+  const kick = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => {
+    kick.current?.();
+  }, [frame, image]);
+  useEffect(() => {
+    stage.scene.add(group);
+    return () => {
+      stage.scene.remove(group);
+      stage.invalidate();
+    };
+  }, [stage, group]);
+  useEffect(() => {
+    if (!calibration) return;
+    let surface: ReturnType<typeof cameraSurface>;
+    try {
+      surface = cameraSurface(calibration);
+    } catch (error) {
+      setImageError(errorMessage(error));
+      return;
+    }
+    const lines = new THREE.BufferGeometry();
+    lines.setAttribute("position", new THREE.Float32BufferAttribute(surface.outline, 3));
+    const outline = new THREE.LineSegments(
+      lines,
+      new THREE.LineBasicMaterial({ color: series.color }),
+    );
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(surface.vertices, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(surface.uvs, 2));
+    geometry.setIndex(surface.indices);
+    const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+    const plane = new THREE.Mesh(geometry, material);
+    group.add(outline, plane);
+    plane.visible = false;
+    let cancelled = false;
+    let busy = false;
+    let decodedFrame: typeof frame;
+    let bitmap: ImageBitmap | undefined;
+    let texture: THREE.Texture | undefined;
+    const load = async () => {
+      if (busy || cancelled) return;
+      busy = true;
+      while (!cancelled) {
+        const next = latest.current;
+        if (!next.frame || !next.image || next.frame === decodedFrame) break;
+        decodedFrame = next.frame;
+        try {
+          const decoded = await decodeImage(next.frame, next.image, true);
+          if (cancelled) {
+            decoded.close();
+            break;
+          }
+          const nextTexture = new THREE.Texture(decoded);
+          nextTexture.colorSpace = THREE.SRGBColorSpace;
+          nextTexture.needsUpdate = true;
+          material.map = nextTexture;
+          material.needsUpdate = true;
+          plane.visible = true;
+          texture?.dispose();
+          bitmap?.close();
+          texture = nextTexture;
+          bitmap = decoded;
+          setImageError("");
+          stage.invalidate();
+        } catch {
+          if (!cancelled) setImageError("Could not decode image");
+        }
+      }
+      busy = false;
+    };
+    kick.current = () => void load();
+    kick.current();
+    stage.invalidate();
+    return () => {
+      cancelled = true;
+      kick.current = undefined;
+      group.remove(outline, plane);
+      lines.dispose();
+      outline.material.dispose();
+      geometry.dispose();
+      material.dispose();
+      texture?.dispose();
+      bitmap?.close();
+      stage.invalidate();
+    };
+  }, [geometryKey, group, stage, series.color]);
+  useEffect(() => {
+    const distance = series.imageDistance;
+    const scale =
+      distance !== undefined && Number.isFinite(distance) && distance > 0
+        ? distance
+        : defaultImageDistance;
+    for (const object of group.children) object.scale.setScalar(scale);
+    stage.invalidate();
+  }, [group, stage, geometryKey, series.color, series.imageDistance]);
+  useEffect(() => {
+    group.visible =
+      !series.hidden && !!calibration && !!image?.frame_id && (!target || !!placement);
+    group.matrix.copy(placement ? matrixOf(placement) : new THREE.Matrix4());
+    group.matrixWorldNeedsUpdate = true;
+    if (!fitted.current && group.visible && group.children.length) {
+      fitted.current = true;
+      stage.fit(group);
+    }
+    stage.invalidate();
+  }, [group, series.hidden, calibration, image, target, placement, stage]);
+  const problem =
+    error ||
+    frame?.error ||
+    imageError ||
+    calibrationError ||
+    transformError ||
+    (image && !image.frame_id ? "Image has no frame ID" : "") ||
+    (unresolved ? `No transform from ${image?.frame_id} to ${target} at this time` : "");
   return problem ? (
     <p className="view-error">
       {series.topicName ?? series.topic}: {problem}
@@ -214,7 +381,15 @@ function createStage(host: HTMLDivElement) {
 }
 
 /** Point clouds and frames in a fixed frame, at the playback position. */
-export default function Scene3D({ widget, info }: { widget: Widget; info: Info | null }) {
+export default function Scene3D({
+  widget,
+  info,
+  index,
+}: {
+  widget: Widget;
+  info: Info | null;
+  index: FieldIndex;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<Stage>();
   const [failure, setFailure] = useState("");
@@ -237,15 +412,28 @@ export default function Scene3D({ widget, info }: { widget: Widget; info: Info |
       <div className="view-problems">
         {problem && <p className="view-error">{problem}</p>}
         {stage &&
-          widget.series.map((series) => (
-            <PointsLayer
-              key={series.key}
-              series={series}
-              info={info}
-              target={target}
-              stage={stage}
-            />
-          ))}
+          widget.series.map((series) =>
+            index.topics
+              .get(topicKey(series.source, series.topic))
+              ?.views.find((view) => view.id === series.view)?.kind === "image" ? (
+              <CameraLayer
+                key={series.key}
+                series={series}
+                info={info}
+                target={target}
+                stage={stage}
+                index={index}
+              />
+            ) : (
+              <PointsLayer
+                key={series.key}
+                series={series}
+                info={info}
+                target={target}
+                stage={stage}
+              />
+            ),
+          )}
       </div>
     </div>
   );

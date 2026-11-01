@@ -683,3 +683,127 @@ enum NumericType {
     Uint8 = 1,
     Float32 = 7,
 }
+
+#[derive(Clone, PartialEq, Message)]
+struct CameraCalibration {
+    #[prost(string, tag = "4")]
+    distortion_model: String,
+    #[prost(string, tag = "9")]
+    frame_id: String,
+    #[prost(fixed32, tag = "2")]
+    width: u32,
+    #[prost(fixed32, tag = "3")]
+    height: u32,
+    #[prost(double, repeated, tag = "5")]
+    d: Vec<f64>,
+    #[prost(double, repeated, tag = "6")]
+    k: Vec<f64>,
+}
+
+#[allow(dead_code)]
+pub fn write_camera_calibration(path: &Path) -> anyhow::Result<()> {
+    let mut descriptor = FileDescriptorSet::decode(foxglove_descriptor().as_slice())?;
+    descriptor.file[0].message_type.push(message(
+        "CameraCalibration",
+        vec![
+            field("frame_id", 9, Type::String, None),
+            field("width", 2, Type::Fixed32, None),
+            field("height", 3, Type::Fixed32, None),
+            field("distortion_model", 4, Type::String, None),
+            repeated(field("D", 5, Type::Double, None)),
+            repeated(field("K", 6, Type::Double, None)),
+        ],
+    ));
+    let mut writer = mcap::Writer::new(File::create(path)?)?;
+    let schema = writer.add_schema(
+        "foxglove.CameraCalibration",
+        "protobuf",
+        &descriptor.encode_to_vec(),
+    )?;
+    let channel = writer.add_channel(schema, "/calibration", "protobuf", &Default::default())?;
+    for (time, k) in [
+        (1, vec![400., 0., 320., 0., 400., 240., 0., 0., 1.]),
+        (2, vec![0.; 9]),
+    ] {
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id: channel,
+                sequence: time as u32,
+                log_time: time,
+                publish_time: time,
+            },
+            &CameraCalibration {
+                frame_id: "camera".into(),
+                distortion_model: "plumb_bob".into(),
+                width: 640,
+                height: 480,
+                d: vec![0.1],
+                k,
+            }
+            .encode_to_vec(),
+        )?;
+    }
+    writer.finish()?;
+    Ok(())
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct RawImage {
+    #[prost(string, tag = "7")]
+    frame_id: String,
+    #[prost(fixed32, tag = "2")]
+    width: u32,
+    #[prost(fixed32, tag = "3")]
+    height: u32,
+    #[prost(string, tag = "4")]
+    encoding: String,
+    #[prost(fixed32, tag = "5")]
+    step: u32,
+    #[prost(bytes = "vec", tag = "6")]
+    data: Vec<u8>,
+}
+
+#[allow(dead_code)]
+pub fn write_raw_images(path: &Path) -> anyhow::Result<()> {
+    let mut descriptor = FileDescriptorSet::decode(foxglove_descriptor().as_slice())?;
+    descriptor.file[0].message_type.push(message(
+        "RawImage",
+        vec![
+            field("frame_id", 7, Type::String, None),
+            field("width", 2, Type::Fixed32, None),
+            field("height", 3, Type::Fixed32, None),
+            field("encoding", 4, Type::String, None),
+            field("step", 5, Type::Fixed32, None),
+            field("data", 6, Type::Bytes, None),
+        ],
+    ));
+    let mut writer = mcap::Writer::new(File::create(path)?)?;
+    let schema = writer.add_schema("foxglove.RawImage", "protobuf", &descriptor.encode_to_vec())?;
+    let channel = writer.add_channel(schema, "/raw", "protobuf", &Default::default())?;
+    for (time, encoding, step, data) in [
+        (1, "rgb8", 8, vec![255, 0, 0, 0, 255, 0, 9, 9]),
+        (2, "rgb8", 5, vec![0; 5]),
+        (3, "unknown", 2, vec![0; 2]),
+        (4, "nv12", 2, vec![0; 2]),
+    ] {
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id: channel,
+                sequence: time as u32,
+                log_time: time,
+                publish_time: time,
+            },
+            &RawImage {
+                frame_id: "camera".into(),
+                width: 2,
+                height: 1,
+                encoding: encoding.into(),
+                step,
+                data,
+            }
+            .encode_to_vec(),
+        )?;
+    }
+    writer.finish()?;
+    Ok(())
+}

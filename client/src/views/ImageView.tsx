@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { secondsFrom } from "../data/data";
 import { useTimeFormatter } from "../timeDisplay";
-import type { Info } from "../types";
-import { useViewFrame } from "../data/useViewData";
-import type { ImageValue } from "../data/viewFrames";
+import { topicKey, type Info, type Schemas, type Selected } from "../types";
+import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 
 const mimeTypes: Record<string, string> = {

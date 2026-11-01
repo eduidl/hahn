@@ -11,7 +11,7 @@ type Loaded<T> = { identity: string; value?: T; error?: string };
  * so a value that changes on every animation frame cannot queue up or starve.
  * The value stays until the next one arrives; `identity` starts over.
  */
-function useLatestOnly<T>(
+export function useLatestOnly<T>(
   identity: string | null,
   key: string | null,
   load: (key: string, previous: T | undefined, signal: AbortSignal) => Promise<T>,
