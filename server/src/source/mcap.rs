@@ -98,6 +98,19 @@ impl Source for McapSource {
         }
     }
 
+    fn is_json_text(&self, topic: &str) -> anyhow::Result<bool> {
+        let id: Option<u16> = topic.strip_prefix("@mcap:").map(str::parse).transpose()?;
+        Ok(self
+            .reader
+            .list_channels(&self.path)?
+            .iter()
+            .any(|channel| {
+                id.map_or(channel.topic == topic, |id| channel.id == id)
+                    && channel.schema_encoding == "jsonschema"
+                    && channel.message_encoding == "json"
+            }))
+    }
+
     fn meta_fields(&self) -> &'static [&'static str] {
         &["log_time", "publish_time"]
     }

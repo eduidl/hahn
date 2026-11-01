@@ -80,6 +80,10 @@ impl Source for Segmented {
         let (meta, _, _) = self.topic(topic)?;
         meta.fields.clone().map_err(anyhow::Error::msg)
     }
+    fn is_json_text(&self, topic: &str) -> anyhow::Result<bool> {
+        let (_, segment, original) = self.topic(topic)?;
+        self.segments[*segment].is_json_text(original)
+    }
     fn read(&self, topic: &str, range: TimeRange, visit: &mut Visit) -> anyhow::Result<()> {
         let (_, index, original) = self.topic(topic)?;
         self.segments[*index].read(original, range, visit)

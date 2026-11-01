@@ -58,14 +58,14 @@ pub(crate) async fn latest(
         } else {
             field_type(&defs, &index).clone()
         };
+        let json_text = source.is_json_text(&query.topic)?;
         Ok(source
             .latest_at(&query.topic, time)?
             .map(|(times, value)| MessageResponse {
                 time_ns: times.log_time.to_string(),
                 value: match &query.meta {
                     Some(name) => meta_value(name, times),
-                    None => select(&value, &index)
-                        .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
+                    None => displayed(&value, &index, &data_type, json_text),
                 },
             }))
     })
@@ -165,6 +165,74 @@ fn items(values: &[Value], element: &DataTypeDef) -> serde_json::Value {
     preview(values.len(), shown)
 }
 
+/// The selected value for display. JSON text is shown parsed, or as text if it is not valid JSON.
+fn displayed(
+    value: &Value,
+    index: &[usize],
+    data_type: &DataTypeDef,
+    json_text: bool,
+) -> serde_json::Value {
+    let Some(selected) = select(value, index) else {
+        return serde_json::Value::Null;
+    };
+    let parsed = |text: &str| serde_json::from_str(text).ok().map(limit_json);
+    if json_text {
+        match (selected, data_type) {
+            (Value::String(text), _) => {
+                if let Some(document) = parsed(text) {
+                    return document;
+                }
+            }
+            (Value::Struct(values), DataTypeDef::Struct(defs)) => {
+                if let ([Value::String(text)], [def]) = (values.as_slice(), &defs.fields[..])
+                    && let Some(document) = parsed(text)
+                {
+                    return json!({ def.name.clone(): document });
+                }
+            }
+            _ => {}
+        }
+    }
+    to_json(selected, data_type)
+}
+
+/// Applies the display limits of [`to_json`] to a parsed document. Integers
+/// JavaScript cannot represent exactly become strings.
+fn limit_json(value: serde_json::Value) -> serde_json::Value {
+    const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
+    use serde_json::Value as Json;
+    match value {
+        Json::Number(number) => {
+            let exact = number.as_i64().map(i64::unsigned_abs).or(number.as_u64());
+            if exact.is_some_and(|v| v > MAX_SAFE_INTEGER) {
+                number.to_string().into()
+            } else {
+                number.into()
+            }
+        }
+        Json::String(text) => shorten(&text),
+        Json::Array(values) => {
+            let length = values.len();
+            let shown = values.into_iter().take(MAX_ITEMS).map(limit_json).collect();
+            preview(length, shown)
+        }
+        Json::Object(fields) => fields
+            .into_iter()
+            .map(|(name, value)| (name, limit_json(value)))
+            .collect::<serde_json::Map<_, _>>()
+            .into(),
+        other => other,
+    }
+}
+
+fn shorten(text: &str) -> serde_json::Value {
+    if text.chars().count() > MAX_CHARS {
+        format!("{}…", text.chars().take(MAX_CHARS).collect::<String>()).into()
+    } else {
+        text.into()
+    }
+}
+
 /// JSON for display: named struct fields, exact 64-bit integers as strings,
 /// and large lists, byte buffers and strings cut down to a preview.
 fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
@@ -183,10 +251,7 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
         Value::U64(v) => v.to_string().into(),
         Value::F32(v) => number(*v as f64),
         Value::F64(v) => number(*v),
-        Value::String(v) if v.chars().count() > MAX_CHARS => {
-            format!("{}…", v.chars().take(MAX_CHARS).collect::<String>()).into()
-        }
-        Value::String(v) => v.to_string().into(),
+        Value::String(v) => shorten(v),
         Value::Bytes(v) => json!({ "$bytes": v.len(), "head": &v[..v.len().min(MAX_BYTES)] }),
         Value::Uint8List(v) if v.len() > MAX_ITEMS => {
             json!({ "$truncated": true, "length": v.len(), "items": &v[..MAX_ITEMS] })
@@ -250,7 +315,7 @@ pub(crate) async fn messages(
     let preview = query.preview.unwrap_or(true) || meta.is_some();
     let topic = query.topic.clone();
     let checked = meta.clone();
-    let (source, index, data_type) = blocking(move || {
+    let (source, index, data_type, json_text) = blocking(move || {
         let source = group.source()?;
         let defs = source.field_defs(&topic)?;
         check_meta(&*source, &checked)?;
@@ -269,7 +334,8 @@ pub(crate) async fn messages(
         } else {
             field_type(&defs, &index).clone()
         };
-        Ok((source, index, data_type))
+        let json_text = source.is_json_text(&topic)?;
+        Ok((source, index, data_type, json_text))
     })
     .await?;
     Ok(stream_rows(
@@ -280,8 +346,7 @@ pub(crate) async fn messages(
             time_ns: times.log_time.to_string(),
             value: match &meta {
                 Some(name) => meta_value(name, times),
-                None if preview => select(&value, &index)
-                    .map_or(serde_json::Value::Null, |v| to_json(v, &data_type)),
+                None if preview => displayed(&value, &index, &data_type, json_text),
                 None => scalar(&value, &index),
             },
         },
@@ -292,6 +357,39 @@ pub(crate) async fn messages(
 mod tests {
     use super::*;
     use mcapdecode::core::{ElementDef, FieldDef};
+
+    #[test]
+    fn json_text_is_parsed_within_the_display_limits() {
+        let long = "x".repeat(MAX_CHARS + 1);
+        let document = json!({
+            "speed": 1.5,
+            "big": 9007199254740993_u64,
+            "text": long,
+            "list": vec![0; MAX_ITEMS + 1],
+        });
+        let shown = limit_json(document);
+        assert_eq!(shown["speed"], 1.5);
+        assert_eq!(shown["big"], "9007199254740993");
+        assert!(shown["text"].as_str().unwrap().ends_with('…'));
+        assert_eq!(shown["list"]["$truncated"], true);
+        assert_eq!(shown["list"]["items"].as_array().unwrap().len(), MAX_ITEMS);
+    }
+
+    #[test]
+    fn invalid_json_text_stays_text() {
+        let data_type =
+            DataTypeDef::Struct(vec![FieldDef::new("json", DataTypeDef::String, false)].into());
+        let value = Value::Struct(vec![Value::string("{broken")]);
+        assert_eq!(
+            displayed(&value, &[], &data_type, true),
+            json!({"json": "{broken"})
+        );
+        let value = Value::Struct(vec![Value::string("{\"a\":1}")]);
+        assert_eq!(
+            displayed(&value, &[], &data_type, false),
+            json!({"json": "{\"a\":1}"})
+        );
+    }
 
     fn point() -> DataTypeDef {
         DataTypeDef::Struct(vec![FieldDef::new("x", DataTypeDef::F64, false)].into())

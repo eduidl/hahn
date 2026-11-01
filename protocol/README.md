@@ -64,17 +64,19 @@ These are the values of `/messages` and `/messages/latest`.
 
 At present, a shortened string can only be recognized by the trailing `…`.
 
+A `jsonschema` + `json` MCAP topic has one string field, `json`, holding the message text. Its preview value is the parsed document instead of the text, under the same limits, with integers beyond ±(2^53 − 1) as strings. Text that is not valid JSON stays a string, and `preview=false` always returns the text.
+
 ## Views
 
 Time Series and Table can show a topic from its schema alone, since a number is simply plotted as a number. Images and point clouds cannot: where an image keeps its data, for example, differs from one user type to another.
 
 So Hahn defines common types for images, point clouds and the like (Hahn types), and the server converts messages of user types to them. This conversion is called a view. The client deals only in Hahn types and does not need to know user types.
 
-The current views are encoded or raw images, camera calibration, point clouds and GeoJSON (`image`, `camera_calibration`, `pointcloud`, `geo`). The Rust server converts `foxglove.CompressedImage`, `foxglove.RawImage`, `foxglove.CameraCalibration`, `foxglove.PointCloud` and `foxglove.LocationFix`.
+The current views are encoded or raw images, camera calibration, point clouds, poses and GeoJSON (`image`, `camera_calibration`, `pointcloud`, `pose`, `geo`). The Rust server converts `foxglove.CompressedImage`, `foxglove.RawImage`, `foxglove.CameraCalibration`, `foxglove.PointCloud`, `foxglove.Odometry` and `foxglove.LocationFix`.
 
 The API is the same for these types: `/views` and `/views/latest`, with the views of a topic listed in `/topics`. An encoded image supports `jpeg`, `png`, `webp` and `avif`; `jpg` is normalized to `jpeg`. Raw images retain their recorded pixels and row stride. Their supported encodings and required dimensions are in the schema.
 
-**In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example.
+**In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example. For pose views, its optional `target_frame` converts each pose into that frame at its own recording time; missing transforms produce per-frame errors so clients can leave gaps.
 
 ### Wire format
 
@@ -108,7 +110,7 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 
 ### Rules common to Hahn types
 
-A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. Point clouds omit points with non-finite positions. Missing poses use identity; zero-length quaternions also mean identity. These are current converter behaviors, not a general validation policy for future kinds.
+A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. The odometry view exposes its current pose in `frame_id`; velocities and covariances remain available as message fields. Point clouds omit points with non-finite positions. Missing poses use identity; zero-length quaternions also mean identity. These are current converter behaviors, not a general validation policy for future kinds.
 
 The client selects views by supported `kind`. Images in an unsupported format show an error. Current view values do not carry measurement stamps. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image recording time. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
 
