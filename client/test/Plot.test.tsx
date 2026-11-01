@@ -28,6 +28,7 @@ function setup(mode: "pan" | "zoom") {
         legend={{ visible: false, position: "top-left" }}
         selectedCount={0}
         onCanReset={() => {}}
+        onToggleSeries={() => {}}
       />
     </PlaybackContext.Provider>,
   );

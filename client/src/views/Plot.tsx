@@ -57,6 +57,7 @@ type Props = {
   /** Series chosen in the widget, including ones whose data has not arrived yet. */
   selectedCount: number;
   onCanReset: (canReset: boolean) => void;
+  onToggleSeries: (key: string) => void;
 };
 const right = 24,
   top = 30;
@@ -105,6 +106,7 @@ export function Plot({
   legend,
   selectedCount,
   onCanReset,
+  onToggleSeries,
 }: Props) {
   const bottom = timeDisplay === "absolute" ? 70 : 52;
   const time = useTimeFormatter(originNs, timeDisplay);
@@ -503,19 +505,19 @@ export function Plot({
       <Playhead domain={domain} left={left} top={top} w={w} h={h} />
       {legend.visible && (
         <div className="plot-legend" style={legendStyle}>
-          {!hasVisible && (
-            <span className="plot-legend-empty">
-              {selectedCount ? "No visible series" : "Add a field"}
-            </span>
-          )}
-          {series
-            .filter((s) => !s.hidden)
-            .map((s) => (
-              <div key={s.key} className="tooltip-row">
-                <i style={{ background: s.color }} />
-                <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
-              </div>
-            ))}
+          {!selectedCount && <span className="plot-legend-empty">Add a field</span>}
+          {series.map((s) => (
+            <button
+              key={s.key}
+              className="plot-legend-item"
+              aria-pressed={!s.hidden}
+              aria-label={`Toggle visibility for ${[s.topicName ?? s.topic, ...s.path].join(" ")}`}
+              onClick={() => onToggleSeries(s.key)}
+            >
+              <i style={{ background: s.color }} />
+              <SeriesName inline source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
+            </button>
+          ))}
         </div>
       )}
       {cursor !== null && pointerY !== null && hasVisible && (

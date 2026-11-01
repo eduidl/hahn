@@ -697,7 +697,43 @@ canvas {
   z-index: 1;
 }
 .plot-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  overflow-y: auto;
+  pointer-events: auto;
   background: #1a1a1ad9;
+}
+.plot-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: #cecece;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plot-legend-item:hover {
+  background: #ffffff14;
+}
+.plot-legend-item[aria-pressed="false"] {
+  color: #777777;
+  text-decoration: line-through;
+}
+.plot-legend-item[aria-pressed="false"] i {
+  opacity: 0.3;
+}
+.series-ref-inline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .plot-legend-empty {
   color: #858585;

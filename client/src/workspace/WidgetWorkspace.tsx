@@ -380,6 +380,14 @@ function TimeSeriesWindow({
         view={widget.view}
         onViewChange={onViewChange}
         onCanReset={setCanReset}
+        onToggleSeries={(key) =>
+          dispatch({
+            type: "series",
+            id: widget.id,
+            update: (list) =>
+              list.map((item) => (item.key === key ? { ...item, hidden: !item.hidden } : item)),
+          })
+        }
       />
     ),
     state: () => (
