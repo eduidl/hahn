@@ -44,7 +44,7 @@ const save = () =>
     runId: "run",
     sources: ["run/b"],
     zoneSource: "browser",
-    tab: "panel",
+    tab: "settings",
   });
 const shown = (): WorkspaceState => JSON.parse(screen.getByTestId("state").textContent!);
 const stored = () => JSON.parse(localStorage.getItem(key)!);
@@ -125,12 +125,85 @@ describe("App session restore", () => {
     render(<App />);
     const list = document.getElementById("widget-catalog")!;
     list.hidePopover = vi.fn();
-    fireEvent.dragStart(screen.getByText("Time Series").parentElement!, {
+    fireEvent.dragStart(list.querySelectorAll(".widget-catalog-item")[3], {
       dataTransfer: { setData: vi.fn() },
     });
     expect(list.hidePopover).not.toHaveBeenCalled();
     vi.advanceTimersByTime(0);
     expect(list.hidePopover).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    ["click", (item: HTMLElement) => fireEvent.click(item)],
+    ["Enter", (item: HTMLElement) => fireEvent.keyDown(item, { key: "Enter" })],
+    ["Space", (item: HTMLElement) => fireEvent.keyDown(item, { key: " " })],
+  ])("adds a widget from the list with %s and closes it", (_, activate) => {
+    server(() => json(run));
+    render(<App />);
+    const list = document.getElementById("widget-catalog")!;
+    list.hidePopover = vi.fn();
+    activate(screen.getByRole("button", { name: /^Log/, hidden: true }));
+    expect(Object.values(shown().widgets).map((w) => w.type)).toEqual(["time-series", "log"]);
+    expect(list.hidePopover).toHaveBeenCalledTimes(1);
+  });
+  describe("adding a field from the topic list", () => {
+    const topic = {
+      id: "/pose",
+      topic: "/pose",
+      schema_name: "Pose",
+      schema_encoding: "protobuf",
+      message_count: 1,
+      fields: [
+        { name: "x", data_type: "float64", type_name: "float64" },
+        { name: "label", data_type: "string", type_name: "string" },
+      ],
+      meta_fields: [],
+      views: [],
+      error: null,
+    };
+    const open = async () => {
+      localStorage.clear();
+      saveSession(localStorage, {
+        workspace: initialWorkspace(),
+        runId: "run",
+        sources: ["run/b"],
+        zoneSource: "browser",
+        tab: "topics",
+      });
+      fetchMock.mockImplementation((url: string) => {
+        if (url === "/api/runs/run") return json(run);
+        if (url.startsWith("/api/runs?")) return json({ items: [], truncated: false });
+        if (url.endsWith("/topics")) return json([topic]);
+        return json(info);
+      });
+      render(<App />);
+      fireEvent.click(await screen.findByText("/pose"));
+    };
+    const field = (name: string) => screen.getByText(name).closest<HTMLElement>(".topic-field")!;
+    const added = () => shown().widgets["widget-1"].series.map((s) => s.path.join("."));
+
+    it.each([
+      ["double-click", (row: HTMLElement) => fireEvent.doubleClick(row)],
+      ["Enter", (row: HTMLElement) => fireEvent.keyDown(row, { key: "Enter" })],
+      ["Space", (row: HTMLElement) => fireEvent.keyDown(row, { key: " " })],
+    ])("adds it to the selected widget with %s", async (_, activate) => {
+      await open();
+      activate(field("x"));
+      expect(added()).toEqual(["x"]);
+      expect(document.querySelector(".sidebar-status")!.textContent).toBe("");
+    });
+    it("says why a field cannot be added", async () => {
+      await open();
+      fireEvent.keyDown(field("label"), { key: "Enter" });
+      expect(added()).toEqual([]);
+      expect(document.querySelector(".sidebar-status")!.textContent).toContain(
+        "string is not supported",
+      );
+    });
+    it("does not add on a single click", async () => {
+      await open();
+      fireEvent.click(field("x"));
+      expect(added()).toEqual([]);
+    });
   });
   it("does not overwrite the session before the restore finishes", async () => {
     save();

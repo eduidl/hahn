@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type DragEvent } from "react";
 import { WidgetWorkspace, widgetSeries } from "./workspace/WidgetWorkspace";
-import { PanelSettings } from "./workspace/PanelSettings";
+import { WidgetSettings } from "./workspace/WidgetSettings";
 import {
   initialWorkspace,
   workspaceReducer,
   requestedSeries,
   addFieldAction,
+  addSelectedAction,
   widgetDragMime,
   widgetSpecs,
   widgetTypes,
@@ -95,7 +96,7 @@ export function App() {
   const [showErrorTopics, setShowErrorTopics] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<SidebarTab>(saved?.tab ?? "panel");
+  const [tab, setTab] = useState<SidebarTab>(saved?.tab ?? "settings");
   const [error, setError] = useState("");
   const loadingInfo = openSources.some((s) => !s || s.loading);
   const [drag, setDrag] = useState<TopicDrag | null>(null);
@@ -192,6 +193,10 @@ export function App() {
     window.addEventListener("pagehide", saveCurrent);
     return () => window.removeEventListener("pagehide", saveCurrent);
   }, []);
+  const addFromCatalog = (type: Widget["type"]) => {
+    dispatch(addSelectedAction(workspace, type));
+    document.getElementById("widget-catalog")?.hidePopover();
+  };
   const resetWorkspace = () => {
     discarded.current = true;
     // Clear first so a failed save still resets instead of keeping the old layout.
@@ -319,7 +324,18 @@ export function App() {
     <div
       key={keyOf(topic.source, topic.topic, field.path)}
       className="field topic-field"
+      // Not a <button>: Firefox does not drag those.
+      role="button"
+      tabIndex={0}
       draggable
+      onDoubleClick={() =>
+        addToSelected({ source: topic.source, topic: topic.topic, path: field.path })
+      }
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        addToSelected({ source: topic.source, topic: topic.topic, path: field.path });
+      }}
       onDragStart={(e) =>
         startDrag(e, {
           source: topic.source,
@@ -384,8 +400,8 @@ export function App() {
                   </button>
                   {groups.length > 1 && (
                     <button
-                      className="recording-trigger"
-                      popoverTarget="recording-menu"
+                      className="group-trigger"
+                      popoverTarget="group-menu"
                       aria-label="Open groups"
                       title="Open groups"
                     >
@@ -407,23 +423,23 @@ export function App() {
                   )}
                 </div>
                 <div
-                  id="recording-menu"
-                  className="recording-menu"
+                  id="group-menu"
+                  className="group-menu"
                   popover="auto"
                   role="dialog"
                   aria-label="Open groups"
                 >
                   <h2>Open groups</h2>
                   <p className="help">Open groups are displayed on a shared timeline.</p>
-                  <div className="recording-list">
+                  <div className="group-list">
                     {groups.map((g) => (
-                      <label key={g.source} className="recording-option">
+                      <label key={g.source} className="group-option">
                         <input
                           type="checkbox"
                           checked={sources.includes(g.source)}
                           onChange={(e) => toggleSource(g.source, e.target.checked)}
                         />
-                        <span className="recording-name" title={g.name}>
+                        <span className="group-name" title={g.name}>
                           {g.name}
                         </span>
                       </label>
@@ -446,12 +462,24 @@ export function App() {
                   role="dialog"
                   aria-label="Add widget"
                 >
-                  <p className="help">Drag to the desired position.</p>
+                  <p className="help">
+                    Click to add next to the selected widget, or drag to a position.
+                  </p>
                   {widgetTypes.map((type) => (
                     <div
                       key={type}
                       className="widget-catalog-item"
+                      // Not a <button>: Firefox does not drag those.
+                      role="button"
+                      tabIndex={0}
                       draggable
+                      onClick={() => addFromCatalog(type)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        addFromCatalog(type);
+                      }}
                       onDragStart={(event) => {
                         event.dataTransfer.setData(widgetDragMime, type);
                         // react-dnd (used by the mosaic) cancels drags without a native type.
@@ -479,11 +507,11 @@ export function App() {
                 <aside>
                   <div className="sidebar-tabs" role="tablist" aria-label="Sidebar">
                     <button
-                      id="tab-panel"
+                      id="tab-settings"
                       role="tab"
-                      aria-controls="sidebar-panel"
-                      aria-selected={tab === "panel"}
-                      onClick={() => setTab("panel")}
+                      aria-controls="sidebar-settings"
+                      aria-selected={tab === "settings"}
+                      onClick={() => setTab("settings")}
                     >
                       Panel settings
                     </button>

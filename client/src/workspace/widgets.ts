@@ -513,6 +513,22 @@ export function subtreeIds(state: WorkspaceState, id: string): string[] {
 export const canPlaceWidget = (type: Widget["type"], container?: Container) =>
   type !== "tabs" || container === undefined;
 
+/** Adds beside the selected widget, or into the open tab when a Tabs widget is selected. */
+export function addSelectedAction(state: WorkspaceState, type: Widget["type"]): WorkspaceAction {
+  const selected = state.activeId ? state.widgets[state.activeId] : undefined;
+  if (!selected) return { type: "add", widgetType: type };
+  if (selected.type === "tabs" && type !== "tabs")
+    return {
+      type: "add",
+      widgetType: type,
+      container: { widgetId: selected.id, tabId: selected.activeTabId },
+    };
+  const owner = ownerOf(state, selected.id);
+  // A Tabs widget cannot nest, so it goes beside the one holding the selection.
+  const target = owner && !canPlaceWidget(type, owner) ? owner.widgetId : selected.id;
+  return { type: "add", widgetType: type, target };
+}
+
 export function canMove(
   state: WorkspaceState,
   id: string,
