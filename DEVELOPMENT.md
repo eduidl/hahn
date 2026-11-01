@@ -37,6 +37,19 @@ cargo run --manifest-path server/Cargo.toml --locked --example generate_visual -
 
 この2つの録画を配信するサーバに対して、`client/` で `BASE_URL=http://host:port npm run conformance` を実行します。実データの比較は任意のローカル確認です。必要な場合だけ `MCAP_TEST_DATA_DIR=/path/to/recordings cargo test --manifest-path server/Cargo.toml --locked --test real_data -- --ignored` を実行し、録画や出力を共有するテストへ持ち込みません。
 
+## Running the client in development
+
+Start the server, then run `npm --prefix client run dev`. Vite forwards `/api` to port 3000.
+
+## Measuring performance
+
+Use a release build with a real topic and field.
+
+```bash
+python3 scripts/measure_stream.py http://127.0.0.1:3000/api/runs/$RUN/groups/$GROUP/messages \
+  --topic <topic> --field <field>
+```
+
 This prints the seconds to the first batch and to completion, the bytes transferred, and the row count. To see the server's peak memory, start it with `/usr/bin/time -v server/target/release/hahn --data-dir ...`; memory-mapped file pages count toward it. In the browser, use the Performance and Memory tools. Measure the first load separately from later loads that benefit from the OS cache.
 
 ## UI wording
