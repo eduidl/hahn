@@ -7,6 +7,11 @@ import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import { addFieldAction, initialWorkspace, workspaceReducer } from "../src/workspace/widgets";
 import type { Topic } from "../src/types";
 
+vi.mock("../src/data/useViewData", async (original) => ({
+  ...(await original<typeof import("../src/data/useViewData")>()),
+  useFrames: () => ({ frames: [], error: "" }),
+}));
+
 afterEach(cleanup);
 
 it("separates the image from additional topics and removes them together", () => {
