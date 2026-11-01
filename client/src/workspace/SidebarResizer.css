@@ -1,0 +1,21 @@
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer:hover,
+.sidebar-resizer:active,
+.sidebar-resizer:focus-visible {
+  outline: 0;
+  background: #91b8ff66;
+}
+@media (max-width: 640px) {
+  .sidebar-resizer {
+    display: none;
+  }
+}

@@ -1,3 +1,4 @@
+import "./WidgetSettings.css";
 import { TabSettings } from "./TabControls";
 import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { addableFields } from "./drop";

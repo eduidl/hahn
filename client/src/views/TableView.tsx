@@ -1,3 +1,4 @@
+import "./TableView.css";
 import { useEffect, useMemo, useRef, useState, type Dispatch, useContext } from "react";
 import { secondsFrom } from "../data/data";
 import type { FieldIndex } from "../workspace/fieldIndex";

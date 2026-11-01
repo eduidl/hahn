@@ -1,0 +1,91 @@
+/* Raw Message: a folding tree of the message at the playback position. */
+/* Fills the chart area and scrolls on its own; the toolbar stays on top. */
+.raw-message {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 8px 12px 12px;
+  font:
+    12px ui-monospace,
+    monospace;
+  color: #cecece;
+}
+.raw-status {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.raw-status:not(.raw-error) {
+  color: #858585;
+}
+.raw-toolbar {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -8px -12px 6px;
+  padding: 6px 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid #242424;
+}
+.raw-toolbar .raw-status {
+  flex: 1;
+  margin: 0;
+}
+.raw-toolbar button {
+  padding: 3px 7px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.raw-node > summary {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.raw-node > summary::before {
+  content: "›";
+  color: #777;
+  width: 8px;
+}
+.raw-node[open] > summary::before {
+  content: "⌄";
+}
+.raw-children {
+  margin-left: 3px;
+  padding-left: 8px;
+  border-left: 1px solid #2a2a2a;
+}
+.raw-leaf {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0 2px 16px;
+  min-width: 0;
+}
+.raw-key {
+  color: #91b8ff;
+  flex-shrink: 0;
+}
+.raw-meta {
+  color: #6f6f6f;
+}
+.raw-value {
+  overflow-wrap: anywhere;
+}
+.raw-string {
+  color: #b8d88a;
+}
+.raw-number {
+  color: #f3bf78;
+}
+.raw-boolean {
+  color: #d69bf3;
+}
+.raw-null {
+  color: #6f6f6f;
+}
+.raw-more {
+  padding: 2px 0 2px 16px;
+}

@@ -1,0 +1,47 @@
+.view-image.zoomed {
+  cursor: grab;
+  touch-action: none;
+}
+.view-image-stage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+.view-image-reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.view-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.view-image .view-time,
+.view-image .view-status,
+.view-image .view-error {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.view-image canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.view-image .projection-error {
+  top: 38px;
+}
+/* Covers the image, so it shows on demand; without hover it has to stay. */
+@media (hover: hover) {
+  .view-image .view-time {
+    visibility: hidden;
+  }
+  .view-image:hover .view-time {
+    visibility: visible;
+  }
+}

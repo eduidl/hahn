@@ -1,3 +1,4 @@
+import "./ValueChangesView.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { stateLabel } from "../data/data";
 import type { Series } from "./Plot";

@@ -1,3 +1,4 @@
+import "./SeriesName.css";
 import { Fragment } from "react";
 import { useSourceLabel } from "./data/sources";
 

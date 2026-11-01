@@ -1,0 +1,20 @@
+.widget-help {
+  font-size: 13px;
+}
+.widget-help-list {
+  position: fixed;
+  /* Override the popover UA centering; the anchor decides the position. */
+  inset: auto;
+  margin: 4px 0;
+  position-area: bottom span-left;
+  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+  padding: 6px 10px;
+  width: max-content;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #ddd;
+  background: #202020;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px #0008;
+}

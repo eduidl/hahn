@@ -1,3 +1,4 @@
+import "./TimeZoneSelect.css";
 import { browserTimeZone, type TimeDisplay, type TimeZoneSource } from "../timeDisplay";
 
 /** The workspace's timezone, naming which side each choice comes from. */

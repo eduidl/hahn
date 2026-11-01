@@ -1,3 +1,4 @@
+import "./WidgetWorkspace.css";
 import {
   Suspense,
   createContext,
@@ -17,7 +18,6 @@ import { TabBar } from "./TabControls";
 import { timeTicks } from "../views/ticks";
 import { axisRange, clampAxis, isDefaultView, zoomAxis, type AxisRange } from "../views/axes";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
-import "react-mosaic-component/react-mosaic-component.css";
 import { WidgetHelp } from "./WidgetHelp";
 import { Plot, defaultPlotView, wheelZoomFactor, type PlotView, type Series } from "../views/Plot";
 import { useTimeFormatter } from "../timeDisplay";

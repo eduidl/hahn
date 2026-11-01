@@ -1,3 +1,4 @@
+import "./ImageView.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { secondsFrom } from "../data/data";
