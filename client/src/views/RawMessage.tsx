@@ -133,7 +133,7 @@ export function RawMessage({
 }) {
   const series = widget.series[0];
   const { message, error } = useCurrentMessage(series, info);
-  const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
+  const formatter = useTimeFormatter(info?.start_ns ?? null);
 
   const folding = useMemo(() => new Map<string, boolean>(), [series?.key, info?.start_ns]);
   const tree = useRef<HTMLDivElement>(null);

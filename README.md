@@ -73,6 +73,7 @@ For CSV and Parquet:
 | --- | --- |
 | Wheel | Zoom the time axis of a plot or state row |
 | Shift + wheel | Zoom the value axis of a plot |
+| Wheel or drag on an image | Zoom, or pan while zoomed |
 | Click a plot or state row | Move the playback position there |
 | Click a legend item | Show or hide that series |
 | Drag | Pan or box zoom, depending on the widget's mode |

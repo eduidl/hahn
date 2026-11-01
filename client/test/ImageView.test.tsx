@@ -211,3 +211,23 @@ it("displays raw images without encoding them as image files", async () => {
   view.unmount();
   expect(bitmap.close).toHaveBeenCalledOnce();
 });
+
+describe("image zoom", () => {
+  const center = { x: 0.5, y: 0.5 };
+  it("keeps the image point under the pointer", () => {
+    const view = zoomImage({ zoom: 2, x: -0.5, y: -0.25 }, 1.5, { x: 0.25, y: 0.75 });
+    expect(view.zoom).toBe(3);
+    expect((0.25 - view.x) / 3).toBeCloseTo((0.25 + 0.5) / 2);
+    expect((0.75 - view.y) / 3).toBeCloseTo((0.75 + 0.25) / 2);
+  });
+  it("returns to the full image when zoomed out, wherever it was moved", () => {
+    expect(zoomImage({ zoom: 1.05, x: -0.05, y: 0 }, 0.5, center)).toEqual(fullImage);
+  });
+  it("stops zooming at the limit", () => {
+    const view = zoomImage({ zoom: 30, x: -14.5, y: -14.5 }, 2, center);
+    expect(view.zoom).toBe(32);
+  });
+  it("pans only as far as the image still covers the view", () => {
+    expect(panImage({ zoom: 2, x: -0.5, y: -0.5 }, 0.9, -0.9)).toEqual({ zoom: 2, x: 0, y: -1 });
+  });
+});

@@ -62,7 +62,7 @@ export function ValueChangesView({
   const visibility = JSON.stringify(series.map((s) => [s.key, s.hidden, s.points.length]));
   // Points grow in place, so rebuild on new data rather than on every playhead frame.
   const rows = useMemo(() => changes(series), [visibility, revision]);
-  const formatter = useTimeFormatter(originNs, widget.timeDisplay);
+  const formatter = useTimeFormatter(originNs);
   const list = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(0);
