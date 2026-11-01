@@ -150,6 +150,25 @@ describe("widget workspace", () => {
     expect(state.widgets["widget-1"].series).toEqual([other]);
     expect(state.widgets["widget-1"].view).toEqual(defaultPlotView());
   });
+  it("keeps views and frames but still drops closed series when restoring", () => {
+    const other: Selected = { ...series, key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
+    const zoomed = { x: { center: 0.2, zoom: 4 } };
+    let state = reduce(initialWorkspace(), {
+      type: "series",
+      id: "widget-1",
+      update: () => [series, other],
+    });
+    state = reduce(state, {
+      type: "view",
+      id: "widget-1",
+      update: (view) => ({ ...view, ...zoomed }),
+    });
+    state = reduce(state, { type: "fixed-frame", id: "widget-1", value: "map" });
+    state = reduce(state, { type: "sources", open: new Set(["r/1"]), keepViews: true });
+    expect(state.widgets["widget-1"].series).toEqual([other]);
+    expect(state.widgets["widget-1"].view.x).toEqual(zoomed.x);
+    expect(state.widgets["widget-1"].fixedFrame).toBe("map");
+  });
   it("temporarily expands without changing layout or widget state", () => {
     let state = reduce(initialWorkspace(), { type: "add" });
     const layout = state.layout;
