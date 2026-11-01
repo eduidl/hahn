@@ -268,7 +268,7 @@ export function StatePlot({
           </div>
         </div>
       ))}
-      <StateAxis formatter={formatter} domain={domain} />
+      {visible.length > 0 && <StateAxis formatter={formatter} domain={domain} />}
     </div>
   );
 }
