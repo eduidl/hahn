@@ -8,6 +8,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("clampSidebarWidth", () => {
+  it("stays within its limits", () => {
+    expect(clampSidebarWidth(100, 1400)).toBe(200);
+    expect(clampSidebarWidth(350, 1400)).toBe(350);
+    expect(clampSidebarWidth(900, 1400)).toBe(600);
+  });
+  it("leaves room for the widgets, except below the minimum width", () => {
+    expect(clampSidebarWidth(600, 800)).toBe(480);
+    expect(clampSidebarWidth(600, 400)).toBe(200);
+  });
+});
+
 describe("SidebarResizer", () => {
   const setup = () => {
     const onResize = vi.fn();

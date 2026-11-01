@@ -84,8 +84,12 @@ header {
   background: #91b8ff;
 }
 .workspace {
+  --sidebar-default: 300px;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  /* Also applies when the window shrinks after the sidebar was resized. */
+  grid-template-columns:
+    min(var(--sidebar-width, var(--sidebar-default)), max(200px, calc(100% - 320px)))
+    minmax(0, 1fr);
   min-height: calc(100vh - 73px - var(--playback-height));
 }
 aside {
@@ -820,9 +824,6 @@ textarea:focus-visible {
   }
 }
 @media (max-width: 900px) {
-  .workspace {
-    grid-template-columns: 240px minmax(0, 1fr);
-  }
   main {
     padding: 23px 18px 0;
   }
@@ -1122,7 +1123,22 @@ summary .unreadable {
 }
 @media (max-width: 900px) and (min-width: 641px) {
   .workspace {
-    grid-template-columns: 290px minmax(0, 1fr);
+    --sidebar-default: 290px;
+  }
+}
+/* The stacked layout of narrow windows has no sidebar edge, and nothing to give room to. */
+@media (min-width: 641px) {
+  .workspace.sidebar-closed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace.sidebar-closed > aside {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .sidebar-toggle,
+  .sidebar-resizer {
+    display: none;
   }
 }
 @media (max-width: 640px) {

@@ -17,12 +17,20 @@ const session = (): Session => ({
   zoneSource: "server",
   timeDisplay: "offset",
   tab: "topics",
+  sidebarWidth: 420,
+  sidebarOpen: false,
 });
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 describe("session persistence", () => {
   beforeEach(() => localStorage.clear());
 
+  it("defaults the sidebar for a session saved without it or with a bad width", () => {
+    const saved = { ...session(), sidebarWidth: 9000 } as Partial<Session>;
+    delete saved.sidebarOpen;
+    saveSession(localStorage, saved as Session);
+    expect(loadSession(localStorage)).toMatchObject({ sidebarWidth: null, sidebarOpen: true });
+  });
   it("round-trips a session", () => {
     const saved = session();
     saveSession(localStorage, saved);

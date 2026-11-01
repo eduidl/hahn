@@ -11,6 +11,9 @@ export type Session = {
   zoneSource: TimeZoneSource;
   timeDisplay: TimeDisplay;
   tab: SidebarTab;
+  /** Null until resized, leaving the width to the stylesheet. */
+  sidebarWidth: number | null;
+  sidebarOpen: boolean;
 };
 export type SidebarTab = "settings" | "topics" | "errors";
 
@@ -100,6 +103,13 @@ export function loadSession(storage: Storage | null): Session | null {
       zoneSource: saved.zoneSource === "server" ? "server" : "browser",
       timeDisplay: saved.timeDisplay === "offset" ? "offset" : "absolute",
       tab: saved.tab === "topics" || saved.tab === "errors" ? saved.tab : "settings",
+      sidebarWidth:
+        typeof saved.sidebarWidth === "number" &&
+        saved.sidebarWidth >= minSidebarWidth &&
+        saved.sidebarWidth <= maxSidebarWidth
+          ? saved.sidebarWidth
+          : null,
+      sidebarOpen: saved.sidebarOpen !== false,
     };
   } catch {
     return null;
