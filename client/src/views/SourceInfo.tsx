@@ -22,16 +22,15 @@ export function SourceInfo({ info, sources }: { info: Info | null; sources: Open
   const names = useContext(SourceNames);
   const start = useTimeFormatter(info?.start_ns ?? null, "absolute");
   const end = useTimeFormatter(info?.end_ns ?? null, "absolute");
-  if (!sources.length) return <p className="source-info-status">Open a run from the header</p>;
-  if (sources.some((source) => source.loading))
-    return <p className="source-info-status">Loading…</p>;
+  if (!sources.length) return <p className="widget-status">Open a run from the header</p>;
+  if (sources.some((source) => source.loading)) return <p className="widget-status">Loading…</p>;
   const failed = sources.filter((source) => source.error);
   const multiple = sources.length > 1;
   const topicCount = sources.reduce((count, source) => count + source.topics.length, 0);
   return (
     <div className="source-info">
       {failed.map((source) => (
-        <p key={source.id} className="source-info-status raw-error" role="alert">
+        <p key={source.id} className="widget-status widget-status-error" role="alert">
           {names.get(source.id) ?? source.id}: {source.error}
         </p>
       ))}
@@ -68,7 +67,7 @@ export function SourceInfo({ info, sources }: { info: Info | null; sources: Open
                   {multiple && <td>{names.get(source.id) ?? source.id}</td>}
                   <td>
                     {topic.topicName ?? topic.topic}
-                    {topic.error && <div className="raw-error">{topic.error}</div>}
+                    {topic.error && <div className="widget-status-error">{topic.error}</div>}
                   </td>
                   <td>{topic.schema_name ?? "—"}</td>
                   <td className="number">{topic.message_count?.toLocaleString() ?? "—"}</td>

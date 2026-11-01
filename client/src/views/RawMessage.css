@@ -39,6 +39,7 @@
   font-size: 12px;
 }
 .raw-node > summary {
+  font-family: var(--font-mono);
   display: flex;
   gap: 8px;
   padding: 2px 0;
@@ -47,7 +48,7 @@
 }
 .raw-node > summary::before {
   content: "›";
-  color: #777;
+  color: var(--text-faint);
   width: 8px;
 }
 .raw-node[open] > summary::before {
@@ -56,7 +57,7 @@
 .raw-children {
   margin-left: 3px;
   padding-left: 8px;
-  border-left: 1px solid #2a2a2a;
+  border-left: 1px solid var(--line);
 }
 .raw-leaf {
   display: flex;
@@ -65,11 +66,11 @@
   min-width: 0;
 }
 .raw-key {
-  color: #91b8ff;
+  color: var(--accent);
   flex-shrink: 0;
 }
 .raw-meta {
-  color: #6f6f6f;
+  color: var(--text-faint);
 }
 .raw-value {
   overflow-wrap: anywhere;
@@ -84,7 +85,7 @@
   color: #d69bf3;
 }
 .raw-null {
-  color: #6f6f6f;
+  color: var(--text-faint);
 }
 .raw-more {
   padding: 2px 0 2px 16px;

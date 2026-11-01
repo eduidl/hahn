@@ -130,9 +130,13 @@
 .widget-icon:disabled {
   opacity: 0.35;
 }
-.value-changes-empty {
-  margin: 12px;
-  color: #858585;
+/* A short message in place of a widget's content: loading, nothing to show, or a failure. */
+.widget-status {
+  margin: 0;
+  padding: 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-faint);
 }
 .raw-error {
   color: #ffc6ab;

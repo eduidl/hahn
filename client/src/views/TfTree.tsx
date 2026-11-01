@@ -184,15 +184,15 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
     }
     setPoseOffset((offset) => ({ x: offset.x + dx, y: offset.y + dy }));
   };
-  if (!runId) return <p className="tf-tree-status">Open a run from the header</p>;
-  if (!state) return <p className="tf-tree-status">Loading…</p>;
+  if (!runId) return <p className="widget-status">Open a run from the header</p>;
+  if (!state) return <p className="widget-status">Loading…</p>;
   if (state.error)
     return (
-      <p className="tf-tree-status raw-error" role="alert">
+      <p className="widget-status widget-status-error" role="alert">
         {state.error}
       </p>
     );
-  if (!nodes.length) return <p className="tf-tree-status">No frames</p>;
+  if (!nodes.length) return <p className="widget-status">No frames</p>;
   return (
     <div className="tf-tree">
       <div className="tf-tree-controls">

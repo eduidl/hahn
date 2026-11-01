@@ -1,3 +1,7 @@
+.series-ref,
+.series-ref-inline {
+  font-family: var(--font-mono);
+}
 /* Shared notation for a series: [recording,] topic over field path, optional type below. */
 .series-ref {
   display: flex;
@@ -5,13 +9,13 @@
   flex: 1;
   min-width: 0;
   line-height: 1.45;
-  color: #cecece;
+  color: var(--text);
   /* Segments break at <wbr>; split a segment only when it alone overflows. */
   overflow-wrap: break-word;
 }
 .series-ref-source,
 .series-ref-type {
-  color: #6f6f6f;
+  color: var(--text-faint);
   font-size: 12px;
 }
 .series-ref-inline {
@@ -28,4 +32,11 @@
 /* The parent gives way first: the field is what tells series apart. */
 .series-ref-parent {
   flex-shrink: 1000;
+}
+.series-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
