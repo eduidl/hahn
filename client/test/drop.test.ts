@@ -71,7 +71,7 @@ describe("drop verdict", () => {
     expect(verdict(["mode"], widget("time-series")).ok).toBe(true);
     expect(verdict(["name"], widget("time-series"))).toEqual({
       ok: false,
-      reason: "string is not supported. Select numeric, bool, enum.",
+      reason: "string is not supported. This widget accepts numeric, bool, enum fields.",
     });
     expect(verdict(["flag"], widget("time-series", [fields[0]]))).toEqual({
       ok: false,
@@ -89,7 +89,7 @@ describe("drop verdict", () => {
     expect(verdict(["name"], widget("state", [fields[1]])).ok).toBe(true);
     expect(verdict(["speed"], widget("state"))).toEqual({
       ok: false,
-      reason: "float64 is not supported. Select bool, enum, string.",
+      reason: "float64 is not supported. This widget accepts bool, enum, string fields.",
     });
   });
 
@@ -101,7 +101,7 @@ describe("drop verdict", () => {
   });
   it("rejects duplicates, structs, topics and unreadable topics", () => {
     expect(verdict(["speed"], widget("time-series", [fields[0]]))).toMatchObject({
-      reason: "Already added.",
+      reason: "Already added",
     });
     expect(verdict(["pose"], widget("time-series"))).toMatchObject({
       reason: expect.stringMatching(/^struct is not supported/),
@@ -124,7 +124,7 @@ describe("drop verdict", () => {
       ),
     ).toEqual({
       ok: false,
-      reason: "No messages.",
+      reason: "No messages",
     });
   });
 
@@ -148,7 +148,7 @@ describe("raw message widget", () => {
       replaces: true,
     });
     expect(verdict(["speed"], widget("raw", [fields[0]]))).toMatchObject({
-      reason: "Already added.",
+      reason: "Already added",
     });
     expect(addableFields(index, widget("raw")).map((entry) => entry.label)).toContain("/t");
   });

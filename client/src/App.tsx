@@ -680,7 +680,7 @@ export function App() {
                       onDrop={(event) => drop(event)}
                     >
                       {activeWidget ? (
-                        <PanelSettings
+                        <WidgetSettings
                           widget={activeWidget}
                           dispatch={dispatch}
                           records={[...records, ...messages.records]}
@@ -700,10 +700,10 @@ export function App() {
                       aria-labelledby="tab-errors"
                     >
                       <div className="field-heading">
-                        <span className="eyebrow">ERRORS</span>
+                        <span className="eyebrow">Errors</span>
                         <span>{errorCount}</span>
                       </div>
-                      {!errorCount && <p className="muted">No errors.</p>}
+                      {!errorCount && <p className="muted">No errors</p>}
                       {error && (
                         <div className="error-item">
                           <strong>Loading run</strong>

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useReducer } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { PanelSettings } from "../src/workspace/PanelSettings";
+import { WidgetSettings } from "../src/workspace/WidgetSettings";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import { addFieldAction, initialWorkspace, workspaceReducer } from "../src/workspace/widgets";
 import type { Topic } from "../src/types";
@@ -41,7 +41,7 @@ it("separates the image from additional topics and removes them together", () =>
   function Harness() {
     const [current, dispatch] = useReducer(workspaceReducer, state);
     return (
-      <PanelSettings
+      <WidgetSettings
         widget={current.widgets["widget-1"]}
         dispatch={dispatch}
         records={[]}
@@ -60,7 +60,7 @@ it("separates the image from additional topics and removes them together", () =>
   fireEvent.click(screen.getByRole("button", { name: "Remove image topic" }));
   expect(screen.queryByText("/lidar")).toBeNull();
   expect(screen.getByText("Select an image topic first.")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "+ Add topic" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Add topic" }).hasAttribute("disabled")).toBe(true);
 });
 
 it("sets an independent image distance in the 3D panel", () => {
@@ -89,7 +89,7 @@ it("sets an independent image distance in the 3D panel", () => {
     const [current, dispatch] = useReducer(workspaceReducer, state);
     return (
       <>
-        <PanelSettings
+        <WidgetSettings
           widget={current.widgets["widget-1"]}
           dispatch={dispatch}
           records={[]}
@@ -137,7 +137,7 @@ it("sets and clears a pose topic's trail duration", () => {
     const [current, dispatch] = useReducer(workspaceReducer, state);
     return (
       <>
-        <PanelSettings
+        <WidgetSettings
           widget={current.widgets["widget-1"]}
           dispatch={dispatch}
           records={[]}

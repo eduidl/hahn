@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useReducer } from "react";
-import { PanelSettings } from "../src/workspace/PanelSettings";
+import { WidgetSettings } from "../src/workspace/WidgetSettings";
 import { TableView, messageAt } from "../src/views/TableView";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import { createPlaybackStore, PlaybackContext } from "../src/workspace/playback";
@@ -101,7 +101,7 @@ describe("table playback", () => {
     fireEvent.keyDown(next, { key: "Enter" });
     expect(store.getState().time).toBe(501);
   });
-  it("toggles individual columns from panel settings and keeps time when all are hidden", () => {
+  it("toggles individual columns from settings and keeps time when all are hidden", () => {
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -140,7 +140,7 @@ describe("table playback", () => {
       const widget = state.widgets["widget-2"];
       return (
         <PlaybackContext.Provider value={store}>
-          <PanelSettings
+          <WidgetSettings
             widget={widget}
             dispatch={dispatch}
             index={index}
