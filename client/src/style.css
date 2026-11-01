@@ -1424,6 +1424,7 @@ header .add-widget {
   padding: 12px;
   text-align: center;
 }
+/* Fills the widget, so that the wheel zooms over the empty space below the rows too. */
 .state-plot {
   flex: 1;
   box-sizing: border-box;

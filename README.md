@@ -76,7 +76,6 @@ For CSV and Parquet:
 | Click a plot or state row | Move the playback position there |
 | Click a legend item | Show or hide that series |
 | Drag | Pan or box zoom, depending on the widget's mode |
-| Double-click a plot or state row | Reset its view |
 | Double-click a field, or press Enter on it | Add it to the selected widget |
 | Space | Play or pause |
 | Left / Right | Move 0.1 s back or forward |

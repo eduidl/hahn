@@ -93,11 +93,11 @@ describe("State transition zoom", () => {
     // The time under the pointer stays put: 25% of the full range before and after.
     expect(view.x.center - 0.25 / view.x.zoom).toBeCloseTo(0.5 - 0.25);
   });
-  it("leaves the wheel to scrolling over a label", () => {
+  it("zooms over a label as well", () => {
     setup();
     const event = wheel(screen.getByText("mode"), -100);
-    expect(event.defaultPrevented).toBe(false);
-    expect(view.x.zoom).toBe(1);
+    expect(event.defaultPrevented).toBe(true);
+    expect(view.x.zoom).toBeGreaterThan(1);
   });
   it("stays inside the recording when zooming out somewhere else", () => {
     const { track } = setup();
@@ -137,9 +137,10 @@ describe("State transition zoom", () => {
     expect(store.getState().time).toBe(0);
     expect(document.querySelector(".playhead")).toBeNull();
   });
-  it("resets on double-click", () => {
-    const { track } = setup({ ...defaultPlotView(), x: { center: 0.5, zoom: 2 } });
+  it("keeps the view on double-click", () => {
+    const zoomed = { center: 0.5, zoom: 2 };
+    const { track } = setup({ ...defaultPlotView(), x: zoomed });
     fireEvent.doubleClick(track);
-    expect(view.x).toEqual(defaultPlotView().x);
+    expect(view.x).toEqual(zoomed);
   });
 });
