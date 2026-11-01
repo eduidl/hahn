@@ -125,6 +125,34 @@ describe("widgets showing views", () => {
   });
 });
 
+describe("the frame of a 3D widget", () => {
+  const withFrame = () =>
+    workspaceReducer(widgetOf("scene"), { type: "fixed-frame", id: "widget-1", value: "base" });
+  it("is forgotten once its last topic is gone", () => {
+    const series = {
+      key: "k",
+      source: "r/0",
+      topic: "/t",
+      path: [],
+      color: "#fff",
+      lineWidth: 1,
+      hidden: false,
+    };
+    let state = workspaceReducer(withFrame(), {
+      type: "series",
+      id: "widget-1",
+      update: () => [series],
+    });
+    expect(state.widgets["widget-1"].fixedFrame).toBe("base");
+    state = workspaceReducer(state, { type: "series", id: "widget-1", update: () => [] });
+    expect(state.widgets["widget-1"].fixedFrame).toBeNull();
+  });
+  it("is forgotten when the widget is cleared", () => {
+    const state = workspaceReducer(withFrame(), { type: "clear", id: "widget-1" });
+    expect(state.widgets["widget-1"].fixedFrame).toBeNull();
+  });
+});
+
 describe("fixedFrameOf", () => {
   const frames = [
     { id: "base", parent: "map" },

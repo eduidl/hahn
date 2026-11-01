@@ -919,7 +919,11 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       }
       const updated =
         action.type === "series"
-          ? withSeries(current, action.update(current.series))
+          ? // With nothing left, the next topic added decides the frame again.
+            {
+              ...withSeries(current, action.update(current.series)),
+              ...(action.update(current.series).length ? {} : { fixedFrame: null }),
+            }
           : action.type === "view"
             ? { ...current, view: action.update(current.view) }
             : action.type === "clear"
@@ -929,6 +933,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                   hiddenColumns: [],
                   columnWidths: {},
                   view: defaultPlotView(),
+                  fixedFrame: null,
                 }
               : action.type === "legend"
                 ? { ...current, legend: { ...current.legend, ...action.value } }
