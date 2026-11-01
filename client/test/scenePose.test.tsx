@@ -23,7 +23,13 @@ vi.mock("../src/data/viewFrames", async (original) => ({
 }));
 
 it("places the latest pose in the fixed frame and hides it if the transform is missing", () => {
-  const stage = { scene: new THREE.Scene(), invalidate: vi.fn(), fit: vi.fn(), reframe: vi.fn() };
+  const stage = {
+    scene: new THREE.Scene(),
+    invalidate: vi.fn(),
+    fit: vi.fn(),
+    reframe: vi.fn(),
+    resetView: vi.fn(),
+  };
   const series = {
     key: "pose",
     source: "r/0",
@@ -63,7 +69,13 @@ it("places the latest pose in the fixed frame and hides it if the transform is m
 });
 
 it("shows the trajectory up to playback and updates it when seeking", async () => {
-  const stage = { scene: new THREE.Scene(), invalidate: vi.fn(), fit: vi.fn(), reframe: vi.fn() };
+  const stage = {
+    scene: new THREE.Scene(),
+    invalidate: vi.fn(),
+    fit: vi.fn(),
+    reframe: vi.fn(),
+    resetView: vi.fn(),
+  };
   const series = {
     key: "pose",
     source: "r/0",

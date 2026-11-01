@@ -228,6 +228,18 @@ it("lays out the rest without a moved widget once its drag has begun, until it e
   expect(shells().map((shell) => shell.getAttribute("data-widget-id"))).toEqual(before);
 });
 
+it("offers the 3D view a reset, at the same place in the title bar", () => {
+  const state = reduce(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "scene",
+  });
+  render(<Harness initialState={state} />);
+  const reset = screen.getByRole("button", { name: "Reset view" }) as HTMLButtonElement;
+  expect(reset.disabled).toBe(false);
+  expect(reset.nextElementSibling?.getAttribute("role")).toBe("separator");
+});
+
 describe("Tab widget interactions", () => {
   it("adds a TF Tree widget inside a tab", () => {
     render(<Harness />);

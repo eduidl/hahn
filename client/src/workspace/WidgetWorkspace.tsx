@@ -373,6 +373,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, owner)) ||
     (!!moving.id && canMove(state, moving.id, owner, widget.id));
   const [canReset, setCanReset] = useState(false);
+  const [sceneResetCount, setSceneResetCount] = useState(0);
   const verdict = widget.type === "tabs" ? null : dragVerdict(widget);
   const onViewChange = useCallback(
     (update: (view: PlotView) => PlotView) => dispatch({ type: "view", id: widget.id, update }),
@@ -638,16 +639,21 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 </button>
               </div>
             )}
-            {hasViewControls && (
+            {(hasViewControls || widget.type === "scene") && (
               <>
                 <button
                   className="widget-icon"
                   aria-label="Reset view"
                   title="Reset view"
                   disabled={
-                    !info || !(widget.type === "state" ? !isDefaultView(widget.view.x) : canReset)
+                    widget.type !== "scene" &&
+                    (!info || !(widget.type === "state" ? !isDefaultView(widget.view.x) : canReset))
                   }
-                  onClick={() => onViewChange(() => defaultPlotView())}
+                  onClick={() =>
+                    widget.type === "scene"
+                      ? setSceneResetCount((count) => count + 1)
+                      : onViewChange(() => defaultPlotView())
+                  }
                 >
                   <svg
                     width="15"

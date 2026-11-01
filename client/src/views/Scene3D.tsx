@@ -31,6 +31,7 @@ type Stage = {
   invalidate: () => void;
   fit: (object: THREE.Object3D) => void;
   reframe: (transform: Transform) => void;
+  resetView: () => void;
 };
 
 const matrixOf = ({ translation, rotation }: Transform) =>
@@ -501,7 +502,8 @@ function createStage(host: HTMLDivElement) {
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1e6);
   // Recorded coordinates have z up.
   camera.up.set(0, 0, 1);
-  camera.position.set(-20, -20, 20);
+  const homePosition = new THREE.Vector3(-20, -20, 20);
+  camera.position.copy(homePosition);
   const grid = new THREE.GridHelper(20, 20, "#5b6570", "#343a42");
   grid.rotation.x = Math.PI / 2;
   scene.add(grid);
@@ -537,20 +539,29 @@ function createStage(host: HTMLDivElement) {
     controls.update();
     invalidate();
   };
-  const reframe = (transform: Transform) => {
-    const target = controls.target.clone();
+  // Controls take the camera's up direction when created, so changing it needs new ones.
+  const replaceControls = (target: THREE.Vector3) => {
     controls.dispose();
-    reframeCamera(camera, target, transform);
     controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(target);
-    grid.position.set(target.x, target.y, 0);
     controls.addEventListener("change", invalidate);
     controls.update();
     invalidate();
   };
+  const reframe = (transform: Transform) => {
+    const target = controls.target.clone();
+    reframeCamera(camera, target, transform);
+    replaceControls(target);
+  };
+  const resetView = () => {
+    camera.up.set(0, 0, 1);
+    camera.position.copy(homePosition);
+    grid.scale.setScalar(1);
+    replaceControls(new THREE.Vector3());
+  };
   invalidate();
   return {
-    stage: { scene, invalidate, fit, reframe },
+    stage: { scene, invalidate, fit, reframe, resetView },
     dispose: () => {
       cancelAnimationFrame(pending);
       resize.disconnect();
