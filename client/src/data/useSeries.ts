@@ -7,7 +7,7 @@ import type { MessageRow } from "../views/table";
 import { errorMessage, type Selected } from "../types";
 
 export type CachedSeries = Series & {
-  status: "loading" | "complete" | "stopped" | "error";
+  status: "loading" | "complete" | "error";
   received: number;
   error?: string;
 };
@@ -51,9 +51,8 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
     for (const [controller, targets] of requests.current) {
       if (targets.every((t) => !keys.has(t.key))) {
         controller.abort();
-        targets.forEach((t) => {
-          t.status = "stopped";
-        });
+        // Forget the partial data, so that adding the field again fetches all of it.
+        targets.forEach((t) => cache.current.delete(t.key));
         requests.current.delete(controller);
         dirty.current = true;
       }
@@ -204,21 +203,10 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
         ]
       : [];
   });
-  const stop = () => {
-    for (const [controller, targets] of requests.current) {
-      controller.abort();
-      targets.forEach((target) => {
-        target.status = "stopped";
-      });
-    }
-    requests.current.clear();
-    dirty.current = true;
-  };
   return {
     plotted,
     records,
     revision,
-    stop,
     busy: records.some((r) => r.status === "loading"),
   };
 }

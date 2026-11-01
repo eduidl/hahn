@@ -126,7 +126,7 @@ describe("full-recording series cache", () => {
     ]);
   });
 
-  it("aborts active streams when stopped and retains partial data", async () => {
+  it("aborts a stream when its field is removed", async () => {
     let signal: AbortSignal | undefined;
     vi.stubGlobal(
       "fetch",
@@ -139,12 +139,19 @@ describe("full-recording series cache", () => {
         );
       }),
     );
-    const { result } = renderHook(() => useSeries(info.start_ns, [field("x")]));
+    const { result, rerender } = renderHook(({ fields }) => useSeries(info.start_ns, fields), {
+      initialProps: { fields: [field("x")] },
+    });
     await waitFor(() => expect(result.current.busy).toBe(true));
-    act(() => result.current.stop());
+    rerender({ fields: [] });
     expect(signal?.aborted).toBe(true);
-    await waitFor(() => expect(result.current.records[0]?.status).toBe("stopped"));
-    expect(result.current.plotted[0].points).toEqual([]);
+    await waitFor(() => expect(result.current.busy).toBe(false));
+
+    // Adding it back must not leave a partial series behind: it fetches again.
+    const fetches = vi.mocked(fetch).mock.calls.length;
+    rerender({ fields: [field("x")] });
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBe(fetches + 1));
+    await waitFor(() => expect(result.current.records[0]?.status).toBe("loading"));
   });
   it("decodes enum labels with the definition carried by the selection", async () => {
     vi.stubGlobal(

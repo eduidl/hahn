@@ -14,7 +14,6 @@ type Props = {
   info: Info | null;
   fullEnd: number;
   busy: boolean;
-  stop: () => void;
 };
 
 const stepSeconds = 0.1;
@@ -43,7 +42,7 @@ const icon = (path: string) => (
   </svg>
 );
 
-export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
+export function PlaybackBar({ info, fullEnd, busy }: Props) {
   const store = usePlaybackStore();
   const time = usePlayback((s) => s.time);
   const playing = usePlayback((s) => s.playing);

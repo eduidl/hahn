@@ -35,7 +35,6 @@ function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefin
   if (record.status === "loading") return `Loading · ${record.received.toLocaleString()}`;
   if (record.status === "complete")
     return `Complete · ${record.received.toLocaleString()} messages`;
-  if (record.status === "stopped") return "Stopped · partial data";
   return "Loading error";
 }
 
