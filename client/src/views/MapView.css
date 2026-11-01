@@ -8,5 +8,5 @@
 .view-map-canvas.leaflet-container {
   position: absolute;
   inset: 0;
-  background: #1a1e23;
+  background: var(--bg-raised);
 }

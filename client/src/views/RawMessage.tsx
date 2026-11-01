@@ -154,11 +154,11 @@ export function RawMessage({
   return (
     <div className="raw-message" ref={tree}>
       {error ? (
-        <p className="raw-status raw-error">{error}</p>
+        <p className="widget-status widget-status-error">{error}</p>
       ) : message === undefined ? (
-        <p className="raw-status">Loading…</p>
+        <p className="widget-status">Loading…</p>
       ) : message === null ? (
-        <p className="raw-status">No messages</p>
+        <p className="widget-status">No messages</p>
       ) : (
         <>
           <div className="raw-toolbar">
