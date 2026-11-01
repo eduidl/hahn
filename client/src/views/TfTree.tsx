@@ -46,10 +46,45 @@ export function layoutFrames(frames: FrameInfo[]): Node[] {
   );
 }
 
+type Viewport = { x: number; y: number; width: number; height: number };
+
+/**
+ * The view showing the whole tree, centered, without enlarging it past one unit
+ * per pixel: a few frames should not grow with the widget. An unmeasured element
+ * gets the bounds themselves.
+ */
+export function fitViewport(bounds: Viewport, size: { width: number; height: number }): Viewport {
+  if (size.width <= 0 || size.height <= 0) return bounds;
+  const pixelsPerUnit = Math.min(size.width / bounds.width, size.height / bounds.height, 1);
+  const width = size.width / pixelsPerUnit;
+  const height = size.height / pixelsPerUnit;
+  return {
+    x: bounds.x + (bounds.width - width) / 2,
+    y: bounds.y + (bounds.height - height) / 2,
+    width,
+    height,
+  };
+}
+
 export function TfTree({ runId, info }: { runId: string | null; info: Info | null }) {
   const [loaded, setLoaded] = useState<{ run: string; frames: FrameInfo[]; error: string }>();
   const [selected, setSelected] = useState<{ run: string; id: string }>();
-  const [view, setView] = useState<{ x: number; y: number; width: number; height: number }>();
+  const [view, setView] = useState<Viewport>();
+  const [svg, setSvg] = useState<SVGSVGElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  // Measured before paint, so that the tree does not first appear at the wrong scale.
+  useLayoutEffect(() => {
+    if (!svg) return;
+    const measure = () => {
+      const { width, height } = svg.getBoundingClientRect();
+      setSize({ width, height });
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [svg]);
   const drag = useRef<{ x: number; y: number }>(undefined);
   const [poseOffset, setPoseOffset] = useState({ x: 0, y: 0 });
   const poseDrag = useRef<{ x: number; y: number }>(undefined);
@@ -74,6 +109,7 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
     selected?.run === runId ? state?.frames.find((item) => item.id === selected.id) : undefined;
   const parent = frame?.parent && byId.has(frame.parent) ? frame.parent : null;
   const ns = usePlaybackNs(info);
+  const clock = useTimeFormatter(info?.start_ns ?? null);
   const { transforms, error: transformError } = useTransforms(
     runId && parent ? `${runId}/` : undefined,
     parent,
@@ -130,6 +166,7 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
         <button onClick={() => setView(undefined)}>Fit</button>
       </div>
       <svg
+        ref={setSvg}
         aria-label="Transform tree"
         viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
         onWheel={(event) => {
@@ -153,9 +190,9 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
           const dy = (event.clientY - drag.current.y) * unitsPerPixel;
           drag.current = { x: event.clientX, y: event.clientY };
           setView((current) => ({
-            ...(current ?? bounds),
-            x: (current ?? bounds).x - dx,
-            y: (current ?? bounds).y - dy,
+            ...(current ?? fitted),
+            x: (current ?? fitted).x - dx,
+            y: (current ?? fitted).y - dy,
           }));
         }}
         onPointerUp={() => {

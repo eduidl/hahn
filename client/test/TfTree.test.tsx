@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
-import { layoutFrames, TfTree } from "../src/views/TfTree";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fitViewport, layoutFrames, TfTree, zoomViewport } from "../src/views/TfTree";
 import { createPlaybackStore, PlaybackContext } from "../src/workspace/playback";
 
 afterEach(() => {
@@ -106,6 +106,7 @@ it("shows the selected frame relative to its last recorded parent at playback ti
   fireEvent.click(await screen.findByRole("button", { name: "base, parent world" }));
   expect(await screen.findByText("Parent Frame: world")).toBeTruthy();
   expect(await screen.findByText("x: 1")).toBeTruthy();
+  expect(screen.getByText(/^Time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \(/)).toBeTruthy();
   const handle = screen.getByRole("button", { name: "Move details for base" });
   fireEvent.keyDown(handle, { key: "ArrowRight" });
   expect(handle.parentElement?.style.transform).toBe("translate(10px, 0px)");
@@ -150,3 +151,73 @@ it("pans by the same amount on both axes when the tree is letterboxed", async ()
   expect(y).toBeCloseTo(-10 * unitsPerPixel);
 });
 
+describe("fitViewport", () => {
+  const bounds = { x: 0, y: 0, width: 220, height: 80 };
+  it("keeps one unit per pixel and centers a tree smaller than the widget", () => {
+    expect(fitViewport(bounds, { width: 1000, height: 600 })).toEqual({
+      x: -390,
+      y: -260,
+      width: 1000,
+      height: 600,
+    });
+  });
+  it("shrinks a tree larger than the widget until all of it fits", () => {
+    const view = fitViewport(bounds, { width: 110, height: 200 });
+    expect(view.width).toBe(220);
+    expect(view.height).toBe(400);
+    expect(view.x).toBe(0);
+    expect(view.y).toBe(-160);
+  });
+  it("falls back to the bounds before the element is measured", () => {
+    expect(fitViewport(bounds, { width: 0, height: 0 })).toEqual(bounds);
+  });
+});
+
+it("zooms from the fitted view and returns to it with Fit", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json({ frames: [{ id: "world", parent: null }] })),
+  );
+  const rect = vi
+    .spyOn(Element.prototype, "getBoundingClientRect")
+    .mockReturnValue({ width: 1000, height: 500 } as DOMRect);
+  const { container } = render(
+    <PlaybackContext.Provider value={createPlaybackStore()}>
+      <TfTree runId="run" info={null} />
+    </PlaybackContext.Provider>,
+  );
+  await screen.findByRole("button", { name: "world" });
+  const box = () => container.querySelector("svg")!.getAttribute("viewBox");
+  await waitFor(() => expect(box()).toBe("-390 -210 1000 500"));
+  fireEvent.click(screen.getByRole("button", { name: "Zoom in TF tree" }));
+  expect(box()).toBe("-290 -160 800 400");
+  fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+  expect(box()).toBe("-390 -210 1000 500");
+  rect.mockRestore();
+});
+
+it("zooms at the pointer with the wheel and stops the page from scrolling", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json({ frames: [{ id: "world", parent: null }] })),
+  );
+  const rect = vi
+    .spyOn(Element.prototype, "getBoundingClientRect")
+    .mockReturnValue({ left: 0, top: 0, width: 1000, height: 500 } as DOMRect);
+  const { container } = render(
+    <PlaybackContext.Provider value={createPlaybackStore()}>
+      <TfTree runId="run" info={null} />
+    </PlaybackContext.Provider>,
+  );
+  await screen.findByRole("button", { name: "world" });
+  const svg = container.querySelector("svg")!;
+  await waitFor(() => expect(svg.getAttribute("viewBox")).toBe("-390 -210 1000 500"));
+  const wheel = new WheelEvent("wheel", { deltaY: -1, clientX: 0, clientY: 0, cancelable: true });
+  act(() => {
+    svg.dispatchEvent(wheel);
+  });
+  expect(wheel.defaultPrevented).toBe(true);
+  // The top left pixel still shows the unit (-390, -210).
+  expect(svg.getAttribute("viewBox")).toBe("-390 -210 800 400");
+  rect.mockRestore();
+});

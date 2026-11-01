@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
-import { ImageView } from "../src/views/ImageView";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fullImage, ImageView, panImage, zoomImage } from "../src/views/ImageView";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import { initialWorkspace, workspaceReducer } from "../src/workspace/widgets";
 import type { Topic } from "../src/types";
