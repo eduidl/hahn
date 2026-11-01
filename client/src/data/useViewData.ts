@@ -121,6 +121,8 @@ export function useTransforms(
   source: string | undefined,
   target: string | null,
   ns: string | null,
+  /** Keeps a frame at its last known place once it is gone, as frames end at different times. */
+  hold = false,
 ) {
   const identity = source && target ? `${runUrl(source)}:${target}` : null;
   const loaded = useLatestOnly<Schemas["Transforms"]>(identity, ns, (key, _, signal) =>
@@ -129,5 +131,16 @@ export function useTransforms(
       signal,
     ),
   );
-  return { transforms: loaded?.value, error: loaded?.error ?? "" };
+  const held = useRef<{ identity: string | null; frames: Schemas["Transforms"]["frames"] }>({
+    identity,
+    frames: {},
+  });
+  const transforms = useMemo(() => {
+    const value = loaded?.value;
+    if (!hold || !value) return value;
+    if (held.current.identity !== identity) held.current = { identity, frames: {} };
+    held.current.frames = { ...held.current.frames, ...value.frames };
+    return { ...value, frames: held.current.frames };
+  }, [hold, identity, loaded?.value]);
+  return { transforms, error: loaded?.error ?? "" };
 }
