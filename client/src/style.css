@@ -1157,6 +1157,10 @@ header .add-widget {
   border-radius: 6px;
   box-shadow: 0 12px 36px #0008;
 }
+/* Widgets without settings show only this text, so it needs its own top gap. */
+.widget-settings > .help:first-child {
+  margin-top: 25px;
+}
 .widget-catalog .help {
   margin: 4px 6px 8px;
 }
@@ -1232,11 +1236,6 @@ header .add-widget {
   overflow: hidden;
 }
 /* Centered on the header regardless of the side groups' widths. */
-.playback-status .stop-loading {
-  margin-left: 12px;
-  padding: 2px 8px;
-  font: inherit;
-}
 /* The layout always fits the available area; panes shrink instead of scrolling. */
 .workspace-stage {
   flex: 1;
