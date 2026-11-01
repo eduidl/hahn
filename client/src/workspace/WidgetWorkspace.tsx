@@ -15,13 +15,14 @@ import {
 } from "react";
 import { TabBar } from "./TabControls";
 import { timeTicks } from "../views/ticks";
+import { axisRange, clampAxis, isDefaultView, zoomAxis, type AxisRange } from "../views/axes";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
-import { Plot, defaultPlotView, type PlotView, type Series } from "../views/Plot";
+import { Plot, defaultPlotView, wheelZoomFactor, type PlotView, type Series } from "../views/Plot";
 import { useTimeFormatter } from "../timeDisplay";
 import type { DropVerdict } from "./drop";
 import { stateLabel } from "../data/data";
-import { LogView } from "../views/LogView";
+import { ValueChangesView } from "../views/ValueChangesView";
 import { TableView } from "../views/TableView";
 import type { MessageRecord } from "../data/useMessages";
 import type { FieldIndex } from "./fieldIndex";

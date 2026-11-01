@@ -8,6 +8,7 @@ import {
   seriesYRange,
   discreteYValues,
   zoomAxis,
+  clampAxis,
 } from "../src/views/axes";
 import type { Series } from "../src/views/Plot";
 
@@ -102,5 +103,14 @@ describe("independent axis magnification", () => {
     };
     expect(discreteYValues([base])).toEqual([1, 3]);
     expect(discreteYValues([{ ...base, hidden: true }])).toEqual([]);
+  });
+});
+
+describe("clampAxis", () => {
+  it("keeps the view inside the reference range", () => {
+    expect(clampAxis({ center: 0.1, zoom: 2 }).center).toBe(0.25);
+    expect(clampAxis({ center: 0.9, zoom: 2 }).center).toBe(0.75);
+    expect(clampAxis({ center: 0.4, zoom: 2 }).center).toBe(0.4);
+    expect(clampAxis({ center: 0.2, zoom: 1 }).center).toBe(0.5);
   });
 });
