@@ -13,7 +13,7 @@ vi.mock("../src/data/sources", async (original) => ({
 it("keeps the old frame until the requested transform arrives and ignores stale responses", async () => {
   const pending: ((value: unknown) => void)[] = [];
   mocks.get.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
-  const stage = { reframe: vi.fn() } as any;
+  const stage = { reframe: vi.fn(), resetView: vi.fn() } as any;
   const info = { start_ns: "0", end_ns: "10", message_count: 1 };
   const store = createPlaybackStore();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -44,7 +44,9 @@ it("keeps the old frame until the requested transform arrives and ignores stale 
   await act(async () => {
     pending[2]({ frames: {} });
   });
-  expect(result.current.target).toBe("c");
-  expect(result.current.error).toContain("No transform from c to d");
+  // No sample at this time to carry the view over with: the frame still changes.
+  await waitFor(() => expect(result.current.target).toBe("d"));
+  expect(result.current.error).toBe("");
   expect(stage.reframe).toHaveBeenCalledTimes(1);
+  expect(stage.resetView).toHaveBeenCalledTimes(1);
 });

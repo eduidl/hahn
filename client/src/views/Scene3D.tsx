@@ -660,8 +660,10 @@ export function useSceneFrame(
       .then((transforms) => {
         if (controller.signal.aborted) return;
         const transform = transforms.frames[old.frame];
-        if (!transform) throw new Error(`No transform from ${old.frame} to ${target} at this time`);
-        stage.reframe(transform);
+        // Frames have samples for different spans of time. Without one here, the view
+        // cannot be carried over, which is no reason to stay in the old frame.
+        if (transform) stage.reframe(transform);
+        else stage.resetView();
         previous.current = { stage, run, frame: target };
         setShown(target);
         setError("");
