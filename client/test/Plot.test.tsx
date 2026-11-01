@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Plot, tooltipValue } from "../src/views/Plot";
+import { drawnPoints } from "../src/views/Plot";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
 import { initialWorkspace } from "../src/workspace/widgets";
 
@@ -239,5 +240,35 @@ describe("Plot playback position", () => {
     fireEvent(canvas, pointer("pointermove", 500));
     fireEvent(canvas, pointer("pointerup", 500));
     expect(store.getState().time).toBe(0);
+  });
+});
+
+describe("drawnPoints", () => {
+  const at = (x: number, y: number | null) => ({ x, y });
+  const identity = (x: number) => x;
+  it("keeps only the first, lowest, highest and last of a pixel column, in order", () => {
+    const points = [at(0.1, 5), at(0.2, 9), at(0.3, 7), at(0.4, 1), at(0.5, 6), at(0.6, 4)];
+    expect(drawnPoints(points, 0, 10, identity)).toEqual([
+      at(0.1, 5),
+      at(0.2, 9),
+      at(0.4, 1),
+      at(0.6, 4),
+    ]);
+  });
+  it("keeps every point when each has its own column", () => {
+    const points = [at(0, 1), at(1, 2), at(2, 3)];
+    expect(drawnPoints(points, 0, 10, identity)).toEqual(points);
+  });
+  it("keeps a gap as a gap", () => {
+    const points = [at(0.1, 1), at(0.2, null), at(0.3, 2)];
+    expect(drawnPoints(points, 0, 10, identity)).toEqual(points);
+  });
+  it("draws at most four points per column however many there are", () => {
+    const points = Array.from({ length: 100_000 }, (_, i) => at(i / 1000, Math.sin(i)));
+    expect(drawnPoints(points, 0, 1000, identity).length).toBeLessThanOrEqual(400);
+  });
+  it("starts where asked and stops after the first point past the end", () => {
+    const points = [at(0, 1), at(1, 2), at(2, 3), at(3, 4), at(4, 5)];
+    expect(drawnPoints(points, 1, 2.5, identity)).toEqual([at(1, 2), at(2, 3), at(3, 4)]);
   });
 });
