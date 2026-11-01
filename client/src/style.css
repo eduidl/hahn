@@ -2069,7 +2069,10 @@ header .add-widget {
   height: 100%;
 }
 .widget-toolbar > .mosaic-window-title { min-width: 0; }
-.widget-toolbar > .mosaic-window-controls { flex: 0 0 auto; margin-left: auto; }
+/* Too narrow for every icon, the title goes first and then the leftmost icons: the menu stays. */
+.widget-toolbar > .mosaic-window-title { flex-shrink: 1000; }
+.widget-toolbar > .mosaic-window-controls { flex: 0 1 auto; min-width: 0; margin-left: auto; justify-content: flex-end; overflow: hidden; }
+.widget-toolbar > .mosaic-window-controls > * { flex-shrink: 0; }
 .widget-tabs-toolbar > .mosaic-window-title { flex: 0 0 24px; justify-content: center; padding: 0; color: #777; }
 .widget-tabs-toolbar > .widget-tab-bar {
   flex: 1;
