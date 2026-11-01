@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type DragEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import {
+  leaves,
   tabDragMime,
   widgetDragMime,
   widgetMoveMime,
@@ -40,6 +42,39 @@ export function TabName({
         }
       }}
     />
+  );
+}
+
+/** Removes a tab, asking first if that would also remove widgets. */
+function RemoveTabButton({
+  widget,
+  tab,
+  dispatch,
+  label,
+  className,
+}: Props & { tab: WidgetTab; label: string; className?: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const remove = () => dispatch({ type: "tab-remove", id: widget.id, tabId: tab.id });
+  const count = leaves(tab.layout).length;
+  return (
+    <>
+      <button
+        className={className}
+        aria-label={label}
+        disabled={widget.tabs.length === 1}
+        onClick={() => (count ? setConfirming(true) : remove())}
+      >
+        ×
+      </button>
+      <ConfirmDialog
+        open={confirming}
+        title={`Delete ${tabLabel(tab)}?`}
+        message={`This removes ${count === 1 ? "1 widget in this tab and its series" : `${count} widgets in this tab and their series`}. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={remove}
+        onClose={() => setConfirming(false)}
+      />
+    </>
   );
 }
 
@@ -85,13 +120,12 @@ export function TabSettings({ widget, dispatch }: Props) {
           >
             ↓
           </button>
-          <button
-            aria-label={`Delete ${tabLabel(tab)}`}
-            disabled={widget.tabs.length === 1}
-            onClick={() => dispatch({ type: "tab-remove", id: widget.id, tabId: tab.id })}
-          >
-            ×
-          </button>
+          <RemoveTabButton
+            widget={widget}
+            tab={tab}
+            dispatch={dispatch}
+            label={`Delete ${tabLabel(tab)}`}
+          />
         </div>
       ))}
       <button onClick={() => dispatch({ type: "tab-add", id: widget.id })}>+ Add tab</button>
@@ -240,14 +274,13 @@ export function TabBar({
             </button>
           )}
           {widget.activeTabId === tab.id && (
-            <button
+            <RemoveTabButton
+              widget={widget}
+              tab={tab}
+              dispatch={dispatch}
+              label={`Close ${tabLabel(tab)}`}
               className="widget-tab-close"
-              aria-label={`Close ${tabLabel(tab)}`}
-              disabled={widget.tabs.length === 1}
-              onClick={() => dispatch({ type: "tab-remove", id: widget.id, tabId: tab.id })}
-            >
-              ×
-            </button>
+            />
           )}
         </div>
       ))}
