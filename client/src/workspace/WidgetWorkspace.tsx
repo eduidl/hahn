@@ -32,6 +32,7 @@ import { TfTree } from "../views/TfTree";
 import { SourceInfo } from "../views/SourceInfo";
 import type { OpenSource } from "../data/sources";
 import { ImageView } from "../views/ImageView";
+import { flattenMapsForDragImage } from "../views/mapDragImage";
 import { SeriesName } from "../SeriesName";
 import { SourceNames } from "../data/sources";
 import { usePlayback, usePlaybackStore } from "./playback";
@@ -551,6 +552,8 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 const frame = event.currentTarget.closest(".widget-shell")!;
                 const { left, top } = frame.getBoundingClientRect();
                 event.dataTransfer.setDragImage(frame, event.clientX - left, event.clientY - top);
+                // The browser takes the image once this handler has returned.
+                setTimeout(flattenMapsForDragImage(frame));
                 moving.setId(widget.id);
                 dispatch({ type: "select", id: widget.id });
               }}
