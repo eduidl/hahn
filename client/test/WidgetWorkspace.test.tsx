@@ -115,6 +115,7 @@ function transfer(type: string, value = "") {
     types: [type],
     getData: (key: string) => (key === type ? value : ""),
     setData: vi.fn(),
+    setDragImage: vi.fn(),
     effectAllowed: "all",
     dropEffect: "none",
   };
