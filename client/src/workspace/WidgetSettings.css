@@ -1,6 +1,6 @@
 .legend {
   flex-shrink: 0;
-  border-top: 1px solid #363636;
+  border-top: 1px solid var(--line);
   margin-top: 4px;
   min-height: 138px;
   padding: 0 16px 16px;
@@ -10,16 +10,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 0 14px;
-  color: #989898;
-  font:
-    12px ui-monospace,
-    monospace;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 .legend-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border-bottom: 1px solid #2e2e2e;
+  border-bottom: 1px solid var(--line);
   padding: 6px 0;
   gap: 8px;
 }
@@ -33,16 +31,7 @@
   background: none;
   text-align: left;
   padding: 6px 0;
-  font:
-    12px ui-monospace,
-    monospace;
-}
-.series-toggle i {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  font: 12px var(--font-mono);
 }
 .add-field {
   anchor-name: --add-field;
@@ -59,7 +48,7 @@
   flex-direction: column;
   gap: 8px;
   margin-bottom: 16px;
-  font: 12px ui-monospace, monospace;
+  font: 12px var(--font-mono);
 }
 .target-summary.removable {
   flex-direction: row;
@@ -89,7 +78,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font: 12px ui-monospace, monospace;
+  font: 12px var(--font-mono);
   overflow-wrap: anywhere;
   cursor: pointer;
 }
