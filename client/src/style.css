@@ -2095,6 +2095,12 @@ header .add-widget {
   color: #ffffff;
   background: #7a2f2f;
 }
+.timezone-name {
+  color: #e4e4e4;
+}
+.timezone-name.disabled {
+  color: #6f6f6f;
+}
 .timezone-select {
   display: flex;
   flex-shrink: 0;
@@ -2115,7 +2121,7 @@ header .add-widget {
   font-size: 12px;
 }
 @media (max-width: 640px) {
-  .timezone-select span {
+  .timezone-select span:not(.timezone-name) {
     display: none;
   }
   .timezone-select select {
