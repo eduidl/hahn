@@ -2033,3 +2033,15 @@ header .add-widget {
   gap: 4px;
   pointer-events: none;
 }
+
+.view-image canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.view-image .projection-error {
+  top: 38px;
+}

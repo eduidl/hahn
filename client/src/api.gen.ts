@@ -454,13 +454,13 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"];
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"];
         /** @description Coordinate frame of an image or point cloud. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
         };
         /**
-         * @description An encoded image. The current converter reads foxglove.CompressedImage; raw pixels and calibration are not implemented.
+         * @description An encoded image or raw pixel image.
          * @example {
          *       "kind": "image",
          *       "frame_id": "camera",
@@ -473,22 +473,33 @@ export interface components {
          *       }
          *     }
          */
-        ImageValue: components["schemas"]["FramedValue"] & {
+        ImageValue: components["schemas"]["FramedValue"] & ({
             /** @enum {string} */
             kind: "image";
             /**
-             * @description Encoding of the image file. jpg is normalized to jpeg.
+             * @description Image file encoding, or raw for pixel data. jpg is normalized to jpeg.
              * @enum {string}
              */
-            format: "jpeg" | "png" | "webp" | "avif";
-            /** @description Blob of the encoded image file. */
+            format: "jpeg" | "png" | "webp" | "avif" | "raw";
+            /** @description Blob of image file bytes, or raw pixel bytes when format is raw. */
             data: components["schemas"]["BlobRef"];
             /**
              * @description The current converter emits color images.
              * @enum {string}
              */
             role?: "color";
-        };
+            /** @description Raw image width in pixels. */
+            width?: number;
+            /** @description Raw image height in pixels. */
+            height?: number;
+            /** @description Raw image row stride in bytes. */
+            step?: number;
+            /**
+             * @description Pixel encoding for a raw image.
+             * @enum {string}
+             */
+            encoding?: "rgb8" | "rgba8" | "bgr8" | "8UC3" | "bgra8" | "mono8" | "8UC1" | "mono16" | "16UC1" | "32FC1" | "yuv422" | "uyvy" | "yuv422_yuy2" | "yuyv" | "nv12" | "bayer_rggb8" | "bayer_bggr8" | "bayer_gbrg8" | "bayer_grbg8";
+        } & unknown);
         /**
          * @description A point cloud, with one blob per column so that a client can use them as typed arrays directly. Laser scans are converted to these. A server drops points without a position, and may send fewer points or fields than were recorded, to save transfer.
          * @example {
@@ -588,6 +599,20 @@ export interface components {
                     [key: string]: unknown;
                 };
             }[];
+        };
+        /** @description Pinhole camera calibration. Image coordinates have x right and y down; the optical axis is positive z. */
+        CameraCalibrationValue: {
+            /** @enum {string} */
+            kind: "camera_calibration";
+            frame_id: components["schemas"]["FrameId"];
+            width: number;
+            height: number;
+            /** @description Row-major 3 by 3 camera matrix K. */
+            intrinsics: number[];
+            /** @description Distortion coefficients; an empty or all-zero array means no distortion. */
+            distortion: number[];
+            /** @description Name of the distortion model, such as plumb_bob. */
+            distortion_model: string;
         };
     };
     responses: {

@@ -15,6 +15,9 @@ import {
 } from "../data/useViewData";
 import { pointBuffers, type PointCloudValue, type Transform } from "../data/viewFrames";
 import type { Widget } from "../workspace/widgets";
+import { cameraSurface, defaultImageDistance } from "./camera";
+import { useCameraCalibration } from "./useCameraCalibration";
+import { reframeCamera } from "./sceneCamera";
 
 type Stage = { scene: THREE.Scene; invalidate: () => void; fit: (object: THREE.Object3D) => void };
 
