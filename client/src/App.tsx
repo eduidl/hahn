@@ -221,7 +221,8 @@ export function App() {
     dispatch({ type: "select", id: widget.id });
     const verdict = dropVerdict(index, payload, widget);
     // Rejected drags never reach here: drop targets only accept fitting fields.
-    if (verdict.ok) dispatch(addFieldAction(widget, verdict.entry.topic, verdict.entry.field));
+    if (verdict.ok)
+      dispatch(addFieldAction(widget, verdict.entry.topic, verdict.entry.field, index));
   };
   /** Verdict for the in-progress drag, so widgets can show it before the drop. */
   const dragVerdict = (widget: Widget) => (drag ? dropVerdict(index, drag, widget) : null);

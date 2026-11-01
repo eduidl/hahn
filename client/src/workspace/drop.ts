@@ -30,8 +30,14 @@ function mismatchReason(current: ValueKind | null, added: ValueKind | null) {
 }
 
 /** Checks that depend on the widget's current series; null when the field fits. */
-function widgetReason(entry: IndexedField, widget: Widget, spec: WidgetSpec) {
+function widgetReason(entry: IndexedField, widget: Widget, spec: WidgetSpec, index: FieldIndex) {
   if (widget.series.some((s) => s.key === entry.key)) return "Already added.";
+  if (
+    widget.type === "image" &&
+    viewFor(spec, entry.topic)?.kind !== "image" &&
+    !widget.series.some((item) => selectedViewKind(index, item) === "image")
+  )
+    return "Select an image topic first.";
   // A single-series widget replaces its series, so nothing else constrains it.
   if (spec.maxSeries === 1) return null;
   const current = seriesKind(widget.series);
@@ -80,13 +86,21 @@ export function dropVerdict(
       // The primitive name (`struct`, `uint32`, ...) keeps the reason short.
       reason: `${displayType(entry.field.data_type, topic.schema_encoding)} is not supported. Select ${accepted}.`,
     };
-  const reason = widgetReason(entry, widget, spec);
+  const reason = widgetReason(entry, widget, spec, index);
   if (reason) return { ok: false, reason };
-  return { ok: true, entry, replaces: spec.maxSeries === 1 && widget.series.length > 0 };
+  return {
+    ok: true,
+    entry,
+    replaces:
+      (spec.maxSeries === 1 && widget.series.length > 0) ||
+      (widget.type === "image" &&
+        viewFor(spec, entry.topic)?.kind === "image" &&
+        widget.series.some((item) => selectedViewKind(index, item) === "image")),
+  };
 }
 
 /** Fields that can be added to the widget right now, from the cached candidates. */
 export const addableFields = (index: FieldIndex, widget: Widget): IndexedField[] =>
   index.candidates[widget.type].filter(
-    (entry) => widgetReason(entry, widget, widgetSpecs[widget.type]) === null,
+    (entry) => widgetReason(entry, widget, widgetSpecs[widget.type], index) === null,
   );
