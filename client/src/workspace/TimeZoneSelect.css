@@ -16,12 +16,6 @@
 }
 .timezone-select select {
   max-width: 240px;
-  padding: 6px 8px;
-  color: var(--text);
-  background: var(--bg-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  font-size: 12px;
 }
 @media (max-width: 640px) {
   .timezone-select span:not(.timezone-name) {

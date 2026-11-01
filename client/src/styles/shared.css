@@ -10,18 +10,11 @@
   font-size: 12px;
   color: var(--text-faint);
 }
-.search {
+/* Roomier than a plain input: it heads a list. */
+.text-input.search {
   margin: 0 17px 16px;
   padding: 9px 10px;
-  background: var(--bg-raised);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  font-size: 12px;
   min-width: 0;
-}
-.search::placeholder {
-  color: var(--text-faint);
 }
 .field {
   display: flex;
@@ -174,4 +167,59 @@
   align-items: flex-start;
   gap: 4px;
   pointer-events: none;
+}
+/* Floats next to the control that opened it; each user sets its anchor, size and padding. */
+.popover-surface {
+  position: fixed;
+  /* Override the popover UA centering; the anchor decides the position. */
+  inset: auto;
+  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+.dialog-surface {
+  padding: 20px;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+}
+.dialog-surface::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+.dialog-surface h2 {
+  font-size: 15px;
+  font-weight: 500;
+}
+/* Sits on top of a widget's content; each user sets its placement and padding. */
+.overlay-box {
+  position: absolute;
+  background: var(--bg-overlay);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+}
+/* Covers the widget's content area and scrolls or lays out on its own. */
+.widget-fill {
+  position: absolute;
+  inset: 0;
+}
+.text-input {
+  padding: 6px 8px;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.text-input::placeholder {
+  color: var(--text-faint);
+}
+/* A compact action inside a widget or a settings row. */
+.small-button {
+  padding: 4px 8px;
+  font-family: var(--font-ui);
+  font-size: 12px;
 }

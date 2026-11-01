@@ -479,7 +479,7 @@ export function App() {
                   </div>
                   <div
                     id="group-menu"
-                    className="group-menu"
+                    className="popover-surface group-menu"
                     popover="auto"
                     role="dialog"
                     aria-label="Open groups"
@@ -516,7 +516,7 @@ export function App() {
                   </button>
                   <div
                     id="widget-catalog"
-                    className="widget-catalog"
+                    className="popover-surface widget-catalog"
                     popover="auto"
                     role="dialog"
                     aria-label="Add widget"
@@ -647,7 +647,7 @@ export function App() {
                           </span>
                         </div>
                         <input
-                          className="search"
+                          className="text-input search"
                           aria-label="Search fields"
                           placeholder="Search topics and fields…"
                           value={search}

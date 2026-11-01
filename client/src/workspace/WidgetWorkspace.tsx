@@ -741,7 +741,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
             </button>
             <div
               id={menuId}
-              className="widget-actions"
+              className="popover-surface widget-actions"
               popover="auto"
               role="menu"
               aria-label={`${widget.title} actions`}
@@ -778,7 +778,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 </button>
                 {changingType && (
                   <div
-                    className="widget-actions submenu"
+                    className="popover-surface widget-actions submenu"
                     role="menu"
                     aria-label="Widget type"
                     style={{ positionAnchor: submenuAnchor }}

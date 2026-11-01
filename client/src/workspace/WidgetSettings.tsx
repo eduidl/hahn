@@ -139,14 +139,14 @@ function FieldPicker({
       <div
         id={pickerId}
         ref={popover}
-        className="field-picker"
+        className="popover-surface field-picker"
         popover="auto"
         role="dialog"
         aria-label={label}
       >
         <input
           ref={input}
-          className="search"
+          className="text-input search"
           type="search"
           role="combobox"
           aria-expanded="true"
@@ -316,6 +316,7 @@ function SeriesStyle({ widget, dispatch, series: s }: WidgetSettingsProps & { se
       <label>
         Line width
         <input
+          className="text-input"
           type="number"
           step="any"
           aria-label={`${name(s)} line width`}
@@ -457,6 +458,7 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
           <div className="legend-heading">Columns</div>
           <div className="table-column-actions" role="group" aria-label="Bulk column controls">
             <button
+              className="small-button"
               disabled={visibleColumns === columns.length}
               onClick={() =>
                 props.dispatch({
@@ -470,6 +472,7 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
               Show all
             </button>
             <button
+              className="small-button"
               disabled={visibleColumns === 0}
               onClick={() =>
                 props.dispatch({
@@ -529,6 +532,7 @@ function ViewSeriesList(props: WidgetSettingsProps) {
             <label className="series-style">
               Image distance (m)
               <input
+                className="text-input"
                 type="number"
                 min="0"
                 step="any"
@@ -556,6 +560,7 @@ function ViewSeriesList(props: WidgetSettingsProps) {
             <label className="series-style">
               Trail duration (s)
               <input
+                className="text-input"
                 type="number"
                 min="0"
                 step="any"
@@ -676,7 +681,7 @@ function MapSettings(props: WidgetSettingsProps) {
       <section className="target-setting" aria-label="Map tiles">
         <div className="legend-heading">Map tiles</div>
         <input
-          className="search"
+          className="text-input search"
           type="url"
           aria-label="Map tile URL"
           placeholder="https://…/{z}/{x}/{y}.png"

@@ -270,7 +270,7 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
       </svg>
       {frame && (
         <div
-          className="tf-tree-pose"
+          className="overlay-box tf-tree-pose"
           style={{ transform: `translate(${poseOffset.x}px, ${poseOffset.y}px)` }}
         >
           <strong

@@ -37,8 +37,6 @@
   anchor-name: --add-field;
   align-self: flex-start;
   margin: 0 16px 16px;
-  padding: 6px 10px;
-  font-size: 12px;
 }
 .target-setting {
   margin: 0 16px 16px;
@@ -70,10 +68,6 @@
   gap: 6px;
   margin-bottom: 12px;
 }
-.table-column-actions button {
-  padding: 4px 8px;
-  font-size: 12px;
-}
 .table-column-option {
   display: flex;
   align-items: flex-start;
@@ -87,8 +81,6 @@
   margin: 1px 0 0;
 }
 .field-picker {
-  position: fixed;
-  inset: auto;
   margin: 4px 0;
   position-anchor: --add-field;
   position-area: bottom span-right;
@@ -99,11 +91,6 @@
   padding: 8px;
   flex-direction: column;
   gap: 8px;
-  background: var(--bg-raised);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
 }
 .field-picker:popover-open {
   display: flex;
@@ -177,10 +164,6 @@
 .series-style input[type="number"] {
   width: 56px;
   padding: 4px 5px;
-  color: var(--text);
-  background: var(--bg-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
 }
 .legend-empty {
   font-size: 12px;

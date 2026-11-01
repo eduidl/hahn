@@ -171,18 +171,10 @@
   background: var(--line-strong);
 }
 .widget-actions {
-  position: fixed;
-  /* Override the popover UA centering; the anchor decides the position. */
-  inset: auto;
   margin: 4px 0;
   position-area: bottom span-right;
-  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
   padding: 4px;
   width: max-content;
-  background: var(--bg-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  box-shadow: var(--shadow);
 }
 .submenu-host > button {
   display: flex !important;

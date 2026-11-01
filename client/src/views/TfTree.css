@@ -6,7 +6,7 @@
 .tf-tree g:focus-visible rect { stroke: white; stroke-width: 3; }
 /* A row of its own, so that a fitted tree never lies under the buttons. */
 .tf-tree-controls { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 4px; padding: 6px; }
-.tf-tree-pose { width: 260px; box-sizing: border-box; position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; padding: 8px; background: var(--bg-overlay); border: 1px solid var(--line-strong); color: var(--text); font: 12px var(--font-mono); overflow-wrap: anywhere; }
+.tf-tree-pose { width: 260px; box-sizing: border-box; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; padding: 8px; color: var(--text); font: 12px var(--font-mono); overflow-wrap: anywhere; }
 .tf-tree g[role="button"] { cursor: pointer; }
 .tf-tree g[aria-pressed="true"] rect { stroke: white; stroke-width: 3; }
 .tf-tree-pose-handle { cursor: move; touch-action: none; }

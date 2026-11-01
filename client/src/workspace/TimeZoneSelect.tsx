@@ -27,6 +27,7 @@ export function TimeZoneSelect({
     <label className="timezone-select">
       <span>Time zone</span>
       <select
+        className="text-input"
         disabled={disabled}
         value={source}
         onChange={(event) => onChange(event.target.value === "server" ? "server" : "browser")}
@@ -50,6 +51,7 @@ export function TimeDisplaySelect({
     <label className="timezone-select">
       <span>Time</span>
       <select
+        className="text-input"
         value={value}
         onChange={(event) => onChange(event.target.value === "offset" ? "offset" : "absolute")}
       >

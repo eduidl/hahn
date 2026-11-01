@@ -575,7 +575,7 @@ export function Plot({
       />
       <Playhead domain={domain} left={left} top={top} w={w} h={h} />
       {legend.visible && series.length > 0 && (
-        <div className="plot-legend" style={legendStyle}>
+        <div className="overlay-box plot-legend" style={legendStyle}>
           {series.map((s) => (
             <button
               key={s.key}
@@ -592,7 +592,7 @@ export function Plot({
       )}
       {/* Reading values gets in the way of a drag, and would describe where it started. */}
       {cursor !== null && pointerY !== null && hasVisible && !drag?.moved && (
-        <div className="tooltip" ref={tooltip}>
+        <div className="overlay-box tooltip" ref={tooltip}>
           <div className="tooltip-time">{time.tooltip(xAt(cursor))}</div>
           {series
             .filter((s) => !s.hidden)

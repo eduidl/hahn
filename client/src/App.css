@@ -90,21 +90,13 @@ header .add-widget {
 }
 .group-menu,
 .widget-catalog {
-  position: fixed;
-  inset: auto;
   margin: 8px 0;
   position-area: bottom span-right;
-  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
 }
 .group-menu {
   position-anchor: --group-trigger;
   width: min(320px, calc(100vw - 32px));
   padding: 20px;
-  background: var(--bg-raised);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
 }
 .group-menu h2 {
   margin-top: 0;
@@ -486,11 +478,6 @@ header .add-widget {
   position-anchor: --add-widget;
   width: min(280px, calc(100vw - 32px));
   padding: 8px;
-  background: var(--bg-raised);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
 }
 /* Widgets without settings show only this text, so it needs its own top gap. */
 .widget-settings > .help:first-child {
