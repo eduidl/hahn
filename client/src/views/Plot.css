@@ -1,9 +1,3 @@
-.plot-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
 .plot-wrap {
   width: 100%;
   height: 100%;
@@ -76,18 +70,7 @@
   font-weight: 400;
   color: var(--text);
 }
-@media (max-width: 900px) {
-  .plot-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-  }
-}
 @media (max-width: 640px) {
-  .plot-heading {
-    flex-direction: column;
-    align-items: stretch;
-  }
   .plot-legend .series-ref {
     max-width: 140px;
   }

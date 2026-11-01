@@ -115,8 +115,7 @@ export function tooltipValue(raw: Point["raw"], dataType: string | undefined): s
   return String(raw);
 }
 // Canvas fonts cannot read CSS variables: keep this in step with --font-ui.
-const axisFont =
-  '12px Inter, "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const axisFont = '12px "Inter Variable", system-ui, "Noto Sans JP", sans-serif';
 let measureContext: CanvasRenderingContext2D | null | undefined;
 /** Rendered width of a tick label, measured once per call on a shared canvas. */
 function labelWidth(text: string) {
