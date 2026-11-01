@@ -204,7 +204,9 @@ export function App() {
     if (session.current && !discarded.current) saveSession(browserStorage(), session.current);
   };
   useEffect(() => {
-    session.current = restoring ? null : { workspace, runId, sources, zoneSource, tab };
+    session.current = restoring
+      ? null
+      : { workspace, runId, sources, zoneSource, timeDisplay, tab, sidebarWidth, sidebarOpen };
     const timer = setTimeout(saveCurrent, 300);
     return () => clearTimeout(timer);
   }, [
@@ -237,6 +239,8 @@ export function App() {
       zoneSource,
       timeDisplay,
       tab,
+      sidebarWidth,
+      sidebarOpen,
     });
     location.reload();
   };
@@ -553,20 +557,34 @@ export function App() {
                       </div>
                     ))}
                   </div>
-                  <div className="file-detail">
-                    {sources.length
-                      ? `${sources.length} groups open · ${info?.message_count?.toLocaleString() ?? "—"} messages`
-                      : `${groups.length} groups`}
-                  </div>
-                </div>
-
-                <button
-                  className="add-widget"
-                  aria-label="Add widget"
-                  popoverTarget="widget-catalog"
-                >
-                  + Widget
-                </button>
+                  <TimeDisplaySelect value={timeDisplay} onChange={setTimeDisplay} />
+                  <TimeZoneSelect
+                    disabled={timeDisplay === "offset"}
+                    source={zoneSource}
+                    serverZone={serverZone}
+                    onChange={setZoneSource}
+                  />
+                  <button
+                    className="sidebar-toggle"
+                    aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                    title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                    aria-expanded={sidebarOpen}
+                    onClick={() => setSidebarOpen((open) => !open)}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="4" width="18" height="16" rx="2" />
+                      <path d="M9 4v16" />
+                    </svg>
+                  </button>
+                </header>
                 <div
                   className={sidebarOpen ? "workspace" : "workspace sidebar-closed"}
                   style={
@@ -575,160 +593,107 @@ export function App() {
                       : ({ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties)
                   }
                 >
-                  <p className="help">
-                    Click to add next to the selected widget, or drag to a position.
-                  </p>
-                  {widgetTypes.map((type) => (
-                    <div
-                      key={type}
-                      className="widget-catalog-item"
-                      // Not a <button>: Firefox does not drag those.
-                      role="button"
-                      tabIndex={0}
-                      draggable
-                      onClick={() => addFromCatalog(type)}
-                      onKeyDown={(event) => {
-                        if (event.key !== "Enter" && event.key !== " ") return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        addFromCatalog(type);
-                      }}
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData(widgetDragMime, type);
-                        // react-dnd (used by the mosaic) cancels drags without a native type.
-                        event.dataTransfer.setData("text/plain", widgetSpecs[type].label);
-                        event.dataTransfer.effectAllowed = "copy";
-                        setWidgetDrag(type);
-                        // The list would cover the drop targets. Hiding the source during
-                        // dragstart cancels the drag, so wait until it has begun.
-                        setTimeout(() => document.getElementById("widget-catalog")?.hidePopover());
-                      }}
-                      onDragEnd={() => setWidgetDrag(null)}
-                    >
-                      <strong>{widgetSpecs[type].label}</strong>
-                      <span>{widgetSpecs[type].description}</span>
+                  <aside>
+                    <SidebarResizer onResize={setSidebarWidth} />
+                    <div className="sidebar-tabs" role="tablist" aria-label="Sidebar">
+                      <button
+                        id="tab-settings"
+                        role="tab"
+                        aria-controls="sidebar-settings"
+                        aria-selected={tab === "settings"}
+                        onClick={() => setTab("settings")}
+                      >
+                        Settings
+                      </button>
+                      <button
+                        id="tab-topics"
+                        role="tab"
+                        aria-controls="sidebar-topics"
+                        aria-selected={tab === "topics"}
+                        onClick={() => setTab("topics")}
+                      >
+                        Topics
+                      </button>
+                      <button
+                        id="tab-errors"
+                        role="tab"
+                        aria-controls="sidebar-errors"
+                        aria-selected={tab === "errors"}
+                        onClick={() => setTab("errors")}
+                      >
+                        Errors
+                        {errorCount > 0 && <span className="badge">{errorCount}</span>}
+                      </button>
                     </div>
-                  ))}
-                </div>
-                <TimeZoneSelect
-                  source={zoneSource}
-                  serverZone={serverZone}
-                  onChange={setZoneSource}
-                />
-              </header>
-              <div className="workspace">
-                <aside>
-                  <div className="sidebar-tabs" role="tablist" aria-label="Sidebar">
-                    <button
-                      id="tab-settings"
-                      role="tab"
-                      aria-controls="sidebar-settings"
-                      aria-selected={tab === "settings"}
-                      onClick={() => setTab("settings")}
-                    >
-                      Settings
-                    </button>
-                    <button
-                      id="tab-topics"
-                      role="tab"
-                      aria-controls="sidebar-topics"
-                      aria-selected={tab === "topics"}
-                      onClick={() => setTab("topics")}
-                    >
-                      Topics
-                    </button>
-                    <button
-                      id="tab-errors"
-                      role="tab"
-                      aria-controls="sidebar-errors"
-                      aria-selected={tab === "errors"}
-                      onClick={() => setTab("errors")}
-                    >
-                      Errors
-                      {errorCount > 0 && <span className="badge">{errorCount}</span>}
-                    </button>
-                  </div>
-                  {tab === "topics" && (
-                    <div
-                      id="sidebar-topics"
-                      className="sidebar-content"
-                      role="tabpanel"
-                      aria-labelledby="tab-topics"
-                    >
-                      <div className="field-heading">
-                        <span className="eyebrow">Topics</span>
-                        <button
-                          className="collapse-topics"
-                          onClick={() => setExpandedTopics(new Set())}
-                          disabled={expandedTopics.size === 0}
-                        >
-                          Collapse all
-                        </button>
-                        <span>
-                          {visibleTopics.length} / {topics.length}
-                        </span>
-                      </div>
-                      <input
-                        className="search"
-                        aria-label="Search fields"
-                        placeholder="Search topics and fields…"
-                        value={search}
-                        onChange={(e) => {
-                          setSearch(e.target.value);
-                          setExpandedTopics(
-                            new Set(
-                              e.target.value ? topics.map((t) => topicKey(t.source, t.topic)) : [],
-                            ),
-                          );
-                        }}
-                      />
-                      <label className="show-error-topics">
+                    {tab === "topics" && (
+                      <div
+                        id="sidebar-topics"
+                        className="sidebar-content"
+                        role="tabpanel"
+                        aria-labelledby="tab-topics"
+                      >
+                        <div className="field-heading">
+                          <span className="eyebrow">Topics</span>
+                          <button
+                            className="collapse-topics"
+                            onClick={() => setExpandedTopics(new Set())}
+                            disabled={expandedTopics.size === 0}
+                          >
+                            Collapse all
+                          </button>
+                          <span>
+                            {visibleTopics.length} / {topics.length}
+                          </span>
+                        </div>
                         <input
-                          type="checkbox"
-                          checked={showErrorTopics}
-                          onChange={(e) => setShowErrorTopics(e.target.checked)}
-                        />
-                        Show topics with errors
-                      </label>
-                      <div className="topics">
-                        {loadingInfo && <p className="muted">Loading group information…</p>}
-                        {visibleTopics.map((t, i) => {
-                          const id = topicKey(t.source, t.topic);
-                          // Several recordings: head each one's topics with its name.
-                          const heading = multiSource &&
-                            visibleTopics[i - 1]?.source !== t.source && (
-                              <div className="source-heading" key={`source-${t.source}`}>
-                                {sourceNames.get(t.source)}
-                              </div>
+                          className="search"
+                          aria-label="Search fields"
+                          placeholder="Search topics and fields…"
+                          value={search}
+                          onChange={(e) => {
+                            setSearch(e.target.value);
+                            setExpandedTopics(
+                              new Set(
+                                e.target.value
+                                  ? topics.map((t) => topicKey(t.source, t.topic))
+                                  : [],
+                              ),
                             );
-                          const query = search.toLowerCase();
-                          const topicMatch = (t.topicName ?? t.topic).toLowerCase().includes(query);
-                          const fields = t.fields.filter(
-                            (f) => topicMatch || f.path.join(".").toLowerCase().includes(query),
-                          );
-                          if (!fields.length && !topicMatch) return heading || null;
-                          return [
-                            heading,
-                            <details
-                              key={id}
-                              open={expandedTopics.has(id)}
-                              className={`topic-group ${t.message_count === 0 ? "no-messages" : ""}`}
-                            >
-                              <summary
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setExpandedTopics((current) => {
-                                    const next = new Set(current);
-                                    if (next.has(id)) next.delete(id);
-                                    else next.add(id);
-                                    return next;
-                                  });
-                                }}
-                                draggable
-                                onDragStart={(e) =>
-                                  startDrag(e, { source: t.source, topic: t.topic })
-                                }
-                                onDragEnd={() => setDrag(null)}
+                          }}
+                        />
+                        <label className="show-error-topics">
+                          <input
+                            type="checkbox"
+                            checked={showErrorTopics}
+                            onChange={(e) => setShowErrorTopics(e.target.checked)}
+                          />
+                          Show topics with errors
+                        </label>
+                        <div className="topics">
+                          {loadingInfo && <p className="muted">Loading group information…</p>}
+                          {visibleTopics.map((t, i) => {
+                            const id = topicKey(t.source, t.topic);
+                            // Several recordings: head each one's topics with its name.
+                            const heading = multiSource &&
+                              visibleTopics[i - 1]?.source !== t.source && (
+                                <div className="source-heading" key={`source-${t.source}`}>
+                                  {sourceNames.get(t.source)}
+                                </div>
+                              );
+                            const query = search.toLowerCase();
+                            const topicMatch = (t.topicName ?? t.topic)
+                              .toLowerCase()
+                              .includes(query);
+                            const fields = t.fields.filter(
+                              (f) => topicMatch || f.path.join(".").toLowerCase().includes(query),
+                            );
+                            if (!fields.length && !topicMatch) return heading || null;
+                            return [
+                              heading,
+                              <details
+                                key={id}
+                                open={expandedTopics.has(id)}
+                                className={`topic-group ${t.message_count === 0 ? "no-messages" : ""}`}
                               >
                                 <summary
                                   onClick={(e) => {

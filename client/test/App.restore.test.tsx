@@ -46,6 +46,8 @@ const save = () =>
     zoneSource: "browser",
     timeDisplay: "absolute",
     tab: "settings",
+    sidebarWidth: null,
+    sidebarOpen: true,
   });
 const shown = (): WorkspaceState => JSON.parse(screen.getByTestId("state").textContent!);
 const stored = () => JSON.parse(localStorage.getItem(key)!);
@@ -170,6 +172,8 @@ describe("App session restore", () => {
         zoneSource: "browser",
         timeDisplay: "absolute",
         tab: "topics",
+        sidebarWidth: null,
+        sidebarOpen: true,
       });
       fetchMock.mockImplementation((url: string) => {
         if (url === "/api/runs/run") return json(run);
