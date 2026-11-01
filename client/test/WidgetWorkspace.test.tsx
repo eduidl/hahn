@@ -209,6 +209,25 @@ it("drags the whole widget as its preview", () => {
   expect(setDragImage).toHaveBeenCalledWith(frame, 30, 10);
 });
 
+it("lays out the rest without a moved widget once its drag has begun, until it ends", async () => {
+  const state = reduce(initialWorkspace(), { type: "add", direction: "row" });
+  const { container } = render(<Harness initialState={state} />);
+  const shells = () => [...container.querySelectorAll("[data-widget-id]")];
+  const [first] = shells();
+  const id = first.getAttribute("data-widget-id")!;
+  const before = shells().map((shell) => shell.getAttribute("data-widget-id"));
+  const dataTransfer = transfer(widgetMoveMime, id);
+  fireEvent.dragStart(first.querySelector(".mosaic-window-title")!, { dataTransfer });
+  // Not during dragstart, which would cancel the drag.
+  expect(container.querySelector(".lifted")).toBeNull();
+  await act(() => new Promise((resolve) => setTimeout(resolve)));
+  expect(container.querySelector(".lifted")?.getAttribute("data-widget-id")).toBe(id);
+  expect(shells().at(-1)?.getAttribute("data-widget-id")).toBe(id);
+  fireEvent.dragEnd(container.querySelector(".lifted .mosaic-window-title")!, { dataTransfer });
+  expect(container.querySelector(".lifted")).toBeNull();
+  expect(shells().map((shell) => shell.getAttribute("data-widget-id"))).toEqual(before);
+});
+
 describe("Tab widget interactions", () => {
   it("adds a TF Tree widget inside a tab", () => {
     render(<Harness />);

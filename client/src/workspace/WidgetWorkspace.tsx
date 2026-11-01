@@ -42,6 +42,8 @@ import {
   canPlaceWidget,
   ownerOf,
   containerLayout,
+  leaves,
+  withoutLifted,
   widgetMoveMime,
   type Container,
   widgetSpecs,
@@ -58,8 +60,14 @@ import {
 const Scene3D = lazy(() => import("../views/Scene3D"));
 const MapView = lazy(() => import("../views/MapView"));
 
-const MoveContext = createContext<{ id: string | null; setId: (id: string | null) => void }>({
+const MoveContext = createContext<{
+  id: string | null;
+  /** The moved widget once its drag has begun, from when the layout goes on without it. */
+  liftedId: string | null;
+  setId: (id: string | null) => void;
+}>({
   id: null,
+  liftedId: null,
   setId: () => {},
 });
 
@@ -296,12 +304,13 @@ function WidgetDropTarget({
       : "copy";
     setEdge(side);
   };
+  const leave = () => setEdge(null);
   const place = (event: DragEvent, side: DropEdge) => {
     if (!isWidgetDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
     onDrop(side);
-    setEdge(null);
+    leave();
   };
   if (frameOnly) {
     const sides: Record<DropEdge, string> = {
@@ -318,7 +327,7 @@ function WidgetDropTarget({
             className={`widget-drop-edge ${side}`}
             aria-label={`Drop on the ${sides[side]} of the Tabs widget`}
             onDragOver={(event) => accept(event, side)}
-            onDragLeave={() => setEdge(null)}
+            onDragLeave={leave}
             onDrop={(event) => place(event, side)}
           />
         ))}
@@ -335,7 +344,7 @@ function WidgetDropTarget({
       className="widget-drop"
       aria-label="Widget drop target"
       onDragOver={(event) => accept(event, edgeAt(event))}
-      onDragLeave={() => setEdge(null)}
+      onDragLeave={leave}
       onDrop={(event) => place(event, edgeAt(event))}
     >
       {edge && <div className={`widget-drop-preview ${edge}`} />}
@@ -346,6 +355,10 @@ function WidgetDropTarget({
 function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path: MosaicPath }) {
   const { state, dispatch, data, info, fullEnd, revision, dragVerdict, drop, openSettings } = props;
   const moving = useContext(MoveContext);
+  // Alone in its layout, it has nothing to give way to and stays in view.
+  const lifted =
+    moving.liftedId === widget.id &&
+    leaves(containerLayout(state, ownerOf(state, widget.id))).length > 1;
   const sourceNames = useContext(SourceNames);
   const selection = widget.series
     .map((series) => {
@@ -502,7 +515,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
   };
   return (
     <section
-      className="widget-shell"
+      className={lifted ? "widget-shell lifted" : "widget-shell"}
       aria-label={widget.title}
       data-widget-id={widget.id}
       onPointerDownCapture={() => dispatch({ type: "select", id: widget.id })}
@@ -858,10 +871,11 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
   const canDrop =
     (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, container)) ||
     (!!moving.id && canMove(state, moving.id, container));
+  const layout = containerLayout(state, container);
   return (
     <div className="mosaic-host">
       <Mosaic<string>
-        value={expanded ?? containerLayout(state, container)}
+        value={expanded ?? (moving.liftedId ? withoutLifted(layout, moving.liftedId) : layout)}
         onChange={(layout) => dispatch({ type: "layout", layout, container })}
         className="hahn-mosaic"
         resize={{ minimumPaneSizePx: { row: 320, column: 260 } }}
@@ -921,6 +935,16 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
 export function WidgetWorkspace(props: Props) {
   const { state, dispatch } = props;
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [liftedId, setLiftedId] = useState<string | null>(null);
+  // Changing the layout during dragstart would cancel the drag, so wait until it has begun.
+  useEffect(() => {
+    if (!movingId) {
+      setLiftedId(null);
+      return;
+    }
+    const timer = setTimeout(() => setLiftedId(movingId));
+    return () => clearTimeout(timer);
+  }, [movingId]);
   useEffect(() => {
     if (!state.expandedId) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -931,7 +955,7 @@ export function WidgetWorkspace(props: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [state.expandedId, dispatch]);
   return (
-    <MoveContext.Provider value={{ id: movingId, setId: setMovingId }}>
+    <MoveContext.Provider value={{ id: movingId, liftedId, setId: setMovingId }}>
       <div className="workspace-stage">
         <WorkspaceLayout {...props} expanded={state.expandedId} />
       </div>

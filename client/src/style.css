@@ -1223,6 +1223,9 @@ header .add-widget {
   background: #91b8ff33;
   border: 1px dashed #91b8ff;
 }
+.widget-shell.lifted {
+  visibility: hidden;
+}
 .widget-drop-preview.left { inset: 0 50% 0 0; }
 .widget-drop-preview.right { inset: 0 0 0 50%; }
 .widget-drop-preview.top { inset: 0 0 50% 0; }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  withoutLifted,
   initialWorkspace,
   workspaceReducer as reduce,
   requestedSeries,
@@ -303,5 +304,27 @@ describe("widget workspace", () => {
     });
     expect(state.widgets["widget-1"].view.y).toEqual(defaultPlotView().y);
     expect(state.widgets["widget-1"].view.pinnedYBase).toBeNull();
+  });
+});
+
+describe("withoutLifted", () => {
+  const layout = {
+    type: "split" as const,
+    direction: "row" as const,
+    splitPercentages: [50, 50],
+    children: ["a", "b"],
+  };
+  it("gives the room to the others while keeping the widget at no size", () => {
+    expect(withoutLifted(layout, "a")).toEqual({
+      type: "split",
+      direction: "row",
+      splitPercentages: [100, 0],
+      children: ["b", "a"],
+    });
+  });
+  it("leaves a layout it would empty, or that the widget is not in", () => {
+    expect(withoutLifted("a", "a")).toBe("a");
+    expect(withoutLifted(layout, "c")).toBe(layout);
+    expect(withoutLifted(null, "a")).toBeNull();
   });
 });
