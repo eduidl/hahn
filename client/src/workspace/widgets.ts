@@ -418,6 +418,21 @@ function removeLeaf(node: MosaicNode<string>, id: string): MosaicNode<string> | 
     splitPercentages: remaining.map((child) => (child.weight / total) * 100),
   };
 }
+/**
+ * The layout that goes on without a widget being dragged. The widget stays at no
+ * size rather than leaving: unmounted, it would lose its state and never report the
+ * end of its drag. A layout it does not belong to, or would leave empty, stays as it is.
+ */
+export function withoutLifted(
+  layout: MosaicNode<string> | null,
+  id: string,
+): MosaicNode<string> | null {
+  if (!layout || !leaves(layout).includes(id)) return layout;
+  const rest = removeLeafNullable(layout, id);
+  if (rest === null) return layout;
+  return { type: "split", direction: "row", splitPercentages: [100, 0], children: [rest, id] };
+}
+
 export function leaves(node: MosaicNode<string> | null): string[] {
   if (node === null) return [];
   if (typeof node === "string") return [node];
