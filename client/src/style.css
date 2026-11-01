@@ -2259,6 +2259,9 @@ header .add-widget {
 .view-scene canvas {
   display: block;
 }
+.view-map-drag-image {
+  display: block;
+}
 .view-map {
   /* Leaflet's panes use z-indexes that must not cover the workspace's overlays. */
   isolation: isolate;
