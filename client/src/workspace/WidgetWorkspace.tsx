@@ -534,6 +534,10 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 event.dataTransfer.setData(widgetMoveMime, widget.id);
                 event.dataTransfer.setData("text/plain", widget.title);
                 event.dataTransfer.effectAllowed = "move";
+                // The whole widget follows the pointer, held where it was grabbed.
+                const frame = event.currentTarget.closest(".widget-shell")!;
+                const { left, top } = frame.getBoundingClientRect();
+                event.dataTransfer.setDragImage(frame, event.clientX - left, event.clientY - top);
                 moving.setId(widget.id);
                 dispatch({ type: "select", id: widget.id });
               }}
