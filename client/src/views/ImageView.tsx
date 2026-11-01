@@ -10,6 +10,7 @@ import { topicKey, type Info, type Schemas, type Selected } from "../types";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 import { cameraDistortionError, cloudToCameraMatrix, projectCameraPoint } from "./camera";
+import { wheelZoomFactor } from "./Plot";
 import { cameraCandidates } from "./useCameraCalibration";
 
 const mimeTypes: Record<string, string> = {
@@ -26,6 +27,32 @@ type Cloud = {
   error?: string;
 };
 type Bundle = { frame: ViewFrame; calibration?: Calibration; clouds: Cloud[]; error?: string };
+
+/** Magnification and offset, the offset as a fraction of the view so that it survives resizing. */
+export type ImageZoom = { zoom: number; x: number; y: number };
+export const fullImage: ImageZoom = { zoom: 1, x: 0, y: 0 };
+const maxImageZoom = 32;
+
+/** Keeps the image covering the whole view, however it was moved. */
+const clampImage = ({ zoom, x, y }: ImageZoom): ImageZoom => ({
+  zoom,
+  x: Math.max(1 - zoom, Math.min(0, x)),
+  y: Math.max(1 - zoom, Math.min(0, y)),
+});
+
+/** Zooms while the image point under `pointer`, a fraction of the view, stays put. */
+export function zoomImage(view: ImageZoom, factor: number, pointer: { x: number; y: number }) {
+  const zoom = Math.max(1, Math.min(maxImageZoom, view.zoom * factor));
+  const ratio = zoom / view.zoom;
+  return clampImage({
+    zoom,
+    x: pointer.x - (pointer.x - view.x) * ratio,
+    y: pointer.y - (pointer.y - view.y) * ratio,
+  });
+}
+
+export const panImage = (view: ImageZoom, dx: number, dy: number) =>
+  clampImage({ ...view, x: view.x + dx, y: view.y + dy });
 
 function Projection({ cloud, calibration }: { cloud: Cloud; calibration: Calibration }) {
   const { series, frame, placement } = cloud;
@@ -82,7 +109,7 @@ export function ImageView({
   const series = widget.series.find((item) => kind(item) === "image");
   const clouds = widget.series.filter((item) => kind(item) === "pointcloud" && !item.hidden);
   const { frame, error } = useViewFrame(series, info);
-  const formatter = useTimeFormatter(info?.start_ns ?? null, widget.timeDisplay);
+  const formatter = useTimeFormatter(info?.start_ns ?? null);
   const candidates = useMemo(() => cameraCandidates(index, series), [index, series?.source]);
   const identity =
     series && info
@@ -236,29 +263,68 @@ export function ImageView({
     (calibration && (shown.width !== calibration.width || shown.height !== calibration.height)
       ? "Image and calibration dimensions differ"
       : "");
+  const zoomed = view.zoom > 1;
   return (
-    <div className="view-image">
-      {shown && !problem && shown.url && (
-        <img src={shown.url} alt={series?.topicName ?? series?.topic} />
+    <div
+      className={zoomed ? "view-image zoomed" : "view-image"}
+      ref={root}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || !zoomed) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drag.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerMove={(event) => {
+        if (!drag.current) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const dx = (event.clientX - drag.current.x) / Math.max(rect.width, 1);
+        const dy = (event.clientY - drag.current.y) / Math.max(rect.height, 1);
+        drag.current = { x: event.clientX, y: event.clientY };
+        setView((current) => panImage(current, dx, dy));
+      }}
+      onPointerUp={() => {
+        drag.current = undefined;
+      }}
+      onPointerCancel={() => {
+        drag.current = undefined;
+      }}
+    >
+      <div
+        className="view-image-stage"
+        style={{
+          transform: `translate(${view.x * 100}%, ${view.y * 100}%) scale(${view.zoom})`,
+        }}
+      >
+        {shown && !problem && shown.url && (
+          <img src={shown.url} alt={series?.topicName ?? series?.topic} draggable={false} />
+        )}
+        {shown && !problem && shown.bitmap && (
+          <canvas
+            role="img"
+            aria-label={series?.topicName ?? series?.topic}
+            width={shown.width}
+            height={shown.height}
+            ref={(element) => {
+              if (element && shown.bitmap) element.getContext("2d")?.drawImage(shown.bitmap, 0, 0);
+            }}
+          />
+        )}
+        {shown &&
+          value?.kind === "image" &&
+          calibration &&
+          !projectionProblem &&
+          shown.bundle.clouds.map((cloud) => (
+            <Projection key={cloud.series.key} cloud={cloud} calibration={calibration} />
+          ))}
+      </div>
+      {zoomed && (
+        <button
+          className="view-image-reset"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => setView(fullImage)}
+        >
+          Reset
+        </button>
       )}
-      {shown && !problem && shown.bitmap && (
-        <canvas
-          role="img"
-          aria-label={series?.topicName ?? series?.topic}
-          width={shown.width}
-          height={shown.height}
-          ref={(element) => {
-            if (element && shown.bitmap) element.getContext("2d")?.drawImage(shown.bitmap, 0, 0);
-          }}
-        />
-      )}
-      {shown &&
-        value?.kind === "image" &&
-        calibration &&
-        !projectionProblem &&
-        shown.bundle.clouds.map((cloud) => (
-          <Projection key={cloud.series.key} cloud={cloud} calibration={calibration} />
-        ))}
       {projectionProblem && <p className="view-error projection-error">{projectionProblem}</p>}
       {problem ? (
         <p className="view-status view-error">{problem}</p>
