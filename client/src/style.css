@@ -1074,15 +1074,6 @@ header .add-widget {
 .widget-catalog .help {
   margin: 4px 6px 8px;
 }
-/* Let drag events reach the tiles underneath while dragging, but keep the
-   source item hit-testable: a drag source without pointer events can stall. */
-.widget-catalog.dragging {
-  pointer-events: none;
-  opacity: 0.4;
-}
-.widget-catalog.dragging .widget-catalog-item.source {
-  pointer-events: auto;
-}
 .widget-catalog-item {
   display: flex;
   flex-direction: column;
