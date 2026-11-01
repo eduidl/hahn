@@ -1,3 +1,4 @@
+import "./WidgetHelp.css";
 import { useId, useRef } from "react";
 
 /** A title bar button listing how to operate a widget, on hover, focus or tap. */

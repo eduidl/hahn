@@ -1,3 +1,4 @@
+import "./RunsDialog.css";
 import { useEffect, useRef, useState } from "react";
 import { get } from "../data/sources";
 import { errorMessage, type RunList } from "../types";

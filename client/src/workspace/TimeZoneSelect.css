@@ -1,0 +1,33 @@
+.timezone-name {
+  color: #e4e4e4;
+}
+.timezone-name.disabled {
+  color: #6f6f6f;
+}
+.timezone-select {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+  white-space: nowrap;
+  color: #a0a0a0;
+  font-size: 12px;
+}
+.timezone-select select {
+  max-width: 240px;
+  padding: 6px 8px;
+  color: #d4d4d4;
+  background: #181818;
+  border: 1px solid #3b3b3b;
+  border-radius: 4px;
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .timezone-select span:not(.timezone-name) {
+    display: none;
+  }
+  .timezone-select select {
+    max-width: 120px;
+  }
+}

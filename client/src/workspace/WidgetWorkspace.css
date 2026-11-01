@@ -1,0 +1,403 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.chart-area {
+  position: relative;
+  margin-top: 22px;
+  min-height: 320px;
+  height: clamp(350px, 52vh, 650px);
+  border-top: 1px solid #363636;
+}
+.chart-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0 22px;
+  color: #8b8b8b;
+  font:
+    12px ui-monospace,
+    monospace;
+}
+@media (max-width: 900px) {
+  .chart-meta {
+    flex-direction: column;
+  }
+  .toolbar {
+    align-self: flex-end;
+  }
+}
+@media (max-width: 640px) {
+  .chart-area {
+    height: 380px;
+  }
+}
+.chart-area.drop-ready {
+  outline: 1px dashed #91b8ff;
+  outline-offset: -1px;
+  background: #0c0e13;
+}
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: #080a10d9;
+  color: #c5d9ff;
+  font-size: 16px;
+  border: 1px dashed #91b8ff;
+  z-index: 2;
+}
+.drop-overlay.rejected {
+  padding: 16px;
+  text-align: center;
+  background: #0d0d0de6;
+  color: #9a8a8a;
+  font-size: 12px;
+  border: 1px dashed #5a3a3a;
+}
+.widget-shell {
+  position: relative;
+}
+.widget-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+.widget-drop-preview {
+  position: absolute;
+  pointer-events: none;
+  background: #91b8ff33;
+  border: 1px dashed #91b8ff;
+}
+.widget-shell.lifted {
+  visibility: hidden;
+}
+.widget-drop-preview.left { inset: 0 50% 0 0; }
+.widget-drop-preview.right { inset: 0 0 0 50%; }
+.widget-drop-preview.top { inset: 0 0 50% 0; }
+.widget-drop-preview.bottom { inset: 50% 0 0 0; }
+/* Only the outer 16px intercepts drags; the centre belongs to the tab contents. */
+.tab-frame-drop { pointer-events: none; }
+.widget-drop-edge { position: absolute; pointer-events: auto; background: #91b8ff12; box-shadow: inset 0 0 0 1px #91b8ff44; }
+.widget-drop-edge:hover { background: #91b8ff33; }
+.widget-drop-edge.left { top: 16px; bottom: 16px; left: 0; width: 16px; }
+.widget-drop-edge.right { top: 16px; bottom: 16px; right: 0; width: 16px; }
+.widget-drop-edge.top { top: 0; left: 0; right: 0; height: 16px; }
+.widget-drop-edge.bottom { bottom: 0; left: 0; right: 0; height: 16px; }
+.widget-drop-label {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  padding: 6px 10px; border: 1px solid #738db8; border-radius: 4px;
+  background: #182337; color: #dfebff; font-size: 12px; white-space: nowrap;
+}
+.workspace-empty.drop-ready {
+  outline: 1px dashed #91b8ff;
+  outline-offset: -8px;
+  background: #0c0e13;
+}
+/* Centered on the header regardless of the side groups' widths. */
+/* The layout always fits the available area; panes shrink instead of scrolling. */
+.workspace-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.mosaic-host {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.widget-shell,
+.widget-shell > .mosaic-window {
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+}
+/* Tiles keep their 3px margin as the gap between widgets; pulling the root out
+   by the same amount puts the outer tiles flush with the main area. */
+.hahn-mosaic .mosaic-root {
+  inset: -3px;
+}
+.hahn-mosaic .mosaic-window {
+  background: #0d0d0d;
+  border: 1px solid #303030;
+  box-shadow: none;
+}
+.hahn-mosaic .mosaic-window.widget-active {
+  border-color: #738db8;
+}
+.hahn-mosaic .mosaic-window-toolbar,
+.hahn-mosaic .mosaic-preview .mosaic-window-toolbar {
+  height: 34px;
+  background: #181818;
+  color: #c5c5c5;
+  box-shadow: none;
+  border-bottom: 1px solid #2b2b2b;
+  font-size: 12px;
+}
+/* Direct children only: a selected Tabs widget must not light up the widgets inside it. */
+.hahn-mosaic .widget-active > .mosaic-window-toolbar {
+  background: #243047;
+  color: #ffffff;
+}
+.hahn-mosaic .mosaic-window-title {
+  padding-left: 10px;
+  font-weight: 500;
+}
+.hahn-mosaic .mosaic-window-body,
+.hahn-mosaic .mosaic-preview .mosaic-window-body {
+  background: #0d0d0d;
+}
+.hahn-mosaic .mosaic-split:hover,
+.hahn-mosaic .mosaic-split.-preview {
+  background: #738db8;
+}
+.widget-drag-mode {
+  display: flex;
+}
+.widget-drag-mode .widget-icon[aria-pressed="true"] {
+  color: #dce8ff;
+  background: #3a4d70;
+}
+.widget-toolbar-separator {
+  align-self: center;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: #555;
+}
+.widget-actions {
+  position: fixed;
+  /* Override the popover UA centering; the anchor decides the position. */
+  inset: auto;
+  margin: 4px 0;
+  position-area: bottom span-right;
+  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+  padding: 4px;
+  width: max-content;
+  background: #202020;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px #0008;
+}
+.submenu-host > button {
+  display: flex !important;
+  justify-content: space-between;
+  gap: 16px;
+}
+.submenu-host.open > button {
+  background: #2c2c2c;
+}
+.widget-actions.submenu {
+  /* Anchored to the item, so clear the parent's padding and border (5px) plus a 4px gap. */
+  margin: -5px 9px 0;
+  position-area: right span-bottom;
+  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+  max-width: 260px;
+}
+/* Bridge the gap on either side so the pointer can reach the submenu. */
+.widget-actions.submenu::before {
+  content: "";
+  position: absolute;
+  inset: 0 -13px;
+  z-index: -1;
+}
+.widget-actions button[aria-checked="true"] {
+  color: #91b8ff;
+}
+.widget-actions button.danger {
+  color: #ff7b7b;
+}
+.widget-actions button.danger:hover:not(:disabled) {
+  background: #3a1d1d;
+  color: #ff9a9a;
+}
+.widget-actions small {
+  display: block;
+  margin-top: 2px;
+  color: #a0a0a0;
+  font-size: 12px;
+}
+.widget-actions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 9px 10px;
+}
+.widget-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.widget-plot-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px 0;
+  font-size: 12px;
+  color: #858585;
+  flex-shrink: 0;
+}
+/* Keeps its line while empty, so that adding a series does not move the content. */
+.widget-selection:empty::before {
+  content: "\200b";
+}
+.widget-selection {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.widget-content .chart-area {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  margin-top: 5px;
+  border-top: 0;
+}
+.widget-content .empty p {
+  font-size: 12px;
+  padding: 12px;
+  text-align: center;
+}
+/* Fills the widget, so that the wheel zooms over the empty space below the rows too. */
+.state-plot {
+  flex: 1;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px 8px;
+  color: #bdbdbd;
+  font-size: 12px;
+}
+.state-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.state-row + .state-row {
+  margin-top: 8px;
+}
+.state-label {
+  display: flex;
+  min-width: 0;
+  font-size: 12px;
+}
+.state-track {
+  position: relative;
+  cursor: pointer;
+  height: 24px;
+  background: #252a30;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.state-segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 1px;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  overflow: hidden;
+  border-right: 1px solid #101317;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px #000;
+}
+.state-segment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.state-segment .state-empty {
+  color: #c3c9d1;
+  font-weight: 400;
+  font-style: italic;
+}
+.state-axis {
+  position: relative;
+  min-height: 34px;
+  margin-top: 7px;
+  color: #858585;
+  font-size: 12px;
+}
+.state-axis span {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.state-axis small {
+  color: #6f6f6f;
+  font-size: 12px;
+}
+.workspace-empty {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #858585;
+  font-size: 12px;
+}
+/* Shared playhead line; pointer events pass through to the plot below. */
+.playhead {
+  position: absolute;
+  width: 0;
+  border-left: 1.5px solid #91b8ff;
+  transform: translateX(-0.75px);
+  pointer-events: none;
+}
+/* A Tab contains the same layout surface as the root workspace. */
+.tab-widget-content {
+  overflow: hidden;
+}
+.widget-tab-panel { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.widget-tab-panel > .mosaic-host { margin: 3px; }
+.mosaic-window-title[draggable="true"] { cursor: grab; }
+.mosaic-window-title[draggable="true"]:active { cursor: grabbing; }
+.widget-tab-panel[hidden] { display: none; }
+.empty-widget-catalog { width: min(680px, 100%); padding: 20px; text-align: left; }
+.empty-widget-catalog > p { margin: 0 0 14px; font-size: 12px; color: #bbb; }
+.empty-widget-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 6px; }
+.empty-widget-options button { text-align: left; padding: 12px; background: #181818; border: 1px solid #303030; }
+.empty-widget-options button:hover { background: #222; border-color: #738db8; }
+.empty-widget-options strong { display: block; font-size: 12px; font-weight: 500; color: #ddd; }
+.empty-widget-options span { display: block; margin-top: 6px; color: #888; font-size: 12px; line-height: 1.5; }
+.workspace-empty:has(.empty-widget-catalog) { overflow: auto; justify-content: safe center; }
+/* Mosaic wraps custom toolbar content; let our row occupy that full wrapper. */
+.widget-toolbar {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+.widget-toolbar > .mosaic-window-title { min-width: 0; }
+/* Too narrow for every icon, the title goes first and then the leftmost icons: the menu stays. */
+.widget-toolbar > .mosaic-window-title { flex-shrink: 1000; }
+.widget-toolbar > .mosaic-window-controls { flex: 0 1 auto; min-width: 0; margin-left: auto; justify-content: flex-end; overflow: hidden; }
+.widget-toolbar > .mosaic-window-controls > * { flex-shrink: 0; }
+.widget-tabs-toolbar > .mosaic-window-title { flex: 0 0 24px; justify-content: center; padding: 0; color: #777; }
+.widget-tabs-toolbar > .widget-tab-bar {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border-bottom: 0;
+  background: transparent;
+}

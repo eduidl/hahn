@@ -1,3 +1,4 @@
+import "./Plot.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useTimeFormatter } from "../timeDisplay";
 import { lowerBound, nearest, type Point } from "../data/data";

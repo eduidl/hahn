@@ -1,3 +1,4 @@
+import "./TfTree.css";
 import { useTimeFormatter } from "../timeDisplay";
 import { secondsFrom } from "../data/data";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

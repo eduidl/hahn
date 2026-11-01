@@ -1,0 +1,179 @@
+.eyebrow {
+  font:
+    12px ui-monospace,
+    monospace;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #9e9e9e;
+}
+.field-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 25px 22px 15px;
+  font-size: 12px;
+  color: #939393;
+}
+.search {
+  margin: 0 17px 16px;
+  padding: 9px 10px;
+  background: #181818;
+  color: #e4e4e4;
+  border: 1px solid #3b3b3b;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+.search::placeholder {
+  color: #818181;
+}
+.field {
+  display: flex;
+  gap: 9px;
+  padding: 9px 12px 9px 24px;
+  font:
+    12px ui-monospace,
+    monospace;
+  align-items: center;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.field:hover {
+  background: #2c2c2c;
+}
+.field.checked {
+  background: #2e2e2e;
+}
+.field span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.field small {
+  /* Zero basis: the type only takes the room the field name leaves. */
+  flex: 1 1 0;
+  min-width: 0;
+  color: #6f6f6f;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.muted {
+  font-size: 12px;
+  color: #939393;
+  padding: 0 12px;
+}
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.empty h2 {
+  margin: 6px 0;
+  font-size: 20px;
+  color: #cecece;
+}
+.empty p {
+  font-size: 12px;
+  color: #979797;
+}
+.empty-wave {
+  font-size: 65px;
+  color: #91b8ff;
+  line-height: 1.2;
+  opacity: 0.7;
+}
+.remove {
+  border: 0;
+  background: none;
+  font-size: 18px;
+  color: #8f8f8f;
+  padding: 0 8px;
+}
+.error {
+  background: #291b17;
+  color: #ffc6ab;
+  padding: 12px;
+  margin-top: 15px;
+  font-size: 12px;
+  border-left: 2px solid #eaa685;
+}
+@media (max-width: 640px) {
+  .field-heading {
+    padding-top: 14px;
+  }
+}
+.field[draggable="true"]:active {
+  cursor: grabbing;
+}
+.help {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #919191;
+  padding: 0 20px;
+  margin: 0 0 16px;
+}
+.widget-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  padding: 0;
+  font-size: 20px;
+  border: 0;
+  border-radius: 0;
+  color: #a9a9a9;
+  background: transparent;
+}
+.widget-icon:disabled {
+  opacity: 0.35;
+}
+.value-changes-empty {
+  margin: 12px;
+  color: #858585;
+}
+.raw-error {
+  color: #ffc6ab;
+}
+.view-image,
+.view-scene,
+.view-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #101317;
+}
+.view-scene canvas {
+  display: block;
+}
+.view-time,
+.view-status,
+.view-error {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #d6dbe1;
+  background: rgb(16 19 23 / 75%);
+}
+.view-error {
+  color: #ff9d9d;
+}
+.view-problems {
+  position: absolute;
+  top: 8px;
+  left: 56px;
+  right: 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}

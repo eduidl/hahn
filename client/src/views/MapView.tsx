@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "./MapView.css";
 import { errorMessage, type Info, type Selected } from "../types";
 import { usePlaybackNs } from "../data/useViewData";
 import {

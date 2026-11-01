@@ -1,3 +1,4 @@
+import "./SourceInfo.css";
 import { useContext } from "react";
 import { SourceNames, type OpenSource } from "../data/sources";
 import { useTimeFormatter } from "../timeDisplay";

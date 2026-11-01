@@ -1,0 +1,31 @@
+/* Shared notation for a series: [recording,] topic over field path, optional type below. */
+.series-ref {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.45;
+  color: #cecece;
+  /* Segments break at <wbr>; split a segment only when it alone overflows. */
+  overflow-wrap: break-word;
+}
+.series-ref-source,
+.series-ref-type {
+  color: #6f6f6f;
+  font-size: 12px;
+}
+.series-ref-inline {
+  display: flex;
+  min-width: 0;
+  white-space: pre;
+}
+.series-ref-parent,
+.series-ref-field {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The parent gives way first: the field is what tells series apart. */
+.series-ref-parent {
+  flex-shrink: 1000;
+}

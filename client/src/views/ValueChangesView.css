@@ -1,0 +1,72 @@
+/* Value changes: in time order, one fixed-height row each. */
+.value-changes-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  font:
+    12px ui-monospace,
+    monospace;
+}
+.value-changes-header,
+.value-changes-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: center;
+  padding: 0 12px;
+}
+.value-changes-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  color: #858585;
+  font-size: 12px;
+  border-bottom: 1px solid #242424;
+}
+.value-changes-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.value-changes-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #cecece;
+  text-align: left;
+  font: inherit;
+}
+.value-changes-row:hover {
+  background: #1b1b1b;
+}
+.value-changes-row.current {
+  background: #1d2a40;
+}
+.value-changes-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.value-changes-time {
+  color: #a0a0a0;
+}
+.value-changes-series {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #a4a4a4;
+}
+.value-changes-series i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.value-changes-value.empty {
+  color: #858585;
+  font-style: italic;
+}

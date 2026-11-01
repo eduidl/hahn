@@ -1,3 +1,4 @@
+import "./TabControls.css";
 import { useEffect, useRef, useState, type Dispatch, type DragEvent } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import {

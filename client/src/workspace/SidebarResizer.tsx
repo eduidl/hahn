@@ -1,3 +1,4 @@
+import "./SidebarResizer.css";
 import type { KeyboardEvent, PointerEvent } from "react";
 
 export const minSidebarWidth = 200;

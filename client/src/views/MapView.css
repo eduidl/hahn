@@ -1,0 +1,12 @@
+.view-map-drag-image {
+  display: block;
+}
+.view-map {
+  /* Leaflet's panes use z-indexes that must not cover the workspace's overlays. */
+  isolation: isolate;
+}
+.view-map-canvas.leaflet-container {
+  position: absolute;
+  inset: 0;
+  background: #1a1e23;
+}
