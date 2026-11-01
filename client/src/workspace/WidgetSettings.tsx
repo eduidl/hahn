@@ -205,32 +205,6 @@ function FieldPicker({
   );
 }
 
-function TimeDisplaySetting({ widget, dispatch }: WidgetSettingsProps) {
-  const label =
-    widget.type === "image" || widgetSpecs[widget.type].maxSeries === 1
-      ? "Time display"
-      : "X-axis time display";
-  return (
-    <label className="time-display-setting">
-      {label}
-      <select
-        aria-label={label}
-        value={widget.timeDisplay}
-        onChange={(event) =>
-          dispatch({
-            type: "time-display",
-            id: widget.id,
-            value: event.target.value === "relative" ? "relative" : "absolute",
-          })
-        }
-      >
-        <option value="absolute">Absolute time</option>
-        <option value="relative">Seconds from run start</option>
-      </select>
-    </label>
-  );
-}
-
 /** Series list shared by all settings; each widget type supplies the per-series row. */
 function SeriesList({
   widget,

@@ -335,6 +335,7 @@ input[type="checkbox"] {
   gap: 8px;
 }
 .reset-workspace {
+  margin-left: auto;
   padding: 0;
   border: 0;
   background: none;
@@ -376,25 +377,6 @@ h1 {
   flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
-}
-.drag-mode {
-  display: flex;
-}
-.drag-mode button {
-  border-radius: 0;
-}
-.drag-mode button:first-child {
-  border-radius: 5px 0 0 5px;
-}
-.drag-mode button:last-child {
-  border-radius: 0 5px 5px 0;
-  margin-left: -1px;
-}
-.drag-mode button[aria-pressed="true"] {
-  background: #253147;
-  border-color: #7195ce;
-  color: #dce8ff;
-  z-index: 1;
 }
 .chart-area {
   position: relative;
