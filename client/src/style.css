@@ -2305,5 +2305,14 @@ header .add-widget {
 .view-image .projection-error {
   top: 38px;
 }
+/* Covers the image, so it shows on demand; without hover it has to stay. */
+@media (hover: hover) {
+  .view-image .view-time {
+    visibility: hidden;
+  }
+  .view-image:hover .view-time {
+    visibility: visible;
+  }
+}
 
 .tf-tree-pose-handle { cursor: move; touch-action: none; }
