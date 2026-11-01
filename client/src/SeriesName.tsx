@@ -20,13 +20,24 @@ export function SeriesName({
   topic,
   path,
   type,
+  inline = false,
 }: {
   source: string;
   topic: string;
   path: string[];
   type?: string;
+  /** One line, for tight spots such as a plot legend. */
+  inline?: boolean;
 }) {
   const label = useSourceLabel(source);
+  if (inline) {
+    const name = [label, topic, path.join(".")].filter(Boolean).join(" · ");
+    return (
+      <span className="series-ref-inline" title={name}>
+        {name}
+      </span>
+    );
+  }
   return (
     <span className="series-ref">
       {label && <span className="series-ref-source">{breakable(label)}</span>}

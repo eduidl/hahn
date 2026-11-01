@@ -74,6 +74,7 @@ For CSV and Parquet:
 | Wheel | Zoom the time axis of a plot |
 | Shift + wheel | Zoom the value axis of a plot |
 | Click a plot or state row | Move the playback position there |
+| Click a legend item | Show or hide that series |
 | Drag | Pan or box zoom, depending on the widget's mode |
 | Double-click a plot | Reset its view |
 | Double-click a field, or press Enter on it | Add it to the selected widget |
