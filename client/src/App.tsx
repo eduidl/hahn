@@ -441,7 +441,7 @@ export function App() {
                 </button>
                 <div
                   id="widget-catalog"
-                  className={`widget-catalog ${widgetDrag ? "dragging" : ""}`}
+                  className="widget-catalog"
                   popover="auto"
                   role="dialog"
                   aria-label="Add widget"
@@ -450,7 +450,7 @@ export function App() {
                   {widgetTypes.map((type) => (
                     <div
                       key={type}
-                      className={`widget-catalog-item ${widgetDrag === type ? "source" : ""}`}
+                      className="widget-catalog-item"
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.setData(widgetDragMime, type);
@@ -458,11 +458,11 @@ export function App() {
                         event.dataTransfer.setData("text/plain", widgetSpecs[type].label);
                         event.dataTransfer.effectAllowed = "copy";
                         setWidgetDrag(type);
+                        // The list would cover the drop targets. Hiding the source during
+                        // dragstart cancels the drag, so wait until it has begun.
+                        setTimeout(() => document.getElementById("widget-catalog")?.hidePopover());
                       }}
-                      onDragEnd={() => {
-                        setWidgetDrag(null);
-                        document.getElementById("widget-catalog")?.hidePopover();
-                      }}
+                      onDragEnd={() => setWidgetDrag(null)}
                     >
                       <strong>{widgetSpecs[type].label}</strong>
                       <span>{widgetSpecs[type].description}</span>
