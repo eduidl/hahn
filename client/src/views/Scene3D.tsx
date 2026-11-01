@@ -19,7 +19,12 @@ import { cameraSurface, defaultImageDistance } from "./camera";
 import { useCameraCalibration } from "./useCameraCalibration";
 import { reframeCamera } from "./sceneCamera";
 
-type Stage = { scene: THREE.Scene; invalidate: () => void; fit: (object: THREE.Object3D) => void };
+type Stage = {
+  scene: THREE.Scene;
+  invalidate: () => void;
+  fit: (object: THREE.Object3D) => void;
+  reframe: (transform: Transform) => void;
+};
 
 const matrixOf = ({ translation, rotation }: Transform) =>
   new THREE.Matrix4().compose(
@@ -338,7 +343,7 @@ function createStage(host: HTMLDivElement) {
   const grid = new THREE.GridHelper(20, 20, "#5b6570", "#343a42");
   grid.rotation.x = Math.PI / 2;
   scene.add(grid);
-  const controls = new OrbitControls(camera, renderer.domElement);
+  let controls = new OrbitControls(camera, renderer.domElement);
   let pending = 0;
   const invalidate = () => {
     pending ||= requestAnimationFrame(() => {
@@ -370,9 +375,20 @@ function createStage(host: HTMLDivElement) {
     controls.update();
     invalidate();
   };
+  const reframe = (transform: Transform) => {
+    const target = controls.target.clone();
+    controls.dispose();
+    reframeCamera(camera, target, transform);
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(target);
+    grid.position.set(target.x, target.y, 0);
+    controls.addEventListener("change", invalidate);
+    controls.update();
+    invalidate();
+  };
   invalidate();
   return {
-    stage: { scene, invalidate, fit },
+    stage: { scene, invalidate, fit, reframe },
     dispose: () => {
       cancelAnimationFrame(pending);
       resize.disconnect();
@@ -381,6 +397,55 @@ function createStage(host: HTMLDivElement) {
       renderer.domElement.remove();
     },
   };
+}
+
+/** Switch the scene and viewpoint together after resolving the frame change. */
+export function useSceneFrame(
+  stage: Stage | undefined,
+  source: string | undefined,
+  target: string | null,
+  info: Info | null,
+) {
+  const playback = usePlaybackStore();
+  const run = source ? runUrl(source) : null;
+  const previous = useRef<{ stage: Stage; run: string; frame: string }>(undefined);
+  const [shown, setShown] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!stage || !run || !target || !info) return;
+    const old = previous.current;
+    if (!old || old.stage !== stage || old.run !== run) {
+      previous.current = { stage, run, frame: target };
+      setShown(target);
+      setError("");
+      return;
+    }
+    if (old.frame === target) {
+      setError("");
+      return;
+    }
+    const controller = new AbortController();
+    const time = String(BigInt(info.start_ns) + BigInt(Math.round(playback.getState().time * 1e9)));
+    get<Schemas["Transforms"]>(
+      `${run}/transforms?${new URLSearchParams({ target, time_ns: time })}`,
+      controller.signal,
+    )
+      .then((transforms) => {
+        if (controller.signal.aborted) return;
+        const transform = transforms.frames[old.frame];
+        if (!transform) throw new Error(`No transform from ${old.frame} to ${target} at this time`);
+        stage.reframe(transform);
+        previous.current = { stage, run, frame: target };
+        setShown(target);
+        setError("");
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setError(`Could not change fixed frame: ${errorMessage(error)}`);
+      });
+    return () => controller.abort();
+  }, [stage, run, target, info?.start_ns, playback]);
+  return { target: shown, error };
 }
 
 /** Point clouds and frames in a fixed frame, at the playback position. */
@@ -407,8 +472,9 @@ export default function Scene3D({
   }, []);
   const sources = widget.series.map((s) => s.source);
   const { frames, error } = useFrames(sources);
-  const target = fixedFrameOf(widget.fixedFrame, frames);
-  const problem = failure || error;
+  const requested = fixedFrameOf(widget.fixedFrame, frames);
+  const { target, error: frameError } = useSceneFrame(stage, sources[0], requested, info);
+  const problem = failure || error || frameError;
   return (
     <div className="view-scene" ref={host}>
       {stage && <FrameAxes source={sources[0]} target={target} info={info} stage={stage} />}

@@ -56,3 +56,23 @@ export function projectCameraPoint(point: readonly number[], calibration: Calibr
     : null;
 }
 
+/** Transform a point cloud pose into the camera frame. */
+export function cloudToCameraMatrix(
+  pose: Schemas["PointCloudValue"]["pose"],
+  transform: Schemas["Transform"] | null | undefined,
+) {
+  const matrix = new THREE.Matrix4().compose(
+    new THREE.Vector3(...(pose.position as [number, number, number])),
+    new THREE.Quaternion(...(pose.orientation as [number, number, number, number])),
+    new THREE.Vector3(1, 1, 1),
+  );
+  if (transform)
+    matrix.premultiply(
+      new THREE.Matrix4().compose(
+        new THREE.Vector3(...(transform.translation as [number, number, number])),
+        new THREE.Quaternion(...(transform.rotation as [number, number, number, number])),
+        new THREE.Vector3(1, 1, 1),
+      ),
+    );
+  return matrix;
+}
