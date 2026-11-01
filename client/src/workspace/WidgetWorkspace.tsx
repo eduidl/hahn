@@ -427,7 +427,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
           {widget.tabs.map((tab) => (
             <div
               key={tab.id}
-              className="widget-tab-settings"
+              className="widget-tab-panel"
               role="tabpanel"
               id={`${widget.id}-${tab.id}-panel`}
               aria-labelledby={`${widget.id}-${tab.id}`}
