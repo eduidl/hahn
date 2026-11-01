@@ -92,3 +92,40 @@ export function linearTicks(min: number, max: number, count = 6): AxisTicks {
   const scale = exponent === null ? "" : `×10${superscript(exponent)} `;
   return { values, labels, annotation: scale + offsetText(offset, unit) };
 }
+
+/** Steps that read as round clock times, in seconds. */
+const clockSteps = [
+  0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900,
+  1800, 3600, 7200, 10800, 21600, 43200, 86400,
+];
+const day = 86400;
+const clockStep = (raw: number) =>
+  clockSteps.find((step) => step >= raw) ?? niceStep(raw / day) * day;
+
+/**
+ * Time axis positions on round values, spaced at least `minSpacing` pixels apart. `offset` is
+ * what turns an axis value into the value that should look round, such as the clock time.
+ * Always gives at least one tick, so that a narrow axis still says where it is.
+ */
+export function timeTicks(
+  start: number,
+  end: number,
+  options: { width: number; minSpacing: number; offset: number; clock: boolean },
+): { values: number[]; step: number } {
+  const { width, minSpacing, offset, clock } = options;
+  const span = end - start;
+  if (!(span > 0) || !(width > 0)) return { values: [], step: 0 };
+  let raw = (span * minSpacing) / width;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const step = clock ? clockStep(raw) : niceStep(raw);
+    const first = Math.ceil((start + offset) / step - 1e-9);
+    const last = Math.floor((end + offset) / step + 1e-9);
+    if (last >= first) {
+      const values: number[] = [];
+      for (let k = first; k <= last; k++) values.push(k * step - offset + 0); // `+ 0` turns -0 into 0.
+      return { values, step };
+    }
+    raw /= 2;
+  }
+  return { values: [start], step: span };
+}

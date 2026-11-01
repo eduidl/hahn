@@ -14,7 +14,7 @@ import {
   type AxisView,
 } from "./axes";
 import { SeriesName } from "../SeriesName";
-import { linearTicks } from "./ticks";
+import { linearTicks, timeTicks } from "./ticks";
 import type { LegendSettings } from "../workspace/widgets";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { isDiscreteKind, valueKind, type EnumValue } from "../types";
@@ -209,6 +209,8 @@ export function Plot({
   const legendStyle = {
     [vertical]: vertical === "top" ? top + inset : bottom + inset,
     [horizontal]: horizontal === "left" ? left + inset : right + inset,
+    // May cover the axis labels on the far side, but must stay inside the widget.
+    maxWidth: Math.max(0, size.w - (horizontal === "left" ? left : right) - inset - 4),
   };
   // Hover readouts (cursor line and tooltip) only make sense with something drawn.
   const hasVisible = series.some((s) => !s.hidden);
@@ -289,21 +291,38 @@ export function Plot({
       ctx.textAlign = "right";
       ctx.fillText(tick.label, left - 12, y + 4);
     }
-    const ticks = Math.max(1, Math.min(6, Math.floor(w / (timeDisplay === "absolute" ? 135 : 85))));
-    for (let i = 0; i <= ticks; i++) {
-      const x = left + (w * i) / ticks;
+    const { values, step } = timeTicks(domain[0], domain[1], {
+      width: w,
+      minSpacing: time.minTickSpacing,
+      offset: time.tickOffset,
+      clock: time.clock,
+    });
+    let shownDate = "";
+    ctx.textAlign = "center";
+    for (const value of values) {
+      const x = px(value);
       ctx.strokeStyle = "#202020";
       ctx.beginPath();
       ctx.moveTo(x, top);
       ctx.lineTo(x, top + h);
       ctx.stroke();
-      ctx.textAlign = i === 0 ? "left" : i === ticks ? "right" : "center";
-      const label = time.tick(domain[0] + ((domain[1] - domain[0]) * i) / ticks);
+      const text = time.axisTime(value, step);
+      // Keep edge labels inside the axis instead of running into its neighbors.
+      const half = ctx.measureText(text).width / 2;
+      const labelX = Math.max(left + half, Math.min(left + w - half, x));
       ctx.fillStyle = "#a0a0a0";
-      ctx.fillText(label.time, x, top + h + 24);
-      if (label.date) {
+      ctx.fillText(text, labelX, top + h + 24);
+      // The date repeats, so show it where it first appears and where it changes.
+      const { date } = time.tick(value);
+      if (date && date !== shownDate) {
+        const dateHalf = ctx.measureText(date).width / 2;
         ctx.fillStyle = "#737373";
-        ctx.fillText(label.date, x, top + h + 39);
+        ctx.fillText(
+          date,
+          Math.max(left + dateHalf, Math.min(left + w - dateHalf, x)),
+          top + h + 39,
+        );
+        shownDate = date;
       }
     }
     ctx.fillStyle = "#808080";
