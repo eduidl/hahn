@@ -559,6 +559,7 @@ function createStage(host: HTMLDivElement) {
   const homePosition = new THREE.Vector3(-20, -20, 20);
   camera.position.copy(homePosition);
   const grid = new THREE.GridHelper(20, 20, "#5b6570", "#343a42");
+  // Stays at the origin: the scene is in the fixed frame, so this is that frame's ground plane.
   grid.rotation.x = Math.PI / 2;
   scene.add(grid);
   let controls = new OrbitControls(camera, renderer.domElement);
@@ -589,7 +590,6 @@ function createStage(host: HTMLDivElement) {
     camera.position.copy(sphere.center).add(new THREE.Vector3(-distance, -distance, distance));
     // Cells of a round number of meters, whatever the size of what is shown.
     grid.scale.setScalar(10 ** Math.ceil(Math.log10(distance) - 1));
-    grid.position.set(sphere.center.x, sphere.center.y, 0);
     controls.update();
     invalidate();
   };
