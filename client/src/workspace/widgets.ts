@@ -111,9 +111,10 @@ export type WorkspaceAction =
   | { type: "table-column-width"; id: string; path: string[] | null; width: number }
   /**
    * The open recordings changed: drop series of recordings that are no
-   * longer open and reset every view to the new full range.
+   * longer open and reset every view to the new full range. `keepViews` skips
+   * the reset, for restoring a saved session over the same time axis.
    */
-  | { type: "sources"; open: ReadonlySet<string> };
+  | { type: "sources"; open: ReadonlySet<string>; keepViews?: boolean };
 
 export const widgetMoveMime = "application/x-hahn-widget-move";
 export const tabDragMime = "application/x-hahn-tab";
@@ -352,7 +353,7 @@ export const addAt = (
   before: edge === "left" || edge === "top",
 });
 
-const widget = (number: number, type: Widget["type"] = "time-series"): Widget => ({
+export const widget = (number: number, type: Widget["type"] = "time-series"): Widget => ({
   id: `widget-${number}`,
   ...(type === "tabs"
     ? {
@@ -819,8 +820,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                 w.series[0] && !action.open.has(w.series[0].source) ? [] : w.hiddenColumns,
               columnWidths:
                 w.series[0] && !action.open.has(w.series[0].source) ? {} : w.columnWidths,
-              view: defaultPlotView(),
-              fixedFrame: null,
+              view: action.keepViews ? w.view : defaultPlotView(),
+              fixedFrame: action.keepViews ? w.fixedFrame : null,
             },
           ]),
         ),

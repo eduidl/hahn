@@ -27,10 +27,20 @@ export function sourceTopics(source: string, topics: Schemas["Topic"][]): Topic[
   });
 }
 
+/** The server answered with an error, as opposed to not being reachable. */
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 export async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Request failed");
+  if (!response.ok) throw new HttpError(body.error ?? "Request failed", response.status);
   return body;
 }
 

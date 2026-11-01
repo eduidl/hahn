@@ -454,8 +454,8 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"];
-        /** @description Coordinate frame of an image or point cloud. */
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"];
+        /** @description Coordinate frame of a spatial value. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
         };
@@ -613,6 +613,12 @@ export interface components {
             distortion: number[];
             /** @description Name of the distortion model, such as plumb_bob. */
             distortion_model: string;
+        };
+        /** @description A position and orientation in frame_id. */
+        PoseValue: components["schemas"]["FramedValue"] & {
+            /** @enum {string} */
+            kind: "pose";
+            pose: components["schemas"]["Pose"];
         };
     };
     responses: {
@@ -875,6 +881,8 @@ export interface operations {
                 start_ns?: components["parameters"]["StartNs"];
                 /** @description The end of the range in primary time, excluded. To read through the last time, omit it. */
                 end_ns?: components["parameters"]["EndNs"];
+                /** @description For pose views only, transform each pose into this frame at its recording time. A missing transform is a frame conversion error. */
+                target_frame?: string;
             };
             header?: never;
             path: {

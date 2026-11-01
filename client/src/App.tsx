@@ -19,10 +19,19 @@ import { useMessages } from "./data/useMessages";
 import { useSeries } from "./data/useSeries";
 import { PlaybackBar } from "./workspace/PlaybackBar";
 import { PlaybackContext, createPlaybackStore } from "./workspace/playback";
+import {
+  browserStorage,
+  clearSession,
+  loadSession,
+  saveSession,
+  type Session,
+  type SidebarTab,
+} from "./workspace/persistence";
 import { RunsDialog } from "./workspace/RunsDialog";
 import { TimeZoneSelect } from "./workspace/TimeZoneSelect";
 import { DisplayTimeZone, usableTimeZone, type TimeZoneSource } from "./timeDisplay";
 import {
+  HttpError,
   SourceNames,
   get,
   initialSources,
@@ -47,9 +56,14 @@ import {
 } from "./types";
 
 export function App() {
-  const [runsOpen, setRunsOpen] = useState(true);
-  const [zoneSource, setZoneSource] = useState<TimeZoneSource>("browser");
-  const [runId, setRunId] = useState<string | null>(null);
+  const [saved] = useState(() => loadSession(browserStorage()));
+  const [runsOpen, setRunsOpen] = useState(!saved?.runId);
+  const [zoneSource, setZoneSource] = useState<TimeZoneSource>(saved?.zoneSource ?? "browser");
+  const [runId, setRunId] = useState<string | null>(saved?.runId ?? null);
+  // The saved session until its run is confirmed. Saving waits for that, so a
+  // half-restored state cannot overwrite the session.
+  const pendingRestore = useRef(saved?.runId ? saved : null);
+  const [restoring, setRestoring] = useState(Boolean(saved?.runId));
   const [run, setRun] = useState<Run | null>(null);
   // Open groups of the run, in the order they were opened.
   const [sources, setSources] = useState<string[]>([]);
@@ -71,7 +85,7 @@ export function App() {
   const [showErrorTopics, setShowErrorTopics] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<"panel" | "topics" | "errors">("panel");
+  const [tab, setTab] = useState<SidebarTab>(saved?.tab ?? "panel");
   const [error, setError] = useState("");
   const loadingInfo = openSources.some((s) => !s || s.loading);
   const [drag, setDrag] = useState<TopicDrag | null>(null);
@@ -126,15 +140,53 @@ export function App() {
         if (controller.signal.aborted) return;
         setRun(detail);
         if (!detail.groups.length) setError("This run has no groups");
-        const open = initialSources(detail);
+        const pending = pendingRestore.current;
+        const restored = pending?.runId === runId;
+        const existing = detail.groups.map((group) => sourceOf(detail.id, group.id));
+        const kept = restored ? pending.sources.filter((id) => existing.includes(id)) : [];
+        const open = kept.length ? kept : initialSources(detail);
         setSources(open);
-        dispatch({ type: "sources", open: new Set(open) });
+        dispatch({ type: "sources", open: new Set(open), keepViews: restored });
+        pendingRestore.current = null;
+        setRestoring(false);
       })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(errorMessage(e));
+        if (controller.signal.aborted) return;
+        setError(errorMessage(e));
+        if (pendingRestore.current?.runId !== runId) return;
+        setRunId(null);
+        setRunsOpen(true);
+        // A run the server no longer has is gone for good. Anything else may be
+        // a server restart, so keep the session for the next reload.
+        if (e instanceof HttpError && e.status === 404) {
+          pendingRestore.current = null;
+          setRestoring(false);
+          dispatch({ type: "sources", open: new Set(), keepViews: true });
+        }
       });
     return () => controller.abort();
   }, [runId]);
+
+  // Save shortly after changes settle, and on leaving in case they have not.
+  const session = useRef<Session | null>(null);
+  const discarded = useRef(false);
+  const saveCurrent = () => {
+    if (session.current && !discarded.current) saveSession(browserStorage(), session.current);
+  };
+  useEffect(() => {
+    session.current = restoring ? null : { workspace, runId, sources, zoneSource, tab };
+    const timer = setTimeout(saveCurrent, 300);
+    return () => clearTimeout(timer);
+  }, [restoring, workspace, runId, sources, zoneSource, tab]);
+  useEffect(() => {
+    window.addEventListener("pagehide", saveCurrent);
+    return () => window.removeEventListener("pagehide", saveCurrent);
+  }, []);
+  const resetWorkspace = () => {
+    discarded.current = true;
+    clearSession(browserStorage());
+    location.reload();
+  };
 
   // Load each newly opened group once; closing one cancels its requests.
   useEffect(() => {
@@ -179,7 +231,12 @@ export function App() {
     setError("");
     setSources([]);
     setLoaded({});
-    dispatch({ type: "sources", open: new Set() });
+    // Picking the run a failed restore was for retries it; another run ends it.
+    if (pendingRestore.current?.runId !== id) {
+      pendingRestore.current = null;
+      setRestoring(false);
+      dispatch({ type: "sources", open: new Set() });
+    }
     setSearch("");
     setExpandedTopics(new Set());
     setRunId(id);
@@ -591,7 +648,12 @@ export function App() {
                       ))}
                     </div>
                   )}
-                  <footer className="sidebar-footer">Drag a topic or field to add it</footer>
+                  <footer className="sidebar-footer">
+                    <span>Drag a topic or field to add it</span>
+                    <button className="reset-workspace" onClick={resetWorkspace}>
+                      Reset workspace
+                    </button>
+                  </footer>
                 </aside>
                 <main>
                   {error && (
