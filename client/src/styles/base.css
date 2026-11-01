@@ -47,8 +47,10 @@ button {
   background: var(--bg-control);
   border: 1px solid var(--line-strong);
   border-radius: 5px;
-  padding: 7px 13px;
+  padding: 6px 12px;
   font-size: 12px;
+  /* A fixed height: fallback CJK fonts have much taller lines than the text they draw. */
+  line-height: 16px;
   transition:
     background 0.15s,
     border-color 0.15s;
