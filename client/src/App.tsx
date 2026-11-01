@@ -21,6 +21,7 @@ import {
   widgetTypes,
   type Widget,
 } from "./workspace/widgets";
+import { Highlight } from "./Highlight";
 import { secondsFrom } from "./data/data";
 import { dropVerdict } from "./workspace/drop";
 import { buildFieldIndex, typeLabel } from "./workspace/fieldIndex";
@@ -391,7 +392,9 @@ export function App() {
       }
       onDragEnd={() => setDrag(null)}
     >
-      <span title={field.path.join(".")}>{field.path.join(".")}</span>
+      <span title={field.path.join(".")}>
+        <Highlight text={field.path.join(".")} query={search} />
+      </span>
       {/* The concrete type suffices: nesting already tells structs apart. */}
       <small title={field.type_name ?? field.data_type}>{typeLabel(topic, field)}</small>
     </div>
@@ -403,92 +406,151 @@ export function App() {
         <DisplayTimeZone.Provider
           value={zoneSource === "server" ? (serverZone ?? undefined) : undefined}
         >
-          <SourceNames.Provider value={sourceNames}>
-            <div className="app">
-              <RunsDialog
-                open={runsOpen}
-                current={runId}
-                onSelect={selectRun}
-                onClose={() => setRunsOpen(false)}
-              />
-              <ConfirmDialog
-                open={resetOpen}
-                title="Reset workspace?"
-                message="This removes all widgets, tabs, and series saved in this browser. This cannot be undone."
-                confirmLabel="Reset"
-                onConfirm={resetWorkspace}
-                onClose={() => setResetOpen(false)}
-              />
-              <header>
-                <div className="header-start">
-                  <div className="brand">
-                    <img
-                      className="brand-mark"
-                      src={new URL("./assets/favicon.svg", import.meta.url).href}
-                      alt=""
-                    />
-                    hahn
-                  </div>
-                  <button
-                    className="runs-trigger"
-                    aria-label={run ? `Select run: ${run.name}` : undefined}
-                    title={run?.name}
-                    onClick={() => setRunsOpen(true)}
-                  >
-                    {run ? (
-                      <>
-                        <span className="runs-trigger-name">{run.name}</span>
-                        <span aria-hidden="true">▾</span>
-                      </>
-                    ) : (
-                      "Select run"
-                    )}
-                  </button>
-                  {groups.length > 1 && (
+          <DisplayTimeMode.Provider value={timeDisplay}>
+            <SourceNames.Provider value={sourceNames}>
+              <div className="app">
+                <RunsDialog
+                  open={runsOpen}
+                  current={runId}
+                  onSelect={selectRun}
+                  onClose={() => setRunsOpen(false)}
+                />
+                <ConfirmDialog
+                  open={resetOpen}
+                  title="Reset workspace?"
+                  message="This removes all widgets, tabs, and series saved in this browser. This cannot be undone."
+                  confirmLabel="Reset"
+                  onConfirm={resetWorkspace}
+                  onClose={() => setResetOpen(false)}
+                />
+                <header>
+                  <div className="header-start">
+                    <div className="brand">
+                      <img
+                        className="brand-mark"
+                        src={new URL("./assets/favicon.svg", import.meta.url).href}
+                        alt=""
+                      />
+                      hahn
+                    </div>
                     <button
-                      className="group-trigger"
-                      popoverTarget="group-menu"
-                      aria-label="Open groups"
-                      title="Open groups"
+                      className="runs-trigger"
+                      aria-label={run ? `Select run: ${run.name}` : undefined}
+                      title={run?.name}
+                      onClick={() => setRunsOpen(true)}
                     >
-                      <svg
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v3" />
-                        <path d="M4 20h15l3-10H7L4 20 2 8h5" />
-                      </svg>
+                      {run ? (
+                        <>
+                          <span className="runs-trigger-name">{run.name}</span>
+                          <span aria-hidden="true">▾</span>
+                        </>
+                      ) : (
+                        "Select run"
+                      )}
                     </button>
-                  )}
-                </div>
-                <div
-                  id="group-menu"
-                  className="group-menu"
-                  popover="auto"
-                  role="dialog"
-                  aria-label="Open groups"
-                >
-                  <h2>Open groups</h2>
-                  <p className="help">Open groups are displayed on a shared timeline.</p>
-                  <div className="group-list">
-                    {groups.map((g) => (
-                      <label key={g.source} className="group-option">
-                        <input
-                          type="checkbox"
-                          checked={sources.includes(g.source)}
-                          onChange={(e) => toggleSource(g.source, e.target.checked)}
-                        />
-                        <span className="group-name" title={g.name}>
-                          {g.name}
-                        </span>
-                      </label>
+                    {groups.length > 1 && (
+                      <button
+                        className="group-trigger"
+                        popoverTarget="group-menu"
+                        aria-label="Open groups"
+                        title="Open groups"
+                      >
+                        <svg
+                          width="19"
+                          height="19"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v3" />
+                          <path d="M4 20h15l3-10H7L4 20 2 8h5" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    id="group-menu"
+                    className="group-menu"
+                    popover="auto"
+                    role="dialog"
+                    aria-label="Open groups"
+                  >
+                    <h2>Open groups</h2>
+                    <p className="help">Open groups are displayed on a shared timeline.</p>
+                    <div className="group-list">
+                      {groups.map((g) => (
+                        <label key={g.source} className="group-option">
+                          <input
+                            type="checkbox"
+                            checked={sources.includes(g.source)}
+                            onChange={(e) => toggleSource(g.source, e.target.checked)}
+                          />
+                          <span className="group-name" title={g.name}>
+                            {g.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="file-detail">
+                      {sources.length
+                        ? `${sources.length} groups open · ${info?.message_count?.toLocaleString() ?? "—"} messages`
+                        : `${groups.length} groups`}
+                    </div>
+                  </div>
+
+                  <button
+                    className="add-widget"
+                    aria-label="Add widget"
+                    popoverTarget="widget-catalog"
+                  >
+                    + Widget
+                  </button>
+                  <div
+                    id="widget-catalog"
+                    className="widget-catalog"
+                    popover="auto"
+                    role="dialog"
+                    aria-label="Add widget"
+                  >
+                    <p className="help">
+                      Click to add next to the selected widget, or drag to a position.
+                    </p>
+                    {widgetTypes.map((type) => (
+                      <div
+                        key={type}
+                        className="widget-catalog-item"
+                        // Not a <button>: Firefox does not drag those.
+                        role="button"
+                        tabIndex={0}
+                        draggable
+                        onClick={() => addFromCatalog(type)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          addFromCatalog(type);
+                        }}
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData(widgetDragMime, type);
+                          // react-dnd (used by the mosaic) cancels drags without a native type.
+                          event.dataTransfer.setData("text/plain", widgetSpecs[type].label);
+                          event.dataTransfer.effectAllowed = "copy";
+                          setWidgetDrag(type);
+                          // The list would cover the drop targets. Hiding the source during
+                          // dragstart cancels the drag, so wait until it has begun.
+                          setTimeout(() =>
+                            document.getElementById("widget-catalog")?.hidePopover(),
+                          );
+                        }}
+                        onDragEnd={() => setWidgetDrag(null)}
+                      >
+                        <strong>{widgetSpecs[type].label}</strong>
+                        <span>{widgetSpecs[type].description}</span>
+                      </div>
                     ))}
                   </div>
                   <div className="file-detail">
@@ -668,140 +730,163 @@ export function App() {
                                 }
                                 onDragEnd={() => setDrag(null)}
                               >
-                                <span className="topic-label">
-                                  <span className="topic-name">{t.topicName ?? t.topic}</span>
-                                  <span className="topic-type">
-                                    {[
-                                      t.schema_name,
-                                      t.message_count === null
-                                        ? null
-                                        : `${t.message_count.toLocaleString()} messages`,
-                                      ...t.views.map((view) => view.name),
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
+                                <summary
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setExpandedTopics((current) => {
+                                      const next = new Set(current);
+                                      if (next.has(id)) next.delete(id);
+                                      else next.add(id);
+                                      return next;
+                                    });
+                                  }}
+                                  draggable
+                                  onDragStart={(e) =>
+                                    startDrag(e, { source: t.source, topic: t.topic })
+                                  }
+                                  onDragEnd={() => setDrag(null)}
+                                >
+                                  <span className="topic-label">
+                                    <span className="topic-name">
+                                      <Highlight text={t.topicName ?? t.topic} query={search} />
+                                    </span>
+                                    <span className="topic-type">
+                                      {[
+                                        t.schema_name,
+                                        t.message_count === null
+                                          ? null
+                                          : `${t.message_count.toLocaleString()} messages`,
+                                        ...t.views.map((view) => view.name),
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                    </span>
                                   </span>
-                                </span>
-                                {t.error && <span className="unreadable">Unreadable</span>}
-                              </summary>
-                              {t.error ? (
-                                <p className="topic-error">{t.error}</p>
-                              ) : fields.length ? (
-                                fields.map((f) => topicField(t, f))
-                              ) : (
-                                <p className="muted">No fields</p>
-                              )}
-                            </details>,
-                          ];
-                        })}
-                        {!loadingInfo && info && !visibleTopics.length && (
-                          <p className="muted">No topics to display</p>
+                                  {t.error && <span className="unreadable">Unreadable</span>}
+                                </summary>
+                                {t.error ? (
+                                  <p className="topic-error">{t.error}</p>
+                                ) : fields.length ? (
+                                  fields.map((f) => topicField(t, f))
+                                ) : (
+                                  <p className="muted">No fields</p>
+                                )}
+                              </details>,
+                            ];
+                          })}
+                          {!loadingInfo && info && !visibleTopics.length && (
+                            <p className="muted">No topics to display</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {tab === "settings" && (
+                      <div
+                        id="sidebar-settings"
+                        className="sidebar-content widget-settings"
+                        role="tabpanel"
+                        aria-labelledby="tab-settings"
+                        onDragOver={acceptDrag}
+                        onDrop={(event) => drop(event)}
+                      >
+                        {activeWidget ? (
+                          <WidgetSettings
+                            widget={activeWidget}
+                            dispatch={dispatch}
+                            records={[...records, ...messages.records]}
+                            pointCount={count}
+                            index={index}
+                          />
+                        ) : (
+                          <p className="muted">Add a widget.</p>
                         )}
                       </div>
-                    </div>
-                  )}
-                  {tab === "settings" && (
-                    <div
-                      id="sidebar-settings"
-                      className="sidebar-content widget-settings"
-                      role="tabpanel"
-                      aria-labelledby="tab-settings"
-                      onDragOver={acceptDrag}
-                      onDrop={(event) => drop(event)}
-                    >
-                      {activeWidget ? (
-                        <WidgetSettings
-                          widget={activeWidget}
-                          dispatch={dispatch}
-                          records={[...records, ...messages.records]}
-                          pointCount={count}
-                          index={index}
-                        />
-                      ) : (
-                        <p className="muted">Add a widget.</p>
-                      )}
-                    </div>
-                  )}
-                  {tab === "errors" && (
-                    <div
-                      id="sidebar-errors"
-                      className="sidebar-content errors-panel"
-                      role="tabpanel"
-                      aria-labelledby="tab-errors"
-                    >
-                      <div className="field-heading">
-                        <span className="eyebrow">Errors</span>
-                        <span>{errorCount}</span>
+                    )}
+                    {tab === "errors" && (
+                      <div
+                        id="sidebar-errors"
+                        className="sidebar-content errors-panel"
+                        role="tabpanel"
+                        aria-labelledby="tab-errors"
+                      >
+                        <div className="field-heading">
+                          <span className="eyebrow">Errors</span>
+                          <span>{errorCount}</span>
+                        </div>
+                        {!errorCount && <p className="muted">No errors</p>}
+                        {error && (
+                          <div className="error-item">
+                            <strong>Loading run</strong>
+                            <p>{error}</p>
+                          </div>
+                        )}
+                        {sourceErrors.map(({ group, error }) => (
+                          <div className="error-item" key={`source-${group.source}`}>
+                            <strong>{group.name}</strong>
+                            <span>Loading group</span>
+                            <p>{error}</p>
+                          </div>
+                        ))}
+                        {runtimeErrors.map((r) => (
+                          <div className="error-item" key={r.key}>
+                            <strong>
+                              {multiSource && <small>{sourceNames.get(r.source)} </small>}
+                              {r.topicName ?? r.topic}
+                            </strong>
+                            <span>Stream error</span>
+                            <p>{r.error}</p>
+                          </div>
+                        ))}
+                        {unreadable.map((t) => (
+                          <div className="error-item" key={topicKey(t.source, t.topic)}>
+                            <strong>
+                              {multiSource && <small>{sourceNames.get(t.source)} </small>}
+                              {t.topicName ?? t.topic}
+                            </strong>
+                            <span>Unreadable</span>
+                            <p>{t.error}</p>
+                          </div>
+                        ))}
                       </div>
-                      {!errorCount && <p className="muted">No errors</p>}
-                      {error && (
-                        <div className="error-item">
-                          <strong>Loading run</strong>
-                          <p>{error}</p>
-                        </div>
-                      )}
-                      {sourceErrors.map(({ group, error }) => (
-                        <div className="error-item" key={`source-${group.source}`}>
-                          <strong>{group.name}</strong>
-                          <span>Loading group</span>
-                          <p>{error}</p>
-                        </div>
-                      ))}
-                      {runtimeErrors.map((r) => (
-                        <div className="error-item" key={r.key}>
-                          <strong>
-                            {multiSource && <small>{sourceNames.get(r.source)} </small>}
-                            {r.topicName ?? r.topic}
-                          </strong>
-                          <span>Stream error</span>
-                          <p>{r.error}</p>
-                        </div>
-                      ))}
-                      {unreadable.map((t) => (
-                        <div className="error-item" key={topicKey(t.source, t.topic)}>
-                          <strong>
-                            {multiSource && <small>{sourceNames.get(t.source)} </small>}
-                            {t.topicName ?? t.topic}
-                          </strong>
-                          <span>Unreadable</span>
-                          <p>{t.error}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p className="sidebar-status" role="status">
-                    {addStatus}
-                  </p>
-                  <footer className="sidebar-footer">
-                    <span>Drag or double-click to add</span>
-                    <button className="reset-workspace" onClick={() => setResetOpen(true)}>
-                      Reset workspace
-                    </button>
-                  </footer>
-                </aside>
-                <main>
-                  {error && (
-                    <div className="error" role="alert">
-                      {error}
-                    </div>
-                  )}
-                  <WidgetWorkspace
-                    runId={runId}
-                    state={workspace}
-                    dispatch={dispatch}
-                    data={plotted}
-                    messageRecords={messages.records}
-                    fieldIndex={index}
-                    info={info}
-                    sources={sourceDetails}
-                    fullEnd={fullEnd}
-                    revision={revision}
-                    dragVerdict={dragVerdict}
-                    widgetDrag={widgetDrag}
-                    drop={drop}
-                    openSettings={() => setTab("settings")}
-                  />
-                </main>
+                    )}
+                    <p className="sidebar-status" role="status">
+                      {addStatus}
+                    </p>
+                    <footer className="sidebar-footer">
+                      {tab === "topics" && <span>Drag or double-click to add</span>}
+                      <button className="reset-workspace" onClick={() => setResetOpen(true)}>
+                        Reset workspace
+                      </button>
+                    </footer>
+                  </aside>
+                  <main>
+                    {error && (
+                      <div className="error" role="alert">
+                        {error}
+                      </div>
+                    )}
+                    <WidgetWorkspace
+                      runId={runId}
+                      state={workspace}
+                      dispatch={dispatch}
+                      data={plotted}
+                      messageRecords={messages.records}
+                      fieldIndex={index}
+                      info={info}
+                      sources={sourceDetails}
+                      fullEnd={fullEnd}
+                      revision={revision}
+                      dragVerdict={dragVerdict}
+                      widgetDrag={widgetDrag}
+                      drop={drop}
+                      openSettings={() => {
+                        setTab("settings");
+                        setSidebarOpen(true);
+                      }}
+                    />
+                  </main>
+                </div>
+                <PlaybackBar info={info} fullEnd={fullEnd} busy={busy || messages.busy} />
               </div>
             </SourceNames.Provider>
           </DisplayTimeMode.Provider>

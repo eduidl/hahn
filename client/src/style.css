@@ -299,6 +299,11 @@ summary span {
 .topic-field {
   cursor: grab;
 }
+.sidebar-content mark {
+  border-radius: 2px;
+  background: #f5c54240;
+  color: #f5c542;
+}
 .topic-field:focus-visible,
 .topic-group summary:focus-visible {
   outline: 2px solid #91b8ff;
