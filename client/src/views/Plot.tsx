@@ -371,7 +371,7 @@ export function Plot({
           }
       }
     }
-    if (cursor !== null && visible.length) {
+    if (cursor !== null && visible.length && !drag?.moved) {
       ctx.strokeStyle = "#c7c7c7";
       // Reset the width left over from the last series.
       ctx.lineWidth = 1;
@@ -539,7 +539,8 @@ export function Plot({
           ))}
         </div>
       )}
-      {cursor !== null && pointerY !== null && hasVisible && (
+      {/* Reading values gets in the way of a drag, and would describe where it started. */}
+      {cursor !== null && pointerY !== null && hasVisible && !drag?.moved && (
         <div className="tooltip" ref={tooltip}>
           <div className="tooltip-time">{time.tooltip(xAt(cursor))}</div>
           {series
@@ -549,7 +550,7 @@ export function Plot({
               return (
                 <div key={s.key} className="tooltip-row">
                   <i style={{ background: s.color }} />
-                  <strong title={p?.ns}>{p?.raw == null ? "—" : String(p.raw)}</strong>
+                  <strong title={p?.ns}>{p ? tooltipValue(p.raw, s.dataType) : "—"}</strong>
                 </div>
               );
             })}

@@ -71,6 +71,20 @@ describe("State transition zoom", () => {
     vi.unstubAllGlobals();
   });
 
+  it("leaves out the axis without visible rows", () => {
+    render(
+      <PlaybackContext.Provider value={createPlaybackStore()}>
+        <StatePlot
+          widget={{ ...initialWorkspace().widgets["widget-1"], type: "state" }}
+          series={[]}
+          fullEnd={10}
+          originNs="0"
+          onViewChange={() => {}}
+        />
+      </PlaybackContext.Provider>,
+    );
+    expect(document.querySelector(".state-axis")).toBeNull();
+  });
   it("zooms around the pointer over a bar instead of scrolling", () => {
     const { track } = setup();
     const event = wheel(track, -100);
