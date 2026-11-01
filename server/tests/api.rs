@@ -1863,3 +1863,22 @@ async fn camera_calibration_view_validates_and_converts() {
     );
 }
 
+#[tokio::test]
+async fn raw_image_view_preserves_pixels_and_rejects_invalid_messages() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_raw_images(&dir.path().join("raw.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    assert_eq!(topics[0]["views"][0]["kind"], "image");
+    let (_, events) = frames(&app, &view_url("views", "/raw", "raw_image", "")).await;
+    let value = &events[0].0["value"];
+    assert_eq!(value["frame_id"], "camera");
+    assert_eq!(value["format"], "raw");
+    assert_eq!(value["encoding"], "rgb8");
+    assert_eq!(value["width"], 2);
+    assert_eq!(value["step"], 8);
+    assert_eq!(&events[0].1[..8], &[255, 0, 0, 0, 255, 0, 9, 9]);
+    assert!(events[1].0["error"].as_str().unwrap().contains("step"));
+    assert!(events[2].0["error"].as_str().unwrap().contains("encoding"));
+    assert!(events[3].0["error"].as_str().unwrap().contains("even"));
+}
