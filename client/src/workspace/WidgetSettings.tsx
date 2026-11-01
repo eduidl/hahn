@@ -62,10 +62,12 @@ function FieldPicker({
   kind,
 }: WidgetSettingsProps & { kind?: "image" | "pointcloud" }) {
   const singleTarget = widgetSpecs[widget.type].maxSeries === 1 || kind === "image";
+  // Widgets fed by converted views take whole topics, never individual fields.
+  const takesTopics = Boolean(widgetSpecs[widget.type].viewKinds);
   const label =
     kind === "image"
       ? "Select image topic"
-      : kind === "pointcloud"
+      : takesTopics
         ? "Add topic"
         : singleTarget
           ? "Select target"
@@ -83,6 +85,18 @@ function FieldPicker({
       ),
     [index, widget, kind],
   );
+  const one = candidates.length === 1;
+  const candidateNoun = takesTopics
+    ? one
+      ? "topic"
+      : "topics"
+    : singleTarget
+      ? one
+        ? "topic or field"
+        : "topics and fields"
+      : one
+        ? "field"
+        : "fields";
   const needle = query.trim().toLowerCase();
   const matches = needle
     ? candidates.filter((entry) => entry.label.toLowerCase().includes(needle))
@@ -119,7 +133,7 @@ function FieldPicker({
         popoverTarget={pickerId}
         disabled={!candidates.length}
       >
-        {singleTarget ? label : label === "Add topic" ? "+ Topic" : "+ Field"}
+        {singleTarget ? label : takesTopics ? "+ Topic" : "+ Field"}
       </button>
       <div
         id={pickerId}
@@ -138,9 +152,15 @@ function FieldPicker({
           aria-controls={`${pickerId}-results`}
           aria-activedescendant={shown.length ? `${pickerId}-${activeIndex}` : undefined}
           aria-label={
-            singleTarget ? "Search for a topic or field to select" : "Search for a field to add"
+            kind === "image"
+              ? "Search for a topic to select"
+              : takesTopics
+                ? "Search for a topic to add"
+                : singleTarget
+                  ? "Search for a topic or field to select"
+                  : "Search for a field to add"
           }
-          placeholder={`Search ${candidates.length.toLocaleString()} ${singleTarget ? "topics and fields" : "fields"}…`}
+          placeholder={`Search ${candidates.length.toLocaleString()} ${candidateNoun}…`}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -577,11 +597,12 @@ function ImageSettings(props: WidgetSettingsProps) {
       <section className="target-setting" aria-label="Image topic">
         <div className="legend-heading">Image topic</div>
         {image ? (
-          <div className="target-summary">
+          <div className="target-summary removable">
             <SeriesName
               source={image.source}
               topic={image.topicName ?? image.topic}
               path={image.path}
+              inline
             />
             <button
               className="remove"
