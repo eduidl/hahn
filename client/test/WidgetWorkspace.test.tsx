@@ -313,7 +313,7 @@ describe("Tab widget interactions", () => {
       fireEvent.dragOver(zone, { dataTransfer });
       expect(frame.querySelector(`.widget-drop-preview.${edge}`)).not.toBeNull();
       fireEvent.drop(zone, { dataTransfer });
-      expect(within(panel()).getByRole("region", { name: "Time series" })).toBeDefined();
+      expect(within(panel()).getByRole("region", { name: "Plot" })).toBeDefined();
       expect(within(panel()).queryByRole("region", { name: "Table" })).toBeNull();
       expect(screen.getByRole("region", { name: "Table" })).toBeDefined();
       expect(container.querySelector(".widget-drop-preview")).toBeNull();
@@ -329,12 +329,12 @@ describe("Tab widget interactions", () => {
     fireEvent.dragStart(title, { dataTransfer });
     fireEvent.drop(tab("tab-1"), { dataTransfer });
     const tabPanel = panel();
-    expect(within(tabPanel).getByRole("region", { name: "Time series" })).toBeDefined();
+    expect(within(tabPanel).getByRole("region", { name: "Plot" })).toBeDefined();
     fireEvent.click(tab("tab-2"));
-    expect(screen.queryByRole("region", { name: "Time series" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Plot" })).toBeNull();
     expect(container.querySelector('[data-widget-id="widget-2"]')).not.toBeNull();
     fireEvent.click(tab("tab-1"));
-    expect(screen.getByRole("region", { name: "Time series" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Plot" })).toBeDefined();
   });
 
   it("switches after 500ms of valid hover, cancels on leave and reorders tab headings", () => {
@@ -372,7 +372,7 @@ describe("Tab widget interactions", () => {
     fireEvent.dragStart(tab("tab-1"), { dataTransfer });
     fireEvent.drop(document.getElementById("widget-3-tab-1")!, { dataTransfer });
     const destination = document.getElementById("widget-3-tab-2-panel")!;
-    expect(within(destination).getByRole("region", { name: "Time series" })).toBeDefined();
+    expect(within(destination).getByRole("region", { name: "Plot" })).toBeDefined();
     expect(document.getElementById("widget-3-tab-2")?.textContent).toBe("Sensors");
     expect(document.getElementById("widget-3-tab-1")).toBeNull();
     expect(

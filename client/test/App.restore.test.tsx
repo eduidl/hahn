@@ -141,8 +141,8 @@ describe("App session restore", () => {
     render(<App />);
     const list = document.getElementById("widget-catalog")!;
     list.hidePopover = vi.fn();
-    activate(screen.getByRole("button", { name: /^Log/, hidden: true }));
-    expect(Object.values(shown().widgets).map((w) => w.type)).toEqual(["time-series", "log"]);
+    activate(screen.getByRole("button", { name: /^Value changes/, hidden: true }));
+    expect(Object.values(shown().widgets).map((w) => w.type)).toEqual(["plot", "value-changes"]);
     expect(list.hidePopover).toHaveBeenCalledTimes(1);
   });
   describe("adding a field from the topic list", () => {

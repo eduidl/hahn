@@ -55,7 +55,7 @@ describe("field index", () => {
   it("caches statically compatible fields per widget type, skipping unreadable topics", () => {
     const paths = (type: Widget["type"]) =>
       index.candidates[type].map((entry) => entry.field.path.join("."));
-    expect(paths("time-series")).toEqual(["speed", "flag", "mode", "other_mode"]);
+    expect(paths("plot")).toEqual(["speed", "flag", "mode", "other_mode"]);
     expect(paths("state")).toEqual(["flag", "mode", "other_mode", "name"]);
     expect(index.byKey.get(keyOf("r/0", "/t", ["speed"]))).toMatchObject({
       kind: { type: "numeric" },
@@ -67,17 +67,17 @@ describe("field index", () => {
 
 describe("drop verdict", () => {
   it("lets an empty time series take any supported kind, then only the same kind", () => {
-    expect(verdict(["speed"], widget("time-series")).ok).toBe(true);
-    expect(verdict(["mode"], widget("time-series")).ok).toBe(true);
-    expect(verdict(["name"], widget("time-series"))).toEqual({
+    expect(verdict(["speed"], widget("plot")).ok).toBe(true);
+    expect(verdict(["mode"], widget("plot")).ok).toBe(true);
+    expect(verdict(["name"], widget("plot"))).toEqual({
       ok: false,
       reason: "string is not supported. This widget accepts numeric, bool, enum fields.",
     });
-    expect(verdict(["flag"], widget("time-series", [fields[0]]))).toEqual({
+    expect(verdict(["flag"], widget("plot", [fields[0]]))).toEqual({
       ok: false,
       reason: "Cannot combine bool with numeric series.",
     });
-    expect(verdict(["other_mode"], widget("time-series", [fields[2]]))).toEqual({
+    expect(verdict(["other_mode"], widget("plot", [fields[2]]))).toEqual({
       ok: false,
       reason: "Enums with different definitions cannot be combined.",
     });
@@ -100,28 +100,20 @@ describe("drop verdict", () => {
     });
   });
   it("rejects duplicates, structs, topics and unreadable topics", () => {
-    expect(verdict(["speed"], widget("time-series", [fields[0]]))).toMatchObject({
+    expect(verdict(["speed"], widget("plot", [fields[0]]))).toMatchObject({
       reason: "Already added",
     });
-    expect(verdict(["pose"], widget("time-series"))).toMatchObject({
+    expect(verdict(["pose"], widget("plot"))).toMatchObject({
       reason: expect.stringMatching(/^struct is not supported/),
     });
-    expect(verdict(undefined, widget("time-series"))).toMatchObject({
+    expect(verdict(undefined, widget("plot"))).toMatchObject({
       reason: expect.stringMatching(/^struct is not supported/),
     });
     expect(
-      dropVerdict(
-        index,
-        { source: "r/0", topic: "/broken", path: ["speed"] },
-        widget("time-series"),
-      ).ok,
+      dropVerdict(index, { source: "r/0", topic: "/broken", path: ["speed"] }, widget("plot")).ok,
     ).toBe(false);
     expect(
-      dropVerdict(
-        index,
-        { source: "r/0", topic: "/silent", path: ["speed"] },
-        widget("time-series"),
-      ),
+      dropVerdict(index, { source: "r/0", topic: "/silent", path: ["speed"] }, widget("plot")),
     ).toEqual({
       ok: false,
       reason: "No messages",
@@ -129,8 +121,8 @@ describe("drop verdict", () => {
   });
 
   it("replaces the series of a single-series widget", () => {
-    const single = { ...widgetSpecs["time-series"], maxSeries: 1 };
-    const w = widget("time-series", [fields[0]]);
+    const single = { ...widgetSpecs["plot"], maxSeries: 1 };
+    const w = widget("plot", [fields[0]]);
     expect(
       dropVerdict(index, { source: "r/0", topic: "/t", path: ["flag"] }, w, single),
     ).toMatchObject({ ok: true, replaces: true });
@@ -155,7 +147,7 @@ describe("raw message widget", () => {
 
   it("does not load its selection as an exact series", () => {
     const raw = { ...widget("raw", [fields[5]]), id: "raw" };
-    const plot = { ...widget("time-series", [fields[0]]), id: "plot" };
+    const plot = { ...widget("plot", [fields[0]]), id: "plot" };
     expect(requestedSeries({ raw, plot }).map((s) => s.key)).toEqual([
       keyOf("r/0", "/t", ["speed"]),
     ]);
@@ -165,14 +157,14 @@ describe("raw message widget", () => {
 describe("addable fields", () => {
   it("filters cached candidates by the widget's current series", () => {
     const names = (w: Widget) => addableFields(index, w).map((entry) => entry.field.path.join("."));
-    expect(names(widget("time-series"))).toEqual(["speed", "flag", "mode", "other_mode"]);
-    expect(names(widget("time-series", [fields[2]]))).toEqual([]);
-    expect(names(widget("time-series", [fields[1]]))).toEqual([]);
+    expect(names(widget("plot"))).toEqual(["speed", "flag", "mode", "other_mode"]);
+    expect(names(widget("plot", [fields[2]]))).toEqual([]);
+    expect(names(widget("plot", [fields[1]]))).toEqual([]);
     expect(names(widget("state", [fields[1]]))).toEqual(["mode", "other_mode", "name"]);
   });
 
   it("appends series with distinct colors and ignores duplicates", () => {
-    const spec = widgetSpecs["time-series"];
+    const spec = widgetSpecs["plot"];
     const one = addSeries([], topic, fields[0], spec);
     const two = addSeries(one, topic, { path: ["speed2"], data_type: "float64" }, spec);
     expect(two).toHaveLength(2);

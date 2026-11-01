@@ -44,7 +44,7 @@ describe("widgets showing views", () => {
     expect(
       addableFields(index, widgetOf("scene").widgets["widget-1"]).map((entry) => entry.topic.topic),
     ).toEqual(["/camera", "/lidar", "/odom"]);
-    const plot = widgetOf("time-series").widgets["widget-1"];
+    const plot = widgetOf("plot").widgets["widget-1"];
     expect(addableFields(index, plot).map((entry) => entry.label)).toContain("/camera · x");
   });
   it("requires an image before adding point clouds and replaces the image", () => {

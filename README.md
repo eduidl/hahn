@@ -25,7 +25,7 @@ mkdir -p data
 curl -fL -o data/canoe-2025-08-20-16-07.mcap 'https://huggingface.co/datasets/Voxel51/canoe-multimodal/resolve/fedc018d2163661f696a4485d40e96bb84148ec8/data/canoe-2025-08-20-16-07_ep000.mcap'
 ```
 
-Restart the server, select the run, and try `/cam_left` in Image, `/lidar` in 3D, `/gps` in Map or Time series, and the TF tree widget. The server cannot decode this recording's JSON-encoded topics or convert its raw radar and sonar images.
+Restart the server, select the run, and try `/cam_left` in Image, `/lidar` in 3D, `/gps` in Map or Plot, and the TF tree widget. The server cannot decode this recording's JSON-encoded topics or convert its raw radar and sonar images.
 
 ## Server options
 
@@ -71,12 +71,12 @@ For CSV and Parquet:
 
 | Input | Action |
 | --- | --- |
-| Wheel | Zoom the time axis of a plot |
+| Wheel | Zoom the time axis of a plot or state row |
 | Shift + wheel | Zoom the value axis of a plot |
 | Click a plot or state row | Move the playback position there |
 | Click a legend item | Show or hide that series |
 | Drag | Pan or box zoom, depending on the widget's mode |
-| Double-click a plot | Reset its view |
+| Double-click a plot or state row | Reset its view |
 | Double-click a field, or press Enter on it | Add it to the selected widget |
 | Space | Play or pause |
 | Left / Right | Move 0.1 s back or forward |

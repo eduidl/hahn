@@ -1411,11 +1411,9 @@ header .add-widget {
   font-size: 11px;
 }
 .state-row {
-  display: grid;
-  grid-template-columns: minmax(110px, 22%) minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .state-row + .state-row {
   margin-top: 8px;
@@ -1454,13 +1452,10 @@ header .add-widget {
   font-weight: 400;
   font-style: italic;
 }
-.state-axis-row {
-  min-height: 0;
-  align-items: start;
-}
 .state-axis {
   position: relative;
   min-height: 34px;
+  margin-top: 7px;
   color: #858585;
   font-size: 10px;
 }
@@ -1478,8 +1473,8 @@ header .add-widget {
   color: #6f6f6f;
   font-size: 10px;
 }
-/* Log: value changes in time order, one fixed-height row each. */
-.log-view {
+/* Value changes: in time order, one fixed-height row each. */
+.value-changes-view {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1488,27 +1483,27 @@ header .add-widget {
     11px ui-monospace,
     monospace;
 }
-.log-header,
-.log-row {
+.value-changes-header,
+.value-changes-row {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 12px;
   align-items: center;
   padding: 0 12px;
 }
-.log-header {
+.value-changes-header {
   padding-top: 6px;
   padding-bottom: 6px;
   color: #858585;
   font-size: 10px;
   border-bottom: 1px solid #242424;
 }
-.log-rows {
+.value-changes-rows {
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
-.log-row {
+.value-changes-row {
   position: absolute;
   left: 0;
   right: 0;
@@ -1520,37 +1515,37 @@ header .add-widget {
   text-align: left;
   font: inherit;
 }
-.log-row:hover {
+.value-changes-row:hover {
   background: #1b1b1b;
 }
-.log-row.current {
+.value-changes-row.current {
   background: #1d2a40;
 }
-.log-row > span {
+.value-changes-row > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.log-time {
+.value-changes-time {
   color: #a0a0a0;
 }
-.log-series {
+.value-changes-series {
   display: flex;
   align-items: center;
   gap: 6px;
   color: #a4a4a4;
 }
-.log-series i {
+.value-changes-series i {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.log-value.empty {
+.value-changes-value.empty {
   color: #858585;
   font-style: italic;
 }
-.log-empty {
+.value-changes-empty {
   margin: 12px;
   color: #858585;
 }

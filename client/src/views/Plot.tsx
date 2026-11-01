@@ -61,7 +61,7 @@ type Props = {
 };
 const right = 24,
   top = 30;
-const wheelZoomFactor = 1.1;
+export const wheelZoomFactor = 1.1;
 const axisFont = "11px ui-monospace, monospace";
 let measureContext: CanvasRenderingContext2D | null | undefined;
 /** Rendered width of a tick label, measured once per call on a shared canvas. */
@@ -418,7 +418,7 @@ export function Plot({
     <div className="plot-wrap">
       <canvas
         ref={canvas}
-        aria-label={`Time series plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Click to move the playback position. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis. Double-click to reset.`}
+        aria-label={`Plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Click to move the playback position. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis. Double-click to reset.`}
         style={{
           cursor: mode === "pan" ? (drag ? "grabbing" : "grab") : "crosshair",
         }}
