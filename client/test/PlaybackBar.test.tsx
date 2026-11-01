@@ -28,6 +28,17 @@ function renderBar(recording: Info | null = info) {
 }
 
 describe("PlaybackBar", () => {
+  it.each([
+    ["summary", "summary"],
+    ["field row", "div"],
+  ])("leaves Space to a focused %s", (_, tag) => {
+    const store = renderBar();
+    const element = document.body.appendChild(document.createElement(tag));
+    if (tag === "div") element.setAttribute("role", "button");
+    fireEvent.keyDown(element, { key: " " });
+    element.remove();
+    expect(store.getState().playing).toBe(false);
+  });
   it("toggles playback with the button and Space", () => {
     const store = renderBar();
     fireEvent.click(screen.getByRole("button", { name: "Play" }));

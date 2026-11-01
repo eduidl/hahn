@@ -320,6 +320,23 @@ export function App() {
       event.dataTransfer.dropEffect = "copy";
     }
   };
+  const [addStatus, setAddStatus] = useState("");
+  const addStatusTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(addStatusTimer.current), []);
+  /** Adds without dragging; a drag would show the refusal on the widget, so show it here. */
+  const addToSelected = (payload: TopicDrag) => {
+    clearTimeout(addStatusTimer.current);
+    const verdict = activeWidget
+      ? dropVerdict(index, payload, activeWidget)
+      : { ok: false as const, reason: "Add a widget first." };
+    if (verdict.ok) {
+      setAddStatus("");
+      dispatch(addFieldAction(activeWidget!, verdict.entry.topic, verdict.entry.field, index));
+      return;
+    }
+    setAddStatus(verdict.reason);
+    addStatusTimer.current = setTimeout(() => setAddStatus(""), 5000);
+  };
   const topicField = (topic: Topic, field: Field) => (
     <div
       key={keyOf(topic.source, topic.topic, field.path)}
@@ -718,8 +735,11 @@ export function App() {
                       ))}
                     </div>
                   )}
+                  <p className="sidebar-status" role="status">
+                    {addStatus}
+                  </p>
                   <footer className="sidebar-footer">
-                    <span>Drag a topic or field to add it</span>
+                    <span>Drag or double-click to add</span>
                     <button className="reset-workspace" onClick={() => setResetOpen(true)}>
                       Reset workspace
                     </button>
@@ -745,7 +765,7 @@ export function App() {
                     dragVerdict={dragVerdict}
                     widgetDrag={widgetDrag}
                     drop={drop}
-                    openSettings={() => setTab("panel")}
+                    openSettings={() => setTab("settings")}
                   />
                 </main>
               </div>

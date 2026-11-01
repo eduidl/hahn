@@ -29,10 +29,10 @@ const seconds = (value: number) =>
 function ownsKey(target: EventTarget | null, key: string) {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
-  // The seek slider handles its own keys; buttons activate on Space natively.
+  // The seek slider handles its own keys; buttons and summaries activate on Space natively.
   const owners =
     key === " "
-      ? "input, select, textarea, button, [role=slider]"
+      ? "input, select, textarea, button, summary, [role=button], [role=slider]"
       : "input, select, textarea, [role=slider]";
   return target.closest(owners) !== null;
 }
