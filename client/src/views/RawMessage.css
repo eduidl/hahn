@@ -5,17 +5,17 @@
   inset: 0;
   overflow: auto;
   padding: 8px 12px 12px;
-  font:
-    12px ui-monospace,
-    monospace;
-  color: #cecece;
+  font: 12px var(--font-mono);
+  color: var(--text);
+}
+/* The container already has padding, so this lands where other widgets put their status. */
+.raw-message > .widget-status {
+  padding: 4px 0;
 }
 .raw-status {
-  margin: 0 0 8px;
+  flex: 1;
+  color: var(--text-faint);
   font-size: 12px;
-}
-.raw-status:not(.raw-error) {
-  color: #858585;
 }
 .raw-toolbar {
   position: sticky;
