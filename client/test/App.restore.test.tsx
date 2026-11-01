@@ -199,6 +199,13 @@ describe("App session restore", () => {
         "string is not supported",
       );
     });
+    it("shows the hint only on the Topics tab", async () => {
+      await open();
+      const hint = "Drag or double-click to add";
+      expect(screen.getByText(hint)).toBeTruthy();
+      fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+      expect(screen.queryByText(hint)).toBeNull();
+    });
     it("does not add on a single click", async () => {
       await open();
       fireEvent.click(field("x"));
