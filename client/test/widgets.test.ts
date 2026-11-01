@@ -83,6 +83,13 @@ describe("widget workspace", () => {
     state = reduce(state, { type: "remove", id: "widget-2" });
     expect(requestedSeries(state.widgets)).toHaveLength(1);
   });
+  it("adds a Data Source Info widget that requests no series", () => {
+    let state = reduce(initialWorkspace(), { type: "add", widgetType: "source-info" });
+    expect(state.widgets["widget-2"].type).toBe("source-info");
+    state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "source-info" });
+    expect(state.widgets["widget-1"].type).toBe("source-info");
+    expect(requestedSeries(state.widgets)).toEqual([]);
+  });
   it("keeps State Transition and Time Series as independent widget types", () => {
     let state = reduce(initialWorkspace(), { type: "add", widgetType: "state" });
     expect(state.widgets["widget-2"].type).toBe("state");

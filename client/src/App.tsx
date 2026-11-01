@@ -71,6 +71,14 @@ export function App() {
   const requests = useRef(new Map<string, AbortController>());
   const openSources = sources.map((id) => loaded[id]);
   const topics = useMemo(() => openSources.flatMap((s) => s?.topics ?? []), [sources, loaded]);
+  const sourceDetails = useMemo(
+    () =>
+      sources.map((id) => ({
+        id,
+        ...(loaded[id] ?? { info: null, topics: [], error: "", loading: true }),
+      })),
+    [sources, loaded],
+  );
   const merged = mergeInfo(openSources);
   // Keep one object per range, so dependents only react to real changes.
   const mergedKey = JSON.stringify(merged);
@@ -669,6 +677,7 @@ export function App() {
                     messageRecords={messages.records}
                     fieldIndex={index}
                     info={info}
+                    sources={sourceDetails}
                     fullEnd={fullEnd}
                     revision={revision}
                     dragVerdict={dragVerdict}

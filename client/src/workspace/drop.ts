@@ -71,6 +71,8 @@ export function dropVerdict(
   if (!topic) return { ok: false, reason: "Topic not found." };
   if (topic.error) return { ok: false, reason: "This topic cannot be read." };
   if (topic.message_count === 0) return { ok: false, reason: "No messages." };
+  if (!spec.accepts.size && !spec.viewKinds?.size)
+    return { ok: false, reason: "This widget does not take topics." };
   const accepted = [...spec.accepts].map(kindLabel).join(", ");
   // A dragged topic stands for its root message (empty path).
   const entry = index.byKey.get(keyOf(drag.source, drag.topic, drag.path ?? []));

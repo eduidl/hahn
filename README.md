@@ -8,15 +8,6 @@ Select a frame to see its translation and quaternion relative to that displayed 
 
 ## Public sample recording
 
-[WireFishing-M](https://huggingface.co/datasets/harpreetsahota/wirefishing-m) provides real robot recordings under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Download this approximately 342 MB recording to try its JPEG camera images and robot telemetry with Hahn:
-
-```bash
-mkdir -p data
-curl -fL -o data/wirefishing-cable-3.mcap 'https://huggingface.co/datasets/harpreetsahota/wirefishing-m/resolve/283fcc1bf97a6337aea8db0f00b338ff07e71987/data/cable_3_human_trial_1.mcap'
-```
-
-Restart the server after adding the recording and select the `wirefishing-cable-3.mcap` run. For an image view, select `/camera/global/image_raw`; for a time series, try `/robot/ee_position` → `x`.
-
 [CANOE Multimodal](https://huggingface.co/datasets/Voxel51/canoe-multimodal) is a public recording of an uncrewed boat, repackaged by Harpreet Sahota from the CANOE dataset by UTIAS ASRL and distributed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). This 30-second, approximately 1.97 GB recording includes camera images, LiDAR, GPS and transforms:
 
 ```bash
@@ -66,6 +57,7 @@ cargo run --manifest-path server/Cargo.toml --release
 
 - 複数のトピック・数値フィールドを重ね描き。
 - TIME SERIESは数値・bool・enumを表示します。系列のない状態では全型を受け付け、最初に追加した系列の型（数値／bool／定義が一致するenum）だけを重ねられます。系列をすべて削除すると再び全型を受け付けます。bool・enumは縦軸を離散値で表示します。STATE TRANSITIONはbool・enum・stringを1系列1行で表示し（空文字列は「（空文字列）」と灰色で表示）、型やenumの定義が異なる系列も並べられます。
+- DATA SOURCE INFOは開いているグループの開始・終了時刻、長さ、メッセージ数、トピック数と、トピックごとのスキーマ・メッセージ数を表示します。メッセージ数はサーバが返さない場合「—」と表示します。読み込めなかったグループとトピックはエラーを表示します。
 - LOGはstring・enum・boolフィールドの値が変わった時点だけを、複数系列まとめて時刻順の一覧で表示します（系列は色で区別）。再生位置の行を強調して自動でスクロールし、行をクリックするとその時刻へ移動します。見えている行だけを描画するので長い録画でも軽量です。
 - TABLEはヘッダー右端のドラッグでカラム幅を調整できます（左右キーでも調整可、ダブルクリックまたはHomeキーで初期幅に戻す）。各カラムのヘッダーにマウスを重ねると表示される×ボタンで、そのカラムを非表示にできます。既定幅は型に応じて変え、boolは72px、小さい整数は80〜104px、64bit整数は160px、浮動小数は104〜136px、文字列は160px、enumはラベルの長さに応じて96〜160px、配列などは180pxです。時刻は実時刻192px／相対時刻104pxとし、手動調整した幅を優先します。幅はウィジェットごとに保持し、表示対象の変更で初期化します。
 - TABLEのパネル設定では「全表示」「全非表示」でカラムを一括切り替えでき、「カラム」のチェックボックスで列ごとにも表示・非表示を切り替えられます（時刻列は常に表示）。表示設定はウィジェットごとに独立し、切り替えても再取得しません。表示対象を変更すると全カラム表示に戻ります。

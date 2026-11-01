@@ -25,6 +25,8 @@ import type { MessageRecord } from "../data/useMessages";
 import type { FieldIndex } from "./fieldIndex";
 import { RawMessage } from "../views/RawMessage";
 import { TfTree } from "../views/TfTree";
+import { SourceInfo } from "../views/SourceInfo";
+import type { OpenSource } from "../data/sources";
 import { ImageView } from "../views/ImageView";
 import { SeriesName } from "../SeriesName";
 import { SourceNames } from "../data/sources";
@@ -65,6 +67,7 @@ type Props = {
   messageRecords: MessageRecord[];
   fieldIndex: FieldIndex;
   info: Info | null;
+  sources: OpenSource[];
   fullEnd: number;
   revision: number;
   /** Whether the topic being dragged fits each widget; null when not dragging. */
@@ -329,9 +332,12 @@ function TimeSeriesWindow({
         }}
       />
     ) : null;
+  // These read the open groups directly, so a series toolbar and empty state do not apply.
+  const selfContained = widget.type === "tf-tree" || widget.type === "source-info";
   // Each widget type draws its own content; the frame, drop target and empty state are shared.
   const views: Record<Widget["type"], () => ReactNode> = {
     "tf-tree": () => <TfTree runId={props.runId ?? null} info={info} />,
+    "source-info": () => <SourceInfo info={info} sources={props.sources} />,
     tabs: () =>
       widget.type === "tabs" ? (
         <>
@@ -626,7 +632,7 @@ function TimeSeriesWindow({
             views.tabs()
           ) : (
             <>
-              {widget.type !== "tf-tree" && (
+              {!selfContained && (
                 <div className="widget-plot-toolbar">
                   <span className="widget-selection" title={selection || undefined}>
                     {selection || "No topic selected"}
@@ -680,7 +686,7 @@ function TimeSeriesWindow({
                       : verdict.reason}
                   </div>
                 )}
-                {widget.type !== "tf-tree" && !widget.series.length && !verdict && (
+                {!selfContained && !widget.series.length && !verdict && (
                   <div className="empty">
                     <p>
                       {info ? widgetSpecs[widget.type].emptyHint : "Open a run from the header"}
