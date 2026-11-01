@@ -198,13 +198,14 @@ export function StatePlot({
     const node = plot.current!;
     // Non-passive to stop the scroll, which React's onWheel cannot do.
     const onWheel = (event: WheelEvent) => {
-      const target = (event.target as Element).closest(".state-track, .state-axis");
+      // All rows share one time axis, so any track maps the pointer to a time.
+      const track = node.querySelector(".state-track");
       const delta = event.deltaY || event.deltaX;
-      if (!target || !delta) return;
+      if (!track || !delta) return;
       event.preventDefault();
       const { view, onViewChange } = zoom.current;
       if (delta > 0 && view.zoom <= 1) return;
-      const rect = target.getBoundingClientRect();
+      const rect = track.getBoundingClientRect();
       const anchor = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       const factor = delta > 0 ? 1 / wheelZoomFactor : wheelZoomFactor;
       onViewChange((current) => ({
@@ -235,7 +236,6 @@ export function StatePlot({
           <div
             className="state-track"
             onClick={(event) => playback.seek(timeAt(event))}
-            onDoubleClick={() => onViewChange(() => defaultPlotView())}
             onPointerMove={(event) => playback.setPreview(timeAt(event))}
             onPointerLeave={() => playback.setPreview(null)}
           >

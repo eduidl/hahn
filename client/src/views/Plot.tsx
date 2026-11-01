@@ -190,7 +190,6 @@ export function Plot({
       setPinnedYBase((base) => base ?? dataYBase);
     }
   };
-  const reset = () => onViewChange(() => defaultPlotView());
   const [size, setSize] = useState({ w: 900, h: 500 });
   const [cursor, setCursor] = useState<number | null>(null);
   const [pointerY, setPointerY] = useState<number | null>(null);
@@ -487,8 +486,7 @@ export function Plot({
         }}
         onPointerUp={() => {
           const active = dragRef.current;
-          // A press without a drag is a click. Double-click also lands here, so it moves the
-          // playback position as well as resetting the view.
+          // A press without a drag is a click.
           if (active && !active.moved) playback.seek(xAt(active.start));
           if (active && !active.pan && Math.abs(active.end - active.start) > 4) {
             pinY();
@@ -523,7 +521,6 @@ export function Plot({
           );
           setXView((view) => zoomAxis(view, zoomFactor, (x - left) / w));
         }}
-        onDoubleClick={reset}
       />
       <Playhead domain={domain} left={left} top={top} w={w} h={h} />
       {legend.visible && series.length > 0 && (
