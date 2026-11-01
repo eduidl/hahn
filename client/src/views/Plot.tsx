@@ -59,6 +59,51 @@ type Props = {
 };
 const right = 24,
   top = 30;
+/**
+ * The points worth drawing: in each pixel column the first, lowest, highest and last, which
+ * look the same as all of them, spikes included. Points without a value are kept as gaps.
+ * Stops after the first point past `end`, so that the line runs off the edge.
+ */
+export function drawnPoints<T extends { x: number; y: number | null }>(
+  points: T[],
+  start: number,
+  end: number,
+  xOf: (x: number) => number,
+): T[] {
+  const drawn: T[] = [];
+  let column = Number.NaN;
+  let first = -1;
+  let low = -1;
+  let high = -1;
+  let last = -1;
+  const flush = () => {
+    if (first < 0) return;
+    for (const i of [first, low, high, last].sort((a, b) => a - b))
+      if (drawn[drawn.length - 1] !== points[i]) drawn.push(points[i]);
+    first = -1;
+  };
+  for (let i = start; i < points.length; i++) {
+    const { x, y } = points[i];
+    if (y === null) {
+      flush();
+      drawn.push(points[i]);
+    } else {
+      const pixel = Math.floor(xOf(x));
+      if (pixel !== column || first < 0) {
+        flush();
+        column = pixel;
+        first = low = high = i;
+      }
+      if (y < (points[low].y as number)) low = i;
+      if (y > (points[high].y as number)) high = i;
+      last = i;
+    }
+    if (x > end) break;
+  }
+  flush();
+  return drawn;
+}
+
 export const wheelZoomFactor = 1.1;
 
 /** Floats to 6 significant digits; other values as they are, because integers must stay exact. */
@@ -135,7 +180,12 @@ export function Plot({
   // Widgets hold a single value kind, so the first series decides the axis.
   const kind = series.length ? valueKind(series[0].dataType, series[0].enumValues) : null;
   const discrete = isDiscreteKind(kind);
-  const categories = useMemo(() => discreteYValues(series), [series, revision]);
+  // The array is new on every render, but scanning every point is too slow to repeat for a zoom.
+  const content = series.map((s) => `${s.key}:${s.hidden}:${s.points.length}`).join();
+  const categories = useMemo(
+    () => (discrete ? discreteYValues(series) : []),
+    [content, revision, discrete],
+  );
   const discreteLabel = (value: number) => {
     if (kind?.type === "bool") return value ? "true" : "false";
     const labels = [
@@ -160,7 +210,7 @@ export function Plot({
       discrete && categories.length
         ? ([-0.5, Math.max(0.5, categories.length - 0.5)] as AxisRange)
         : seriesYRange(series),
-    [series, categories, discrete],
+    [content, revision, categories, discrete],
   );
   const yBase = pinnedYBase ?? dataYBase;
   const domain = axisRange([0, fullEnd], xView);
@@ -342,8 +392,7 @@ export function Plot({
       let connected = false;
       let previousY = 0;
       const start = Math.max(0, lowerBound(s.points, domain[0]) - 1);
-      for (let i = start; i < s.points.length; i++) {
-        const p = s.points[i];
+      for (const p of drawnPoints(s.points, start, domain[1], px)) {
         if (p.y === null) {
           connected = false;
           continue;
@@ -360,7 +409,6 @@ export function Plot({
         } else ctx.moveTo(x, y);
         connected = true;
         previousY = y;
-        if (p.x > domain[1]) break;
       }
       ctx.stroke();
       // Single samples and duplicate timestamps should still be visible.

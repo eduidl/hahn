@@ -69,11 +69,10 @@ export function seriesYRange(series: Series[]): AxisRange {
 
 /** Sorted, unique numeric states used as equally spaced Y-axis categories. */
 export function discreteYValues(series: Series[]): number[] {
-  return [
-    ...new Set(
-      series
-        .filter((item) => !item.hidden)
-        .flatMap((item) => item.points.flatMap((point) => (point.y === null ? [] : [point.y]))),
-    ),
-  ].sort((a, b) => a - b);
+  const values = new Set<number>();
+  for (const item of series) {
+    if (item.hidden) continue;
+    for (const point of item.points) if (point.y !== null) values.add(point.y);
+  }
+  return [...values].sort((a, b) => a - b);
 }
