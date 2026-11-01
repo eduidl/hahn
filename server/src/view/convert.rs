@@ -362,6 +362,89 @@ impl ImageConverter for Image {
     }
 }
 
+/// `foxglove.RawImage`, retaining the recorded pixel bytes and row stride.
+struct RawImage;
+
+impl Converter for RawImage {
+    fn id(&self) -> &'static str {
+        "raw_image"
+    }
+    fn kind(&self) -> &'static str {
+        "image"
+    }
+    fn name(&self) -> &'static str {
+        "Raw image"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "foxglove.RawImage"
+            && has(defs, "frame_id", is_string)
+            && has(defs, "width", is_number)
+            && has(defs, "height", is_number)
+            && has(defs, "step", is_number)
+            && has(defs, "encoding", is_string)
+            && has(defs, "data", is_bytes)
+    }
+    fn convert(
+        &self,
+        message: &Message,
+        payload: &mut Payload,
+    ) -> anyhow::Result<serde_json::Value> {
+        let dimension = |name| -> anyhow::Result<usize> {
+            let n = message.number(name)?;
+            ensure!(
+                n.is_finite() && n > 0. && n.fract() == 0. && n <= u32::MAX as f64,
+                "Invalid image {name}"
+            );
+            Ok(n as usize)
+        };
+        let width = dimension("width")?;
+        let height = dimension("height")?;
+        let step = dimension("step")?;
+        let encoding = message.string("encoding")?;
+        let bytes_per_pixel = match encoding {
+            "mono8" | "8UC1" | "nv12" | "bayer_rggb8" | "bayer_bggr8" | "bayer_gbrg8"
+            | "bayer_grbg8" => 1usize,
+            "mono16" | "16UC1" | "yuv422" | "uyvy" | "yuv422_yuy2" | "yuyv" => 2,
+            "rgb8" | "bgr8" | "8UC3" => 3,
+            "rgba8" | "bgra8" | "32FC1" => 4,
+            _ => bail!("Unsupported raw image encoding: {encoding:?}"),
+        };
+        if matches!(
+            encoding,
+            "yuv422" | "uyvy" | "yuv422_yuy2" | "yuyv" | "nv12"
+        ) {
+            ensure!(
+                width.is_multiple_of(2),
+                "Raw image width must be even for {encoding}"
+            );
+        }
+        if encoding == "nv12" {
+            ensure!(
+                height.is_multiple_of(2),
+                "Raw image height must be even for nv12"
+            );
+        }
+        ensure!(
+            step >= width
+                .checked_mul(bytes_per_pixel)
+                .context("Image row is too large")?,
+            "Raw image step is too small"
+        );
+        let rows = height
+            .checked_add(if encoding == "nv12" { height / 2 } else { 0 })
+            .context("Image height is too large")?;
+        let size = step.checked_mul(rows).context("Image data is too large")?;
+        let data = message.bytes("data")?;
+        ensure!(
+            data.len() == size,
+            "Raw image data length does not match step and height"
+        );
+        Ok(
+            json!({"kind":"image", "frame_id":frame_id(message)?, "format":"raw", "width":width, "height":height, "step":step, "encoding":encoding, "data":payload.add(data)}),
+        )
+    }
+}
+
 /// `foxglove.PointCloud`.
 struct PointCloud;
 

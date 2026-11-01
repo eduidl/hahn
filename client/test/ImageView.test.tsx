@@ -138,3 +138,76 @@ it("keeps the previous image and points visible while the next projection loads"
   expect(view.container.querySelector("canvas")).not.toBeNull();
 });
 
+it("displays raw images without encoding them as image files", async () => {
+  const bitmap = { width: 2, height: 1, close: vi.fn() };
+  vi.stubGlobal(
+    "ImageData",
+    class {
+      constructor(
+        public data: Uint8ClampedArray,
+        public width: number,
+        public height: number,
+      ) {}
+    },
+  );
+  vi.stubGlobal(
+    "createImageBitmap",
+    vi.fn(async () => bitmap),
+  );
+  const drawImage = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage } as any);
+  mocks.frame = {
+    time_ns: "1",
+    value: {
+      kind: "image",
+      frame_id: "camera",
+      format: "raw",
+      width: 2,
+      height: 1,
+      step: 6,
+      encoding: "rgb8",
+      data: { $blob: { offset: 0, length: 6 } },
+    },
+    blob: () => Uint8Array.from([255, 0, 0, 0, 255, 0]),
+  };
+  const topic: Topic = {
+    source: "r/0",
+    topic: "/image",
+    schema_name: "T",
+    schema_encoding: null,
+    views: [{ id: "raw_image", kind: "image", name: "Image" }],
+    message_count: 1,
+    error: null,
+    fields: [],
+  };
+  const index = buildFieldIndex([topic]);
+  const state = workspaceReducer(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "image",
+  });
+  const widget = state.widgets["widget-1"];
+  widget.series = [
+    {
+      key: "image",
+      source: "r/0",
+      topic: "/image",
+      path: [],
+      color: "red",
+      lineWidth: 1,
+      hidden: false,
+      view: "raw_image",
+    },
+  ];
+  const view = render(
+    <ImageView
+      widget={widget}
+      info={{ start_ns: "0", end_ns: "10", message_count: 1 }}
+      index={index}
+    />,
+  );
+  await waitFor(() => expect(screen.getByRole("img").tagName).toBe("CANVAS"));
+  expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0);
+  view.unmount();
+  expect(bitmap.close).toHaveBeenCalledOnce();
+});
