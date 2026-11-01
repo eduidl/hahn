@@ -49,7 +49,7 @@ function SettingsHeader({ widget }: WidgetSettingsProps) {
           <span>{widget.series.length} series</span>
         )}
       </div>
-      <p className="help">{widgetSpecs[widget.type].help}</p>
+      {!widget.series.length && <p className="help">{widgetSpecs[widget.type].help}</p>}
     </>
   );
 }
@@ -701,7 +701,7 @@ function MapSettings(props: WidgetSettingsProps) {
 }
 
 const settingsByType: Record<Widget["type"], (props: WidgetSettingsProps) => ReactNode> = {
-  "tf-tree": () => <p className="help">Drag to pan and use the mouse wheel to zoom.</p>,
+  "tf-tree": () => <p className="help">{widgetSpecs["tf-tree"].help}</p>,
   "source-info": () => (
     <p className="help">Shows the open groups. There is nothing to configure.</p>
   ),

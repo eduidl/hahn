@@ -1305,6 +1305,43 @@ header .add-widget {
   color: #a9a9a9;
   background: transparent;
 }
+.widget-icon:disabled {
+  opacity: 0.35;
+}
+.widget-drag-mode {
+  display: flex;
+}
+.widget-drag-mode .widget-icon[aria-pressed="true"] {
+  color: #dce8ff;
+  background: #3a4d70;
+}
+.widget-toolbar-separator {
+  align-self: center;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: #555;
+}
+.widget-help {
+  font-size: 13px;
+}
+.widget-help-list {
+  position: fixed;
+  /* Override the popover UA centering; the anchor decides the position. */
+  inset: auto;
+  margin: 4px 0;
+  position-area: bottom span-left;
+  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+  padding: 6px 10px;
+  width: max-content;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #ddd;
+  background: #202020;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px #0008;
+}
 .widget-actions {
   position: fixed;
   /* Override the popover UA centering; the anchor decides the position. */
