@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { stateLabel } from "../data/data";
 import type { Series } from "./Plot";
+import { SeriesName } from "../SeriesName";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { useTimeFormatter } from "../timeDisplay";
 import type { Widget } from "../workspace/widgets";
@@ -45,7 +46,7 @@ export function rowAt(rows: { x: number }[], time: number) {
   return lo - 1;
 }
 
-export function LogView({
+export function ValueChangesView({
   widget,
   series,
   originNs,
@@ -89,18 +90,18 @@ export function LogView({
   const first = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
   const last = Math.min(rows.length, Math.ceil((scrollTop + height) / rowHeight) + overscan);
   return (
-    <div className="log-view">
-      <div className="log-header">
+    <div className="value-changes-view">
+      <div className="value-changes-header">
         <span>Time</span>
         <span>Series</span>
         <span>Value</span>
       </div>
       <div
-        className="log-rows"
+        className="value-changes-rows"
         ref={list}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        {!rows.length && <p className="log-empty">No values</p>}
+        {!rows.length && <p className="value-changes-empty">No values</p>}
         <div style={{ height: rows.length * rowHeight, position: "relative" }}>
           {rows.slice(first, last).map((row, offset) => {
             const index = first + offset;
@@ -108,17 +109,21 @@ export function LogView({
             return (
               <button
                 key={index}
-                className={`log-row ${index === current ? "current" : ""}`}
+                className={`value-changes-row ${index === current ? "current" : ""}`}
                 style={{ top: index * rowHeight, height: rowHeight }}
-                title={`${s.topicName ?? s.topic} · ${s.path.join(".")}`}
                 onClick={() => store.seek(row.x)}
               >
-                <span className="log-time">{formatter.tick(row.x).time}</span>
-                <span className="log-series">
+                <span className="value-changes-time">{formatter.tick(row.x).time}</span>
+                <span className="value-changes-series">
                   <i style={{ background: s.color }} />
-                  {s.path.join(".")}
+                  <SeriesName
+                    inline
+                    source={s.source}
+                    topic={s.topicName ?? s.topic}
+                    path={s.path}
+                  />
                 </span>
-                <span className={`log-value ${row.value === "" ? "empty" : ""}`}>
+                <span className={`value-changes-value ${row.value === "" ? "empty" : ""}`}>
                   {row.value === "" ? "(empty string)" : row.value}
                 </span>
               </button>

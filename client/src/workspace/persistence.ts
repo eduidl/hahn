@@ -34,8 +34,7 @@ function reviveWidget(id: string, saved: unknown): Widget | null {
   if (!isRecord(saved) || saved.id !== id) return null;
   const type = saved.type as Widget["type"];
   if (typeof type !== "string" || !Object.hasOwn(widgetSpecs, type)) return null;
-  // The title is the current name of the type; older saves hold retired names.
-  const revived = { ...widget(0, type), ...saved, title: widgetSpecs[type].label } as Widget;
+  const revived = { ...widget(0, type), ...saved } as Widget;
   if (!Array.isArray(revived.series)) return null;
   if (revived.type === "tabs") {
     const { tabs, activeTabId } = revived;
