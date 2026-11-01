@@ -775,7 +775,7 @@ export function WidgetWorkspace(props: Props) {
   useEffect(() => {
     if (!state.expandedId) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !document.querySelector(":popover-open"))
+      if (event.key === "Escape" && !document.querySelector(":popover-open, dialog[open]"))
         dispatch({ type: "expand", id: null });
     };
     window.addEventListener("keydown", onKeyDown);

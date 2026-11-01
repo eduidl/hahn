@@ -1,3 +1,42 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TabBar, TabSettings } from "../src/workspace/TabControls";
+import type { TabWidget, WidgetTab, WorkspaceAction } from "../src/workspace/widgets";
+
+const tab = (id: string, title: string, layout: WidgetTab["layout"]): WidgetTab => ({
+  id,
+  title,
+  layout,
+});
+const widgetWith = (...tabs: WidgetTab[]) =>
+  ({ id: "w", title: "Tab", type: "tabs", tabs, activeTabId: tabs[0].id }) as unknown as TabWidget;
+const remove: WorkspaceAction = { type: "tab-remove", id: "w", tabId: "a" };
+const filled = widgetWith(
+  tab("a", "Camera", { type: "split", direction: "row", children: ["x", "y"] }),
+  tab("b", "Other", null),
+);
+
+const renderers = {
+  "tab bar": {
+    label: "Close Camera",
+    show: (widget: TabWidget, dispatch: (action: WorkspaceAction) => void) =>
+      render(
+        <TabBar
+          widget={widget}
+          dispatch={dispatch}
+          acceptWidget={() => false}
+          dropWidget={() => {}}
+        />,
+      ),
+  },
+  "tab settings": {
+    label: "Delete Camera",
+    show: (widget: TabWidget, dispatch: (action: WorkspaceAction) => void) =>
+      render(<TabSettings widget={widget} dispatch={dispatch} />),
+  },
+};
+
 describe.each(Object.entries(renderers))("removing a tab from the %s", (_, { label, show }) => {
   const showModal = vi.fn();
   beforeEach(() => {

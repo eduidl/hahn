@@ -1,3 +1,6 @@
+import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
+
 /** Asks before an action that cannot be undone. */
 export function ConfirmDialog({
   open,

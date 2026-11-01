@@ -27,6 +27,7 @@ import {
   type Session,
   type SidebarTab,
 } from "./workspace/persistence";
+import { ConfirmDialog } from "./workspace/ConfirmDialog";
 import { RunsDialog } from "./workspace/RunsDialog";
 import { TimeZoneSelect } from "./workspace/TimeZoneSelect";
 import { DisplayTimeZone, usableTimeZone, type TimeZoneSource } from "./timeDisplay";
