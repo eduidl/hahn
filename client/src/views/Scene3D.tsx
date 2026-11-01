@@ -41,6 +41,39 @@ const matrixOf = ({ translation, rotation }: Transform) =>
     new THREE.Vector3(1, 1, 1),
   );
 
+/**
+ * Where the latest data of `frameId` sits in `target`, by the transform at the data's own time.
+ * It counts as the present, so what is rigid to `target` stays still between messages.
+ */
+function useFramePlacement(
+  source: string | undefined,
+  frameId: string | null | undefined,
+  target: string | null,
+  dataNs: string | null,
+) {
+  const placed = !!frameId && !!target;
+  const { transforms, error } = useTransforms(
+    source,
+    placed && frameId !== target ? target : null,
+    dataNs,
+    true,
+  );
+  const transform = frameId ? transforms?.frames[frameId] : undefined;
+  const matrix = useMemo(() => {
+    if (!placed) return undefined;
+    if (frameId === target) return new THREE.Matrix4();
+    return transform ? matrixOf(transform) : undefined;
+  }, [placed, frameId, target, transform]);
+  // Data arrives ahead of its transform; placed by the previous one, it would jump and return.
+  const settled = !placed || frameId === target || transforms?.time_ns === dataNs || !!error;
+  return {
+    matrix,
+    missing: placed && frameId !== target && !!transforms && !transform,
+    error,
+    settled,
+  };
+}
+
 /** Dark to bright, so that intensity reads on the dark background. */
 function intensityColors(intensities: Float32Array) {
   const colors = new Float32Array(intensities.length * 3);
@@ -106,6 +139,7 @@ function PointsLayer({
   }, [frame, value, points, stage, series.color]);
   const frameId = value?.frame_id ?? null;
   useEffect(() => {
+    if (!settled) return;
     points.visible = !series.hidden && !!value && !unresolved;
     if (value) {
       const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
@@ -113,7 +147,7 @@ function PointsLayer({
       points.matrixWorldNeedsUpdate = true;
     }
     stage.invalidate();
-  }, [points, value, placement, unresolved, series.hidden, stage]);
+  }, [points, value, placement, unresolved, series.hidden, stage, settled]);
   const problem =
     error ||
     frame?.error ||
@@ -131,6 +165,7 @@ export function PoseTrail({
   series,
   info,
   target,
+  world,
   stage,
 }: {
   series: Selected;
@@ -272,8 +307,8 @@ export function PoseLayer({
     };
   }, [arrow, stage]);
   useEffect(() => {
-    arrow.visible =
-      !series.hidden && !!value && !!frameId && (!target || target === frameId || !!placement);
+    if (!settled) return;
+    arrow.visible = !series.hidden && !!value && !!frameId && (!target || !!placement);
     arrow.setColor(new THREE.Color(series.color));
     if (value) {
       const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
@@ -281,7 +316,7 @@ export function PoseLayer({
       arrow.matrixWorldNeedsUpdate = true;
     }
     stage.invalidate();
-  }, [arrow, value, frameId, target, placement, series.hidden, series.color, stage]);
+  }, [arrow, value, frameId, target, placement, series.hidden, series.color, stage, settled]);
   const problem =
     error ||
     frame?.error ||
@@ -444,6 +479,7 @@ export function CameraLayer({
     stage.invalidate();
   }, [group, stage, geometryKey, series.color, series.imageDistance]);
   useEffect(() => {
+    if (!settled) return;
     group.visible =
       !series.hidden && !!calibration && !!image?.frame_id && (!target || !!placement);
     group.matrix.copy(placement ?? new THREE.Matrix4());
@@ -453,7 +489,7 @@ export function CameraLayer({
       stage.fit(group);
     }
     stage.invalidate();
-  }, [group, series.hidden, calibration, image, target, placement, stage]);
+  }, [group, series.hidden, calibration, image, target, placement, stage, settled]);
   const problem =
     error ||
     frame?.error ||

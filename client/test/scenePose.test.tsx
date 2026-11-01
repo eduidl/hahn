@@ -63,8 +63,8 @@ it("places the latest pose in the fixed frame and hides it if the transform is m
   const forward = new THREE.Vector3(1, 0, 0).applyMatrix4(arrow.matrix);
   expect(forward.x).toBeCloseTo(0);
   expect(forward.y).toBeCloseTo(4);
-  mocks.transforms = { frames: {} };
-  view.rerender(<PoseLayer series={series} info={null} target="fixed" stage={stage} />);
+  mocks.transforms = { time_ns: "1", frames: {} };
+  view.rerender(<PoseLayer world="map" series={series} info={null} target="fixed" stage={stage} />);
   expect(arrow.visible).toBe(false);
   expect(screen.getByText(/No transform from map to fixed/)).toBeTruthy();
   view.unmount();
