@@ -417,6 +417,8 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     ) : null;
   // These read the open groups directly, so a series toolbar and empty state do not apply.
   const selfContained = widget.type === "tf-tree" || widget.type === "source-info";
+  const singleTarget = widgetSpecs[widget.type].maxSeries === 1;
+  const hasViewControls = widget.type === "plot" || widget.type === "state";
   // Each widget type draws its own content; the frame, drop target and empty state are shared.
   const views: Record<Widget["type"], () => ReactNode> = {
     "tf-tree": () => <TfTree runId={props.runId ?? null} info={info} />,
@@ -800,7 +802,8 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
             views.tabs()
           ) : (
             <>
-              {!selfContained && (
+              {/* Widgets taking several topics name them in their own content. */}
+              {singleTarget && (
                 <div className="widget-plot-toolbar">
                   <span className="widget-selection" title={selection}>
                     {selection}

@@ -140,34 +140,72 @@ describe("Data Source Info widget", () => {
   });
 });
 
-it("shows selected topics and field paths in the widget toolbar", () => {
-  const state = initialWorkspace();
-  state.widgets["widget-1"].series = [
-    {
-      key: "first",
-      source: "r/0",
-      topic: "/robot/pose",
-      path: ["position", "x"],
-      color: "red",
-      lineWidth: 1,
-      hidden: false,
+it("names the selection only on widgets taking a single target", () => {
+  const series = (key: string, topic: string, path: string[]) => ({
+    key,
+    source: "r/0",
+    topic,
+    path,
+    color: "red",
+    lineWidth: 1,
+    hidden: false,
+  });
+  const plot = initialWorkspace();
+  plot.widgets["widget-1"].series = [series("first", "/robot/pose", ["position", "x"])];
+  const { container, unmount } = render(<Harness initialState={plot} />);
+  expect(container.querySelector(".widget-selection")).toBeNull();
+  unmount();
+
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
     },
-    {
-      key: "second",
-      source: "r/0",
-      topic: "/robot/status",
-      path: [],
-      color: "blue",
-      lineWidth: 1,
-      hidden: false,
-    },
-  ];
-  render(<Harness initialState={state} />);
-  const label = screen.getByText("/robot/pose · position.x, /robot/status");
-  expect(label.getAttribute("title")).toBe("/robot/pose · position.x, /robot/status");
-  expect(
-    within(label.closest(".widget-plot-toolbar") as HTMLElement).queryByText("2 series"),
-  ).toBeNull();
+  );
+  const table = reduce(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "table",
+  });
+  table.widgets["widget-1"].series = [series("first", "/robot/pose", [])];
+  const view = render(<Harness initialState={table} />);
+  expect(view.container.querySelector(".widget-selection")?.textContent).toContain("/robot/pose");
+  vi.unstubAllGlobals();
+});
+
+it("puts the view actions left of the common ones, behind a separator", () => {
+  const { container } = render(<Harness initialState={initialWorkspace()} />);
+  const controls = container.querySelector(".mosaic-window-controls")!;
+  const parts = [...controls.querySelectorAll("button, [role=separator]")]
+    .filter((element) => !element.closest("[popover]"))
+    .map((element) => element.getAttribute("aria-label") ?? element.getAttribute("role"));
+  expect(parts).toEqual([
+    "Pan",
+    "Box zoom",
+    "Reset view",
+    "separator",
+    "Plot controls",
+    "Maximize Plot",
+    "Plot settings",
+    "Plot menu",
+  ]);
+  expect(screen.getByRole("button", { name: "Pan" }).getAttribute("aria-pressed")).toBe("true");
+});
+
+it("drags the whole widget as its preview", () => {
+  const { container } = render(<Harness initialState={initialWorkspace()} />);
+  const setDragImage = vi.fn();
+  const frame = container.querySelector(".widget-shell")!;
+  vi.spyOn(frame, "getBoundingClientRect").mockReturnValue({ left: 100, top: 50 } as DOMRect);
+  const title = container.querySelector(".mosaic-window-title")!;
+  const event = createEvent.dragStart(title, {
+    dataTransfer: { setData: vi.fn(), setDragImage },
+  });
+  // jsdom has no DragEvent, so the coordinates do not arrive through the init.
+  Object.defineProperties(event, { clientX: { value: 130 }, clientY: { value: 60 } });
+  fireEvent(title, event);
+  expect(setDragImage).toHaveBeenCalledWith(frame, 30, 10);
 });
 
 describe("Tab widget interactions", () => {
