@@ -67,11 +67,12 @@ function PointsLayer({
   const { frame, error } = useViewFrame(series, info);
   const value = frame?.value?.kind === "pointcloud" ? (frame.value as PointCloudValue) : undefined;
   // A cloud is placed by where its frame was when it was captured.
-  const { transforms, error: transformError } = useTransforms(
-    series.source,
-    target,
-    frame?.time_ns ?? null,
-  );
+  const {
+    matrix: placement,
+    missing: unresolved,
+    error: transformError,
+    settled,
+  } = useFramePlacement(series.source, value?.frame_id, target, frame?.time_ns ?? null);
   const points = useMemo(() => {
     const object = new THREE.Points(
       new THREE.BufferGeometry(),
@@ -104,14 +105,11 @@ function PointsLayer({
     stage.invalidate();
   }, [frame, value, points, stage, series.color]);
   const frameId = value?.frame_id ?? null;
-  const placement = target && frameId ? transforms?.frames[frameId] : undefined;
-  // Without a graph the cloud can only be shown where it was recorded.
-  const unresolved = !!target && !!frameId && !!transforms && !placement;
   useEffect(() => {
     points.visible = !series.hidden && !!value && !unresolved;
     if (value) {
       const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
-      points.matrix.copy(placement ? matrixOf(placement).multiply(pose) : pose);
+      points.matrix.copy(placement ? placement.clone().multiply(pose) : pose);
       points.matrixWorldNeedsUpdate = true;
     }
     stage.invalidate();
@@ -138,15 +136,25 @@ export function PoseTrail({
   series: Selected;
   info: Info | null;
   target: string | null;
+  /** A frame that stays put, for the samples: in the frame of a moving body, each would be at its origin. */
+  world: string | null;
   stage: Stage;
 }) {
   const ns = usePlaybackNs(info);
-  const identity = JSON.stringify([series.key, series.view, info?.start_ns, target]);
+  const identity = JSON.stringify([series.key, series.view, info?.start_ns, world]);
+  // The whole trail is then seen from where the fixed frame is now.
+  const { transforms, error: transformError } = useTransforms(
+    series.source,
+    target,
+    ns === null ? null : String(ns),
+    true,
+  );
+  const placement = world ? transforms?.frames[world] : undefined;
   const [loaded, setLoaded] = useState<{ identity: string; frames: ViewFrame[]; error: string }>();
   useEffect(() => {
     if (!info) return;
     const controller = new AbortController();
-    fetchViewHistory(series, controller.signal, target ?? undefined)
+    fetchViewHistory(series, controller.signal, world ?? undefined)
       .then((frames) => {
         if (!controller.signal.aborted) setLoaded({ identity, frames, error: "" });
       })
@@ -158,10 +166,17 @@ export function PoseTrail({
   }, [identity]);
   const history = loaded?.identity === identity ? loaded : undefined;
   const trail = useMemo(() => poseTrail(history?.frames ?? []), [history]);
-  const line = useMemo(
-    () => new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial()),
-    [],
-  );
+  const line = useMemo(() => {
+    const line = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    line.matrixAutoUpdate = false;
+    return line;
+  }, []);
+  useEffect(() => {
+    line.matrix.copy(placement ? matrixOf(placement) : new THREE.Matrix4());
+    line.matrixWorldNeedsUpdate = true;
+    stage.invalidate();
+  }, [line, placement, stage]);
+  const unplaced = !!target && !!world && !!transforms && !placement;
   const clipped = useRef<number | null>(null);
   useEffect(() => {
     stage.scene.add(line);
@@ -201,11 +216,13 @@ export function PoseTrail({
     if (changed) attribute.needsUpdate = true;
     line.geometry.setDrawRange(window.start * 2, window.count * 2);
     line.material.color.set(series.color);
-    line.visible = !series.hidden;
+    line.visible = !series.hidden && !unplaced;
     stage.invalidate();
-  }, [line, trail, ns, series.color, series.hidden, series.trailDuration, stage]);
+  }, [line, trail, ns, series.color, series.hidden, series.trailDuration, stage, unplaced]);
   const problem =
-    history?.error || (trail.gaps ? "Some trajectory samples could not be placed" : "");
+    history?.error ||
+    transformError ||
+    (trail.gaps ? "Some trajectory samples could not be placed" : "");
   return problem ? (
     <p className="view-error">
       {series.topicName ?? series.topic}: {problem}
@@ -218,24 +235,24 @@ export function PoseLayer({
   series,
   info,
   target,
+  world,
   stage,
 }: {
   series: Selected;
   info: Info | null;
   target: string | null;
+  world: string | null;
   stage: Stage;
 }) {
   const { frame, error } = useViewFrame(series, info);
   const value = frame?.value?.kind === "pose" ? frame.value : undefined;
   const frameId = value?.frame_id;
-  const { transforms, error: transformError } = useTransforms(
-    series.source,
-    target,
-    frame?.time_ns ?? null,
-  );
-  const placement =
-    target && frameId && target !== frameId ? transforms?.frames[frameId] : undefined;
-  const missing = !!target && !!frameId && target !== frameId && !!transforms && !placement;
+  const {
+    matrix: placement,
+    missing,
+    error: transformError,
+    settled,
+  } = useFramePlacement(series.source, frameId, target, frame?.time_ns ?? null);
   const arrow = useMemo(() => {
     const arrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
@@ -260,7 +277,7 @@ export function PoseLayer({
     arrow.setColor(new THREE.Color(series.color));
     if (value) {
       const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
-      arrow.matrix.copy(placement ? matrixOf(placement).multiply(pose) : pose);
+      arrow.matrix.copy(placement ? placement.clone().multiply(pose) : pose);
       arrow.matrixWorldNeedsUpdate = true;
     }
     stage.invalidate();
@@ -273,7 +290,9 @@ export function PoseLayer({
     (missing ? `No transform from ${frameId} to ${target} at this time` : "");
   return (
     <>
-      {info && <PoseTrail series={series} info={info} target={target} stage={stage} />}
+      {info && (
+        <PoseTrail series={series} info={info} target={target} world={world} stage={stage} />
+      )}
       {problem && (
         <p className="view-error">
           {series.topicName ?? series.topic}: {problem}
@@ -315,13 +334,12 @@ export function CameraLayer({
       calibration.distortion_model,
       calibration.distortion,
     ]);
-  const { transforms, error: transformError } = useTransforms(
-    series.source,
-    target,
-    frame?.time_ns ?? null,
-  );
-  const placement = target && image?.frame_id ? transforms?.frames[image.frame_id] : undefined;
-  const unresolved = !!target && !!image?.frame_id && !!transforms && !placement;
+  const {
+    matrix: placement,
+    missing: unresolved,
+    error: transformError,
+    settled,
+  } = useFramePlacement(series.source, image?.frame_id, target, frame?.time_ns ?? null);
   const group = useMemo(() => {
     const group = new THREE.Group();
     group.matrixAutoUpdate = false;
@@ -428,7 +446,7 @@ export function CameraLayer({
   useEffect(() => {
     group.visible =
       !series.hidden && !!calibration && !!image?.frame_id && (!target || !!placement);
-    group.matrix.copy(placement ? matrixOf(placement) : new THREE.Matrix4());
+    group.matrix.copy(placement ?? new THREE.Matrix4());
     group.matrixWorldNeedsUpdate = true;
     if (!fitted.current && group.visible && group.children.length) {
       fitted.current = true;
@@ -699,6 +717,7 @@ export default function Scene3D({
                 series={series}
                 info={info}
                 target={target}
+                world={world}
                 stage={stage}
               />
             ) : (
