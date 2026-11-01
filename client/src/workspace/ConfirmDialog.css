@@ -1,9 +1,9 @@
 .confirm-dialog {
   width: min(420px, calc(100vw - 32px));
   padding: 20px;
-  color: #e4e4e4;
-  background: #171717;
-  border: 1px solid #3f3f3f;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
 }
 .confirm-dialog::backdrop {
@@ -16,7 +16,7 @@
 }
 .confirm-dialog p {
   margin: 0;
-  color: #a0a0a0;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -27,10 +27,10 @@
   margin-top: 16px;
 }
 .confirm-actions .danger {
-  color: #ff8a8a;
-  border-color: #7a3a3a;
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 50%, transparent);
 }
 .confirm-actions .danger:hover {
-  color: #ffffff;
-  background: #7a2f2f;
+  color: var(--text);
+  background: color-mix(in srgb, var(--error) 40%, transparent);
 }

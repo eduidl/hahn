@@ -12,9 +12,9 @@
   width: max-content;
   font-size: 12px;
   line-height: 1.7;
-  color: #ddd;
-  background: #202020;
-  border: 1px solid #444;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
   border-radius: 4px;
-  box-shadow: 0 8px 24px #0008;
+  box-shadow: var(--shadow);
 }
