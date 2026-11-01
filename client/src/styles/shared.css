@@ -138,8 +138,8 @@
   font-size: 12px;
   color: var(--text-faint);
 }
-.raw-error {
-  color: #ffc6ab;
+.widget-status-error {
+  color: var(--error);
 }
 .view-image,
 .view-scene,
