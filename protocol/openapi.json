@@ -294,6 +294,16 @@
           },
           {
             "$ref": "#/components/parameters/EndNs"
+          },
+          {
+            "name": "target_frame",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "For pose views only, transform each pose into this frame at its recording time. A missing transform is a frame conversion error."
           }
         ],
         "responses": {
@@ -1291,11 +1301,14 @@
           },
           {
             "$ref": "#/components/schemas/CameraCalibrationValue"
+          },
+          {
+            "$ref": "#/components/schemas/PoseValue"
           }
         ]
       },
       "FramedValue": {
-        "description": "Coordinate frame of an image or point cloud.",
+        "description": "Coordinate frame of a spatial value.",
         "type": "object",
         "required": [
           "frame_id"
@@ -1664,6 +1677,32 @@
             "description": "Name of the distortion model, such as plumb_bob."
           }
         }
+      },
+      "PoseValue": {
+        "description": "A position and orientation in frame_id.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "pose"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "pose"
+                ]
+              },
+              "pose": {
+                "$ref": "#/components/schemas/Pose"
+              }
+            }
+          }
+        ]
       }
     },
     "parameters": {

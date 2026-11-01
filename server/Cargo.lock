@@ -1237,8 +1237,8 @@ version = "0.9.0"
 dependencies = [
  "mcap",
  "mcapdecode-core",
- "mcapdecode-json",
  "mcapdecode-protobuf",
+ "mcapdecode-rawjson",
  "mcapdecode-ros2idl",
  "mcapdecode-ros2msg",
  "memmap2",
@@ -1254,13 +1254,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mcapdecode-json"
-version = "0.9.0"
-dependencies = [
- "mcapdecode-core",
-]
-
-[[package]]
 name = "mcapdecode-protobuf"
 version = "0.9.0"
 dependencies = [
@@ -1268,6 +1261,13 @@ dependencies = [
  "prost-reflect",
  "prost-types",
  "thiserror",
+]
+
+[[package]]
+name = "mcapdecode-rawjson"
+version = "0.9.0"
+dependencies = [
+ "mcapdecode-core",
 ]
 
 [[package]]

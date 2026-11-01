@@ -899,6 +899,57 @@ async fn message_windows_keep_timestamp_ties_and_validate_bounds() {
 }
 
 #[tokio::test]
+async fn json_channels_without_a_schema_show_parsed_messages() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut writer =
+        mcap::Writer::new(std::fs::File::create(dir.path().join("json.mcap")).unwrap()).unwrap();
+    let schema = writer.add_schema("Status", "jsonschema", b"").unwrap();
+    let channel = writer
+        .add_channel(schema, "/status", "json", &Default::default())
+        .unwrap();
+    let text = r#"{"speed": 1.5}"#;
+    writer
+        .write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id: channel,
+                sequence: 0,
+                log_time: 1,
+                publish_time: 1,
+            },
+            text.as_bytes(),
+        )
+        .unwrap();
+    writer.finish().unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, topics) = get(app.clone(), "/g/topics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(topics[0]["error"].is_null());
+    assert_eq!(topics[0]["schema_encoding"], "jsonschema");
+    assert_eq!(topics[0]["fields"][0]["name"], "json");
+    assert_eq!(topics[0]["fields"][0]["data_type"], "string");
+    let rows = |events: Vec<serde_json::Value>| -> Vec<serde_json::Value> {
+        events
+            .iter()
+            .filter_map(|event| event["rows"].as_array())
+            .flatten()
+            .cloned()
+            .collect()
+    };
+    let (status, events) = stream(app.clone(), "/g/messages", json!({"topic":"/status"})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(rows(events)[0]["value"], json!({"json": {"speed": 1.5}}));
+    // Exact values keep the message's own text.
+    let (status, events) = stream(
+        app,
+        "/g/messages",
+        json!({"topic":"/status","path":"[\"json\"]","preview":"false"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(rows(events)[0]["value"], text);
+}
+
+#[tokio::test]
 async fn ros_uint8_sequences_use_list_previews() {
     let dir = tempfile::tempdir().unwrap();
     let mut writer =

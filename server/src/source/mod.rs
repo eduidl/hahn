@@ -74,6 +74,10 @@ pub trait Source: Send + Sync {
     fn info(&self) -> anyhow::Result<SourceInfo>;
     fn topics(&self) -> anyhow::Result<Vec<TopicMeta>>;
     fn field_defs(&self, topic: &str) -> anyhow::Result<FieldDefs>;
+    /// Whether messages of `topic` are one string field of unparsed JSON text.
+    fn is_json_text(&self, _topic: &str) -> anyhow::Result<bool> {
+        Ok(false)
+    }
     /// Messages of `topic` within `range`, in the recording's order: not always by time.
     fn read(&self, topic: &str, range: TimeRange, visit: &mut Visit) -> anyhow::Result<()>;
 
