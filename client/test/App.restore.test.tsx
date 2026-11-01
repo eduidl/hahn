@@ -148,4 +148,41 @@ describe("App session restore", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(localStorage.getItem(key)).toBe(before);
   });
+  it("keeps the session when a workspace reset is cancelled", async () => {
+    save();
+    server(() => json(run));
+    const reload = vi.fn();
+    vi.stubGlobal("location", Object.assign(new URL("http://localhost/"), { reload }));
+    render(<App />);
+    await waitFor(() => expect(shown().widgets["widget-1"].series).toEqual([series]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset workspace" }));
+    expect(showModal).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+    expect(reload).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(reload).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).not.toBeNull();
+  });
+  it("resets the layout but keeps the run after a workspace reset is confirmed", async () => {
+    save();
+    server(() => json(run));
+    const reload = vi.fn();
+    vi.stubGlobal("location", Object.assign(new URL("http://localhost/"), { reload }));
+    render(<App />);
+    await waitFor(() => expect(shown().widgets["widget-1"].series).toEqual([series]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(stored().runId).toBe("run");
+    expect(stored().sources).toEqual(["run/b"]);
+    expect(stored().workspace).toEqual(JSON.parse(JSON.stringify(initialWorkspace())));
+
+    // Whatever was pending must not bring the old layout back on the way out.
+    window.dispatchEvent(new Event("pagehide"));
+    expect(stored().workspace).toEqual(JSON.parse(JSON.stringify(initialWorkspace())));
+  });
 });

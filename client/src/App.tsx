@@ -58,6 +58,7 @@ import {
 export function App() {
   const [saved] = useState(() => loadSession(browserStorage()));
   const [runsOpen, setRunsOpen] = useState(!saved?.runId);
+  const [resetOpen, setResetOpen] = useState(false);
   const [zoneSource, setZoneSource] = useState<TimeZoneSource>(saved?.zoneSource ?? "browser");
   const [runId, setRunId] = useState<string | null>(saved?.runId ?? null);
   // The saved session until its run is confirmed. Saving waits for that, so a
@@ -192,7 +193,15 @@ export function App() {
   }, []);
   const resetWorkspace = () => {
     discarded.current = true;
+    // Clear first so a failed save still resets instead of keeping the old layout.
     clearSession(browserStorage());
+    saveSession(browserStorage(), {
+      workspace: initialWorkspace(),
+      runId,
+      sources,
+      zoneSource,
+      tab,
+    });
     location.reload();
   };
 
@@ -338,6 +347,14 @@ export function App() {
                 current={runId}
                 onSelect={selectRun}
                 onClose={() => setRunsOpen(false)}
+              />
+              <ConfirmDialog
+                open={resetOpen}
+                title="Reset workspace?"
+                message="This removes all widgets, tabs, and series saved in this browser. This cannot be undone."
+                confirmLabel="Reset"
+                onConfirm={resetWorkspace}
+                onClose={() => setResetOpen(false)}
               />
               <header>
                 <div className="header-start">
@@ -662,7 +679,7 @@ export function App() {
                   )}
                   <footer className="sidebar-footer">
                     <span>Drag a topic or field to add it</span>
-                    <button className="reset-workspace" onClick={resetWorkspace}>
+                    <button className="reset-workspace" onClick={() => setResetOpen(true)}>
                       Reset workspace
                     </button>
                   </footer>
