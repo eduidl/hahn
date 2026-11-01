@@ -2,9 +2,9 @@
   width: min(560px, calc(100vw - 32px));
   max-height: min(640px, calc(100vh - 32px));
   padding: 20px;
-  color: #e4e4e4;
-  background: #171717;
-  border: 1px solid #3f3f3f;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
 }
 .runs-dialog[open] {
@@ -21,7 +21,7 @@
 }
 .runs-count {
   margin: 8px 0;
-  color: #a0a0a0;
+  color: var(--text-muted);
   font-size: 12px;
 }
 .runs-list {
@@ -35,17 +35,17 @@
 .runs-list li {
   padding: 7px 13px;
   border-radius: 4px;
-  color: #d4d4d4;
+  color: var(--text);
   cursor: pointer;
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 .runs-list li[aria-current] {
-  background: #24324a;
+  background: var(--bg-accent);
 }
 .runs-list li[aria-selected="true"] {
-  background: #2a2a2a;
-  outline: 1px solid #91b8ff;
+  background: var(--bg-hover);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 .runs-close {

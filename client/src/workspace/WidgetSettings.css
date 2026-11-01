@@ -99,11 +99,11 @@
   padding: 8px;
   flex-direction: column;
   gap: 8px;
-  background: #181818;
-  color: #e4e4e4;
-  border: 1px solid #444;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  box-shadow: 0 12px 36px #0008;
+  box-shadow: var(--shadow);
 }
 .field-picker:popover-open {
   display: flex;
@@ -121,8 +121,8 @@
   margin: 8px 10px;
 }
 .field-option[aria-selected="true"] {
-  background: #2a2a2a;
-  outline: 1px solid #91b8ff;
+  background: var(--bg-hover);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 .field-option {
@@ -134,12 +134,10 @@
   border-radius: 0;
   background: none;
   text-align: left;
-  font:
-    12px ui-monospace,
-    monospace;
+  font: 12px var(--font-mono);
 }
 .field-option + .field-option {
-  border-top: 1px solid #242424;
+  border-top: 1px solid var(--line);
 }
 .series-toggle.dim {
   opacity: 0.35;
@@ -172,21 +170,21 @@
   width: 26px;
   height: 24px;
   padding: 1px;
-  background: #181818;
-  border: 1px solid #444;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
   cursor: pointer;
 }
 .series-style input[type="number"] {
   width: 56px;
   padding: 4px 5px;
-  color: #e4e4e4;
-  background: #181818;
-  border: 1px solid #444;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
   border-radius: 3px;
 }
 .legend-empty {
   font-size: 12px;
-  color: #828282;
+  color: var(--text-faint);
 }
 @media (max-width: 640px) {
   .legend-row {
@@ -202,7 +200,7 @@
   gap: 8px;
   padding: 6px 16px 20px;
   font-size: 12px;
-  color: #a0a0a0;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 .legend-setting {
@@ -213,7 +211,7 @@
   padding: 0 16px 20px;
   border: 0;
   font-size: 12px;
-  color: #a0a0a0;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 .legend-setting legend {

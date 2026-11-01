@@ -1,7 +1,7 @@
 header {
   position: relative;
   height: 73px;
-  border-bottom: 1px solid #343434;
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -11,7 +11,7 @@ header {
   display: flex;
   align-items: center;
   gap: 11px;
-  color: #f0f0f0;
+  color: var(--text);
   font-size: 27px;
   letter-spacing: -1px;
   font-weight: 650;
@@ -24,11 +24,9 @@ header {
   flex: none;
 }
 .brand-detail {
-  font:
-    12px ui-monospace,
-    monospace;
+  font: 12px var(--font-mono);
   letter-spacing: 1.2px;
-  color: #909090;
+  color: var(--text-faint);
   margin-left: 20px;
 }
 .workspace {
@@ -41,10 +39,10 @@ header {
   min-height: calc(100vh - 73px - var(--playback-height));
 }
 aside {
-  border-right: 1px solid #343434;
+  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  background: #101010;
+  background: var(--bg-base);
   min-width: 0;
 }
 .sidebar-toggle {
@@ -53,7 +51,7 @@ aside {
   width: 30px;
   height: 30px;
   padding: 0;
-  color: #a9a9a9;
+  color: var(--text-muted);
   background: transparent;
   border: 0;
 }
@@ -79,7 +77,7 @@ aside {
   display: grid;
   place-items: center;
   padding: 7px;
-  color: #a0a0a0;
+  color: var(--text-muted);
   background: transparent;
   border-color: transparent;
 }
@@ -102,11 +100,11 @@ header .add-widget {
   position-anchor: --group-trigger;
   width: min(320px, calc(100vw - 32px));
   padding: 20px;
-  background: #181818;
-  color: #e4e4e4;
-  border: 1px solid #444;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  box-shadow: 0 12px 36px #0008;
+  box-shadow: var(--shadow);
 }
 .group-menu h2 {
   margin-top: 0;
@@ -114,7 +112,7 @@ header .add-widget {
 .group-list {
   max-height: min(360px, 50vh);
   overflow: auto;
-  border: 1px solid #333;
+  border: 1px solid var(--line);
   border-radius: 4px;
 }
 .group-option {
@@ -127,10 +125,10 @@ header .add-widget {
   cursor: pointer;
 }
 .group-option + .group-option {
-  border-top: 1px solid #262626;
+  border-top: 1px solid var(--line);
 }
 .group-option:hover {
-  background: #222;
+  background: var(--bg-raised);
 }
 .group-name {
   overflow: hidden;
@@ -488,11 +486,11 @@ header .add-widget {
   position-anchor: --add-widget;
   width: min(280px, calc(100vw - 32px));
   padding: 8px;
-  background: #181818;
-  color: #e4e4e4;
-  border: 1px solid #444;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  box-shadow: 0 12px 36px #0008;
+  box-shadow: var(--shadow);
 }
 /* Widgets without settings show only this text, so it needs its own top gap. */
 .widget-settings > .help:first-child {
@@ -506,7 +504,7 @@ header .add-widget {
   flex-direction: column;
   gap: 4px;
   padding: 10px;
-  border: 1px solid #333;
+  border: 1px solid var(--line);
   border-radius: 4px;
   cursor: pointer;
   user-select: none;
@@ -515,19 +513,19 @@ header .add-widget {
   margin-top: 6px;
 }
 .widget-catalog-item:focus-visible {
-  outline: 2px solid #91b8ff;
+  outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
 .widget-catalog-item:hover {
-  border-color: #91b8ff;
-  background: #202530;
+  border-color: var(--accent);
+  background: var(--bg-accent);
 }
 .widget-catalog-item strong {
   font-weight: 500;
   font-size: 13px;
 }
 .widget-catalog-item span {
-  color: #a0a0a0;
+  color: var(--text-muted);
   font-size: 12px;
 }
 .workspace > main {

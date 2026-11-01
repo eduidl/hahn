@@ -1,8 +1,8 @@
 .timezone-name {
-  color: #e4e4e4;
+  color: var(--text);
 }
 .timezone-name.disabled {
-  color: #6f6f6f;
+  color: var(--text-faint);
 }
 .timezone-select {
   display: flex;
@@ -11,15 +11,15 @@
   gap: 8px;
   margin-left: 16px;
   white-space: nowrap;
-  color: #a0a0a0;
+  color: var(--text-muted);
   font-size: 12px;
 }
 .timezone-select select {
   max-width: 240px;
   padding: 6px 8px;
-  color: #d4d4d4;
-  background: #181818;
-  border: 1px solid #3b3b3b;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
   border-radius: 4px;
   font-size: 12px;
 }

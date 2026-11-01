@@ -22,8 +22,8 @@
   --shadow: 0 12px 36px #0008;
   color-scheme: dark;
   font-family: var(--font-ui);
-  color: #e4e4e4;
-  background: #090909;
+  color: var(--text);
+  background: var(--bg-base);
   font-synthesis: none;
   font-weight: 400;
 }
@@ -43,9 +43,9 @@ select {
   cursor: pointer;
 }
 button {
-  color: #d4d4d4;
-  background: #242424;
-  border: 1px solid #3f3f3f;
+  color: var(--text);
+  background: var(--bg-control);
+  border: 1px solid var(--line-strong);
   border-radius: 5px;
   padding: 7px 13px;
   font-size: 12px;
@@ -54,8 +54,8 @@ button {
     border-color 0.15s;
 }
 button:hover:not(:disabled) {
-  background: #393939;
-  border-color: #91b8ff;
+  background: var(--bg-hover);
+  border-color: var(--accent);
 }
 button:disabled {
   opacity: 0.35;
@@ -69,9 +69,9 @@ h2 {
 select {
   width: 100%;
   padding: 10px 9px;
-  background: #242424;
-  border: 1px solid #484848;
-  color: #eaeaea;
+  background: var(--bg-control);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
   border-radius: 5px;
   font-size: 12px;
 }

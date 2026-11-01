@@ -26,12 +26,8 @@
   gap: 6px;
   margin: -8px -12px 6px;
   padding: 6px 12px;
-  background: #0d0d0d;
-  border-bottom: 1px solid #242424;
-}
-.raw-toolbar .raw-status {
-  flex: 1;
-  margin: 0;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--line);
 }
 .raw-toolbar button {
   padding: 3px 7px;
