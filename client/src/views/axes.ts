@@ -32,6 +32,12 @@ export function zoomAxis(view: AxisView, factor: number, anchor: number): AxisVi
   return constrain({ zoom, center: point - (anchor - 0.5) / zoom });
 }
 
+/** Pulls a view back inside the reference range, for views that have no way to pan back. */
+export function clampAxis(view: AxisView): AxisView {
+  const half = 0.5 / view.zoom;
+  return { ...view, center: Math.max(half, Math.min(1 - half, view.center)) };
+}
+
 export function panAxis(view: AxisView, delta: number): AxisView {
   return constrain({ ...view, center: view.center + delta / view.zoom });
 }
