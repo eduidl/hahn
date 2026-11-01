@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { useTimeFormatter, type TimeDisplay } from "../timeDisplay";
+import { useTimeFormatter } from "../timeDisplay";
 import { lowerBound, nearest, type Point } from "../data/data";
 import {
   axisRange,
@@ -48,7 +48,6 @@ type Props = {
   series: Series[];
   fullEnd: number;
   originNs: string | null;
-  timeDisplay: TimeDisplay;
   revision: number;
   view: PlotView;
   onViewChange: (update: (view: PlotView) => PlotView) => void;
@@ -98,7 +97,6 @@ export function Plot({
   series,
   fullEnd,
   originNs,
-  timeDisplay,
   revision,
   view,
   onViewChange,
@@ -108,8 +106,8 @@ export function Plot({
   onCanReset,
   onToggleSeries,
 }: Props) {
-  const bottom = timeDisplay === "absolute" ? 70 : 52;
-  const time = useTimeFormatter(originNs, timeDisplay);
+  const time = useTimeFormatter(originNs);
+  const bottom = time.clock ? 70 : 52;
   const playback = usePlaybackStore();
   const canvas = useRef<HTMLCanvasElement>(null);
   const { x: xView, y: yView, pinnedYBase } = view;
@@ -405,7 +403,7 @@ export function Plot({
     drag,
     revision,
     time,
-    timeDisplay,
+    time,
     discrete,
     kind,
     categories,
@@ -418,12 +416,12 @@ export function Plot({
     <div className="plot-wrap">
       <canvas
         ref={canvas}
-        aria-label={`Plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Click to move the playback position. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis. Double-click to reset.`}
+        aria-label={`Plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Click to move the playback position. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis.`}
         style={{
           cursor: mode === "pan" ? (drag ? "grabbing" : "grab") : "crosshair",
         }}
         data-drag-mode={mode}
-        data-time-display={timeDisplay}
+        data-time-display={time.clock ? "absolute" : "offset"}
         data-x-min={domain[0]}
         data-x-max={domain[1]}
         data-y-min={yDomain[0]}

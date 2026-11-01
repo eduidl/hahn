@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlaybackBar } from "../src/workspace/PlaybackBar";
+import { DisplayTimeMode, type TimeDisplay } from "../src/timeDisplay";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
 import type { Info } from "../src/types";
 
@@ -21,13 +22,33 @@ function renderBar(recording: Info | null = info) {
   store.reset(recording ? 10 : 0);
   render(
     <PlaybackContext.Provider value={store}>
-      <PlaybackBar info={recording} fullEnd={10} busy={false} stop={vi.fn()} />
+      <PlaybackBar info={recording} fullEnd={10} busy={false} />
     </PlaybackContext.Provider>,
   );
   return store;
 }
 
 describe("PlaybackBar", () => {
+  it.each<[TimeDisplay, RegExp, RegExp]>([
+    ["absolute", /^\d{4}-/, /\/ .* s$/],
+    ["offset", /\/ .* s$/, /^\d{4}-/],
+  ])("shows both forms, with the %s one first", (mode, first, second) => {
+    const store = createPlaybackStore(
+      () => 1,
+      () => {},
+    );
+    store.reset(10);
+    const { container } = render(
+      <DisplayTimeMode.Provider value={mode}>
+        <PlaybackContext.Provider value={store}>
+          <PlaybackBar info={info} fullEnd={10} busy={false} />
+        </PlaybackContext.Provider>
+      </DisplayTimeMode.Provider>,
+    );
+    const [main, sub] = container.querySelector(".playback-time")!.children;
+    expect(main.textContent).toMatch(first);
+    expect(sub.textContent).toMatch(second);
+  });
   it.each([
     ["summary", "summary"],
     ["field row", "div"],
@@ -108,7 +129,7 @@ describe("PlaybackBar", () => {
     expect(status.textContent).toContain("Buffering…");
     expect([...bar.children]).toEqual(children);
     act(() => store.setBuffering(token, false));
-    expect(status.textContent).toContain("READY");
+    expect(status.textContent).toContain("Ready");
     expect([...bar.children]).toEqual(children);
   });
 });

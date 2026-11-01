@@ -28,9 +28,13 @@ describe("time display", () => {
     expect(format.axisLabel).toContain("Asia/Tokyo");
   });
   it("supports relative seconds and absent or out of range timestamps", () => {
-    const relative = timeFormatter(origin, "relative");
-    expect(relative.tick(1.25)).toEqual({ time: "1.25", date: "" });
-    expect(relative.tooltip(-2)).toBe("-2 s");
+    const relative = timeFormatter(origin, "offset");
+    expect(relative.tick(1.25)).toEqual({ time: "1.250", date: "" });
+    expect(relative.tick(0.1)).toEqual({ time: "0.100", date: "" });
+    expect(relative.tooltip(-2)).toBe("-2.000 s");
+    // Axis labels stay as short as their ticks allow.
+    expect(relative.axisTime(5, 5)).toBe("5");
+    expect(relative.axisTime(0.5, 0.5)).toBe("0.5");
     expect(timeFormatter(null, "absolute").tick(0).time).toBe("—");
     expect(timeFormatter(origin, "absolute").tick(1e308).time).toBe("—");
   });
@@ -52,6 +56,6 @@ describe("usableTimeZone", () => {
     expect(format.axisTime(0, 0.05)).toBe("01:46:40.12");
     expect(format.axisTime(0, 0.002)).toBe("01:46:40.123");
     expect(timeFormatter(null, "absolute").tickOffset).toBe(0);
-    expect(timeFormatter("0", "relative").tickOffset).toBe(0);
+    expect(timeFormatter("0", "offset").tickOffset).toBe(0);
   });
 });

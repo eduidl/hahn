@@ -44,6 +44,7 @@ const save = () =>
     runId: "run",
     sources: ["run/b"],
     zoneSource: "browser",
+    timeDisplay: "absolute",
     tab: "settings",
   });
 const shown = (): WorkspaceState => JSON.parse(screen.getByTestId("state").textContent!);
@@ -167,6 +168,7 @@ describe("App session restore", () => {
         runId: "run",
         sources: ["run/b"],
         zoneSource: "browser",
+        timeDisplay: "absolute",
         tab: "topics",
       });
       fetchMock.mockImplementation((url: string) => {

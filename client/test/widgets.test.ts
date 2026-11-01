@@ -194,25 +194,6 @@ describe("widget workspace", () => {
     expect(state.expandedId).toBeNull();
     expect(state.layout).toBe("widget-1");
   });
-  it("defaults to absolute time and keeps each widget's time display independent", () => {
-    let state = initialWorkspace();
-    expect(state.widgets["widget-1"].timeDisplay).toBe("absolute");
-    state = reduce(state, {
-      type: "time-display",
-      id: "widget-1",
-      value: "relative",
-    });
-    state = reduce(state, { type: "add", duplicate: true });
-    expect(state.widgets["widget-2"].timeDisplay).toBe("relative");
-    state = reduce(state, {
-      type: "time-display",
-      id: "widget-2",
-      value: "absolute",
-    });
-    expect(state.widgets["widget-1"].timeDisplay).toBe("relative");
-    state = reduce(state, { type: "sources", open: new Set() });
-    expect(state.widgets["widget-1"].timeDisplay).toBe("relative");
-  });
   it("maps a drop position to the nearest tile edge", () => {
     expect(dropEdge(10, 50, 100, 100)).toBe("left");
     expect(dropEdge(95, 50, 100, 100)).toBe("right");
@@ -236,14 +217,12 @@ describe("widget workspace", () => {
       id: "widget-1",
       update: () => [series],
     });
-    state = reduce(state, { type: "time-display", id: "widget-1", value: "relative" });
     state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "state" });
     expect(state.widgets["widget-1"]).toMatchObject({
       id: "widget-1",
       type: "state",
       title: "State transition",
       series: [],
-      timeDisplay: "absolute",
       view: defaultPlotView(),
     });
     expect(state.layout).toBe("widget-1");
@@ -283,7 +262,6 @@ describe("widget workspace", () => {
     let state = reduce(initialWorkspace(), { type: "add" });
     for (const id of ["widget-1", "widget-2"])
       state = reduce(state, { type: "series", id, update: () => [series] });
-    state = reduce(state, { type: "time-display", id: "widget-1", value: "relative" });
     state = reduce(state, {
       type: "view",
       id: "widget-1",
@@ -293,7 +271,6 @@ describe("widget workspace", () => {
     expect(state.widgets["widget-1"]).toMatchObject({
       series: [],
       view: defaultPlotView(),
-      timeDisplay: "relative",
     });
     expect(state.widgets["widget-2"].series).toEqual([series]);
     expect(requestedSeries(state.widgets)).toEqual([series]);

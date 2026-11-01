@@ -1,4 +1,5 @@
-import type { TimeZoneSource } from "../timeDisplay";
+import type { TimeDisplay, TimeZoneSource } from "../timeDisplay";
+import { maxSidebarWidth, minSidebarWidth } from "./SidebarResizer";
 import { leaves, widget, widgetSpecs, type Widget, type WorkspaceState } from "./widgets";
 
 /** What survives a reload. Fetched data and playback position are not kept. */
@@ -8,6 +9,7 @@ export type Session = {
   /** Open groups of the run, in the order they were opened. */
   sources: string[];
   zoneSource: TimeZoneSource;
+  timeDisplay: TimeDisplay;
   tab: SidebarTab;
 };
 export type SidebarTab = "settings" | "topics" | "errors";
@@ -96,6 +98,7 @@ export function loadSession(storage: Storage | null): Session | null {
       runId: typeof saved.runId === "string" ? saved.runId : null,
       sources: isStringArray(saved.sources) ? saved.sources : [],
       zoneSource: saved.zoneSource === "server" ? "server" : "browser",
+      timeDisplay: saved.timeDisplay === "offset" ? "offset" : "absolute",
       tab: saved.tab === "topics" || saved.tab === "errors" ? saved.tab : "settings",
     };
   } catch {

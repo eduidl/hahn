@@ -49,7 +49,6 @@ describe("message history loading", () => {
         ...initial,
         copy: {
           ...initial.copy,
-          timeDisplay: "relative",
           hiddenColumns: [JSON.stringify(["x"])],
           columnWidths: { time: 300 },
         },
@@ -84,7 +83,7 @@ describe("message history loading", () => {
     rerender({ items: {} });
     expect(result.current.records).toEqual([]);
   });
-  it("stops an active stream while retaining partial rows", async () => {
+  it("releases an active stream and its rows when the selection goes away", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>

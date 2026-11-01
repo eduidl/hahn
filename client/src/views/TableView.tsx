@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, useContext } from "react";
 import { secondsFrom } from "../data/data";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
@@ -12,7 +12,7 @@ import {
   type MessageRow,
   type TableColumn,
 } from "./table";
-import { useTimeFormatter } from "../timeDisplay";
+import { DisplayTimeMode, useTimeFormatter } from "../timeDisplay";
 import type { MessageRecord } from "../data/useMessages";
 import type { Widget, WorkspaceAction } from "../workspace/widgets";
 
@@ -116,13 +116,13 @@ export function TableView({
       ? tableColumns(index, selected).filter((column) => !hidden.has(JSON.stringify(column.path)))
       : [];
   }, [index, selected?.key, widget.hiddenColumns]);
-  const timeWidth = widget.timeDisplay === "relative" ? 104 : 192;
+  const timeWidth = useContext(DisplayTimeMode) === "offset" ? 104 : 192;
   const widthOf = (column: TableColumn | null) =>
     widget.columnWidths?.[column === null ? "time" : JSON.stringify(column.path)] ??
     (column === null ? timeWidth : defaultColumnWidth(column));
   const resize = (path: string[] | null, width: number) =>
     dispatch({ type: "table-column-width", id: widget.id, path, width });
-  const formatter = useTimeFormatter(originNs, widget.timeDisplay);
+  const formatter = useTimeFormatter(originNs);
   const viewport = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(0);

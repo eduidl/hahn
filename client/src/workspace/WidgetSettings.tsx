@@ -347,7 +347,6 @@ function PlotSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <TimeDisplaySetting {...props} />
       <LegendSetting {...props} />
       <FieldPicker {...props} />
       <SeriesList
@@ -372,7 +371,6 @@ function StateSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <TimeDisplaySetting {...props} />
       <FieldPicker {...props} />
       <SeriesList {...props} row={(s) => <SeriesRow key={s.key} {...props} series={s} />} />
     </>
@@ -384,7 +382,6 @@ function ValueChangesSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <TimeDisplaySetting {...props} />
       <FieldPicker {...props} />
       <SeriesList
         {...props}
@@ -414,7 +411,6 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <TimeDisplaySetting {...props} />
       <section className="target-setting" aria-label="Target">
         <div className="legend-heading">Target</div>
         {target ? (
@@ -578,7 +574,6 @@ function ImageSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <TimeDisplaySetting {...props} />
       <section className="target-setting" aria-label="Image topic">
         <div className="legend-heading">Image topic</div>
         {image ? (

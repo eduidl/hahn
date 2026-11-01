@@ -443,7 +443,6 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
         series={widgetSeries(widget, data)}
         fullEnd={fullEnd}
         originNs={info?.start_ns ?? null}
-        timeDisplay={widget.timeDisplay}
         revision={revision}
         mode={widget.mode}
         legend={widget.legend}

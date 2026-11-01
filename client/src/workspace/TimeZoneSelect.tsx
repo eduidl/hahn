@@ -1,14 +1,17 @@
-import { browserTimeZone, type TimeZoneSource } from "../timeDisplay";
+import { browserTimeZone, type TimeDisplay, type TimeZoneSource } from "../timeDisplay";
 
 /** The workspace's timezone, naming which side each choice comes from. */
 export function TimeZoneSelect({
   source,
   serverZone,
   onChange,
+  disabled = false,
 }: {
   source: TimeZoneSource;
   serverZone: string | null;
   onChange: (source: TimeZoneSource) => void;
+  /** Offsets do not depend on a time zone. */
+  disabled?: boolean;
 }) {
   const browserZone = browserTimeZone();
   // With nothing to choose between, just say which zone times are shown in.

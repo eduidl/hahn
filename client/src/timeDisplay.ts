@@ -1,12 +1,16 @@
 import { createContext, useContext, useMemo } from "react";
 
-export type TimeDisplay = "absolute" | "relative";
+/** How times are written: on the clock, or as seconds from the start of the run. */
+export type TimeDisplay = "absolute" | "offset";
 
 /** Where the displayed timezone comes from, chosen once for the whole workspace. */
 export type TimeZoneSource = "browser" | "server";
 
 /** The timezone clock times are shown in; undefined means the browser's. */
 export const DisplayTimeZone = createContext<string | undefined>(undefined);
+
+/** The workspace's choice of time display, which every time follows by default. */
+export const DisplayTimeMode = createContext<TimeDisplay>("absolute");
 
 export const browserTimeZone = () => new Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -20,8 +24,11 @@ export function usableTimeZone(zone: string | null | undefined): string | null {
   }
 }
 
-export function useTimeFormatter(originNs: string | null, mode: TimeDisplay) {
+/** `mode` overrides the workspace's choice, for places that always need one form. */
+export function useTimeFormatter(originNs: string | null, mode?: TimeDisplay) {
   const zone = useContext(DisplayTimeZone);
+  const chosen = useContext(DisplayTimeMode);
+  mode ??= chosen;
   return useMemo(() => timeFormatter(originNs, mode, zone), [originNs, mode, zone]);
 }
 
@@ -31,15 +38,20 @@ export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZo
     Number.isFinite(seconds)
       ? seconds.toLocaleString(undefined, { maximumSignificantDigits: 6 })
       : "—";
-  if (mode === "relative")
+  // A fixed width lines up in lists, and matches the milliseconds of clock times.
+  const exact = (seconds: number) =>
+    Number.isFinite(seconds)
+      ? seconds.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+      : "—";
+  if (mode === "offset")
     return {
-      tick: (seconds: number) => ({ time: relative(seconds), date: "" }),
-      tooltip: (seconds: number) => `${relative(seconds)} s`,
+      tick: (seconds: number) => ({ time: exact(seconds), date: "" }),
+      tooltip: (seconds: number) => `${exact(seconds)} s`,
       axisTime: (seconds: number) => relative(seconds),
       tickOffset: 0,
       minTickSpacing: 70,
       clock: false,
-      axisLabel: "Seconds from run start",
+      axisLabel: "Offset (s)",
     };
   const clock = new Intl.DateTimeFormat("en-GB", {
     timeZone,

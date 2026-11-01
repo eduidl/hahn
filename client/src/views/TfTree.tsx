@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useTimeFormatter } from "../timeDisplay";
+import { secondsFrom } from "../data/data";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { get } from "../data/sources";
 import { usePlaybackNs, useTransforms, type FrameInfo } from "../data/useViewData";
 import { errorMessage, type Info, type Schemas } from "../types";
@@ -255,7 +257,9 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
                 <span>Transform unavailable at this time</span>
               ) : (
                 <>
-                  <span>Time: {transforms.time_ns} ns</span>
+                  <span>
+                    Time: {clock.tooltip(secondsFrom(transforms.time_ns, info!.start_ns))}
+                  </span>
                   <span>Translation (m):</span>
                   {pose.translation.map((value, i) => (
                     <span key={i}>
