@@ -40,7 +40,13 @@ it("keeps the displayed texture while the next image is decoding", async () => {
     data: { $blob: { offset: 0, length: 1 } },
   };
   const frame = (time: string) => ({ time_ns: time, value, blob: () => new Uint8Array([1]) });
-  const stage = { scene: new THREE.Scene(), invalidate: vi.fn(), fit: vi.fn(), reframe: vi.fn() };
+  const stage = {
+    scene: new THREE.Scene(),
+    invalidate: vi.fn(),
+    fit: vi.fn(),
+    reframe: vi.fn(),
+    resetView: vi.fn(),
+  };
   const series = {
     key: "camera",
     source: "r/0",
@@ -123,7 +129,13 @@ it("uses raw pixels as a 3D camera texture", async () => {
     },
     blob: () => Uint8Array.from([255, 0, 0, 0, 255, 0]),
   };
-  const stage = { scene: new THREE.Scene(), invalidate: vi.fn(), fit: vi.fn(), reframe: vi.fn() };
+  const stage = {
+    scene: new THREE.Scene(),
+    invalidate: vi.fn(),
+    fit: vi.fn(),
+    reframe: vi.fn(),
+    resetView: vi.fn(),
+  };
   const series = {
     key: "camera",
     source: "r/0",
