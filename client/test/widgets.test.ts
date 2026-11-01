@@ -100,7 +100,7 @@ describe("widget workspace", () => {
     });
     state = reduce(state, { type: "add", target: "widget-2", duplicate: true });
     expect(state.widgets["widget-3"].type).toBe("state");
-    expect(state.widgets["widget-1"].type).toBe("time-series");
+    expect(state.widgets["widget-1"].type).toBe("plot");
   });
   it("preserves views during layout and selection changes and clears series on recording change", () => {
     let state = reduce(initialWorkspace(), {
@@ -223,7 +223,7 @@ describe("widget workspace", () => {
     let state = reduce(initialWorkspace(), addAt("state", "widget-1", "left"));
     expect(state.layout).toMatchObject({ direction: "row", children: ["widget-2", "widget-1"] });
     expect(state.widgets["widget-2"].type).toBe("state");
-    state = reduce(state, addAt("time-series", "widget-1", "bottom"));
+    state = reduce(state, addAt("plot", "widget-1", "bottom"));
     expect(state.layout).toMatchObject({
       direction: "row",
       children: ["widget-2", { direction: "column", children: ["widget-1", "widget-3"] }],

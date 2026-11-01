@@ -47,16 +47,16 @@ describe("adding from the widget list", () => {
     reduce(state, addSelectedAction(state, type));
 
   it("adds beside the selected widget", () => {
-    const state = add(initialWorkspace(), "log");
+    const state = add(initialWorkspace(), "value-changes");
     expect(leaves(state.layout)).toEqual(["widget-1", "widget-2"]);
     expect(state.activeId).toBe("widget-2");
   });
   it("adds to the empty root when nothing is selected", () => {
     const empty = reduce(initialWorkspace(), { type: "remove", id: "widget-1" });
-    expect(leaves(add(empty, "log").layout)).toHaveLength(1);
+    expect(leaves(add(empty, "value-changes").layout)).toHaveLength(1);
   });
   it("adds into the open tab when a Tab widget is selected", () => {
-    const state = add(initial(), "log");
+    const state = add(initial(), "value-changes");
     expect(leaves(state.layout)).toEqual(["widget-1"]);
     expect(leaves(containerLayout(state, first))).toEqual([state.activeId]);
     invariant(state);
@@ -67,13 +67,13 @@ describe("adding from the widget list", () => {
     invariant(state);
   });
   it("adds a Tab beside the Tab widget holding the selected child", () => {
-    const state = add(add(initial(), "log"), "tabs");
+    const state = add(add(initial(), "value-changes"), "tabs");
     expect(leaves(state.layout)).toHaveLength(2);
     expect(state.widgets[state.activeId!].type).toBe("tabs");
     invariant(state);
   });
   it("adds beside a selected child inside its tab", () => {
-    const state = add(add(initial(), "log"), "table");
+    const state = add(add(initial(), "value-changes"), "table");
     expect(leaves(state.layout)).toEqual(["widget-1"]);
     expect(leaves(containerLayout(state, first))).toHaveLength(2);
     invariant(state);
@@ -83,10 +83,7 @@ describe("adding from the widget list", () => {
 describe("Tab workspace", () => {
   it("uses unnumbered default names while keeping distinct widget and tab IDs", () => {
     let state = reduce(initialWorkspace(), { type: "add", duplicate: true });
-    expect(Object.values(state.widgets).map((w) => w.title)).toEqual([
-      "Time series",
-      "Time series",
-    ]);
+    expect(Object.values(state.widgets).map((w) => w.title)).toEqual(["Plot", "Plot"]);
     expect(Object.keys(state.widgets)).toEqual(["widget-1", "widget-2"]);
     state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "tabs" });
     state = reduce(state, { type: "tab-add", id: "widget-1" });

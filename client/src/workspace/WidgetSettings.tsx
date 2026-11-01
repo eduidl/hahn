@@ -370,7 +370,7 @@ function LegendSetting({ widget, dispatch }: WidgetSettingsProps) {
   );
 }
 
-function TimeSeriesSettings(props: WidgetSettingsProps) {
+function PlotSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
@@ -407,7 +407,7 @@ function StateSettings(props: WidgetSettingsProps) {
 }
 
 /** Values change over time as rows; the dot color tells the series apart. */
-function LogSettings(props: WidgetSettingsProps) {
+function ValueChangesSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
@@ -720,10 +720,10 @@ const settingsByType: Record<Widget["type"], (props: WidgetSettingsProps) => Rea
     props.widget.type === "tabs" ? (
       <TabSettings widget={props.widget} dispatch={props.dispatch} />
     ) : null,
-  "time-series": TimeSeriesSettings,
+  plot: PlotSettings,
   state: StateSettings,
   raw: SingleTargetSettings,
-  log: LogSettings,
+  "value-changes": ValueChangesSettings,
   table: SingleTargetSettings,
   image: ImageSettings,
   scene: SceneSettings,

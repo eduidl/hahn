@@ -122,19 +122,20 @@ function stateSegments(series: Series, fullEnd: number) {
   if (current) segments.push(current);
   return segments;
 }
-function StatePlayhead({ fullEnd }: { fullEnd: number }) {
+function StatePlayhead({ domain }: { domain: AxisRange }) {
   const time = usePlayback((s) => s.time);
-  const ratio = Math.max(0, Math.min(1, time / fullEnd));
+  const ratio = (time - domain[0]) / (domain[1] - domain[0]);
+  if (ratio < 0 || ratio > 1) return null;
   return <div className="playhead" style={{ left: `${ratio * 100}%`, top: 0, bottom: 0 }} />;
 }
 
-/** The time axis under the rows, with the same ticks as a Time series plot. */
+/** The time axis under the rows, with the same ticks as a Plot widget. */
 export function StateAxis({
   formatter,
-  fullEnd,
+  domain,
 }: {
   formatter: ReturnType<typeof useTimeFormatter>;
-  fullEnd: number;
+  domain: AxisRange;
 }) {
   const axis = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -144,7 +145,7 @@ export function StateAxis({
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
-  const { values, step } = timeTicks(0, fullEnd, {
+  const { values, step } = timeTicks(domain[0], domain[1], {
     width,
     minSpacing: formatter.minTickSpacing,
     offset: formatter.tickOffset,
@@ -152,46 +153,72 @@ export function StateAxis({
   });
   let shownDate = "";
   return (
-    <div className="state-row state-axis-row">
-      <div />
-      <div className="state-axis" ref={axis}>
-        {values.map((value) => {
-          const text = formatter.axisTime(value, step);
-          const { date } = formatter.tick(value);
-          const showDate = date && date !== shownDate;
-          if (showDate) shownDate = date;
-          // Keep edge labels inside the axis; 3.2px is about half a character here.
-          const half = Math.max(text.length, showDate ? date.length : 0) * 3.2;
-          const center = (value / fullEnd) * width;
-          return (
-            <span key={value} style={{ left: Math.max(half, Math.min(width - half, center)) }}>
-              {text}
-              {showDate && <small>{date}</small>}
-            </span>
-          );
-        })}
-      </div>
+    <div className="state-axis" ref={axis}>
+      {values.map((value) => {
+        const text = formatter.axisTime(value, step);
+        const { date } = formatter.tick(value);
+        const showDate = date && date !== shownDate;
+        if (showDate) shownDate = date;
+        // Keep edge labels inside the axis; 3.2px is about half a character here.
+        const half = Math.max(text.length, showDate ? date.length : 0) * 3.2;
+        const center = ((value - domain[0]) / (domain[1] - domain[0])) * width;
+        return (
+          <span key={value} style={{ left: Math.max(half, Math.min(width - half, center)) }}>
+            {text}
+            {showDate && <small>{date}</small>}
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-function StatePlot({
+export function StatePlot({
   widget,
   series,
   fullEnd,
   originNs,
+  onViewChange,
 }: {
   widget: Widget;
   series: Series[];
   fullEnd: number;
   originNs: string | null;
+  onViewChange: (update: (view: PlotView) => PlotView) => void;
 }) {
   const formatter = useTimeFormatter(originNs, widget.timeDisplay);
   const playback = usePlaybackStore();
+  const domain = axisRange([0, fullEnd], widget.view.x);
+  const plot = useRef<HTMLDivElement>(null);
+  // Latest values for the listener below, which is attached only once.
+  const zoom = useRef({ view: widget.view.x, onViewChange });
+  zoom.current = { view: widget.view.x, onViewChange };
+  useEffect(() => {
+    const node = plot.current!;
+    // Non-passive to stop the scroll, which React's onWheel cannot do. Only bars and the axis
+    // zoom, so the wheel over a label can still scroll a long list of rows.
+    const onWheel = (event: WheelEvent) => {
+      const target = (event.target as Element).closest(".state-track, .state-axis");
+      const delta = event.deltaY || event.deltaX;
+      if (!target || !delta) return;
+      event.preventDefault();
+      const { view, onViewChange } = zoom.current;
+      if (delta > 0 && view.zoom <= 1) return;
+      const rect = target.getBoundingClientRect();
+      const anchor = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      const factor = delta > 0 ? 1 / wheelZoomFactor : wheelZoomFactor;
+      onViewChange((current) => ({
+        ...current,
+        x: clampAxis(zoomAxis(current.x, factor, anchor)),
+      }));
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
   useEffect(() => () => playback.setPreview(null), [playback]);
   const timeAt = (event: MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    return ((event.clientX - rect.left) / rect.width) * fullEnd;
+    return domain[0] + ((event.clientX - rect.left) / rect.width) * (domain[1] - domain[0]);
   };
   const visible = series.filter((s) => !s.hidden);
   const segments = useMemo(
@@ -199,21 +226,24 @@ function StatePlot({
     [visible, fullEnd],
   );
   return (
-    <div className="state-plot" aria-label="State transitions">
+    <div className="state-plot" ref={plot} aria-label="State transitions">
       {visible.map((s) => (
         <div className="state-row" key={s.key}>
           <div className="state-label">
-            <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
+            <SeriesName inline source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
           </div>
           <div
             className="state-track"
             onClick={(event) => playback.seek(timeAt(event))}
+            onDoubleClick={() => onViewChange(() => defaultPlotView())}
             onPointerMove={(event) => playback.setPreview(timeAt(event))}
             onPointerLeave={() => playback.setPreview(null)}
           >
             {(segments.get(s.key) ?? []).map((segment, i) => {
-              const left = Math.max(0, Math.min(100, (segment.start / fullEnd) * 100));
-              const right = Math.max(left, Math.min(100, (segment.end / fullEnd) * 100));
+              if (segment.end < domain[0] || segment.start > domain[1]) return null;
+              const span = domain[1] - domain[0];
+              const left = Math.max(0, Math.min(100, ((segment.start - domain[0]) / span) * 100));
+              const right = Math.max(left, Math.min(100, ((segment.end - domain[0]) / span) * 100));
               return (
                 <div
                   key={`${segment.ns}-${i}`}
@@ -233,11 +263,11 @@ function StatePlot({
                 </div>
               );
             })}
-            <StatePlayhead fullEnd={fullEnd} />
+            <StatePlayhead domain={domain} />
           </div>
         </div>
       ))}
-      <StateAxis formatter={formatter} fullEnd={fullEnd} />
+      <StateAxis formatter={formatter} domain={domain} />
     </div>
   );
 }
@@ -312,11 +342,7 @@ function WidgetDropTarget({
   );
 }
 
-function TimeSeriesWindow({
-  widget,
-  path,
-  ...props
-}: Props & { widget: Widget; path: MosaicPath }) {
+function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path: MosaicPath }) {
   const { state, dispatch, data, info, fullEnd, revision, dragVerdict, drop, openSettings } = props;
   const moving = useContext(MoveContext);
   const sourceNames = useContext(SourceNames);
@@ -411,7 +437,7 @@ function TimeSeriesWindow({
           ))}
         </>
       ) : null,
-    "time-series": () => (
+    plot: () => (
       <Plot
         series={widgetSeries(widget, data)}
         fullEnd={fullEnd}
@@ -440,6 +466,7 @@ function TimeSeriesWindow({
         series={widgetSeries(widget, data)}
         fullEnd={fullEnd}
         originNs={info?.start_ns ?? null}
+        onViewChange={onViewChange}
       />
     ),
     table: () => (
@@ -463,8 +490,8 @@ function TimeSeriesWindow({
         <MapView widget={widget} info={info} />
       </Suspense>
     ),
-    log: () => (
-      <LogView
+    "value-changes": () => (
+      <ValueChangesView
         widget={widget}
         series={widgetSeries(widget, data)}
         originNs={info?.start_ns ?? null}
@@ -702,7 +729,7 @@ function TimeSeriesWindow({
                     {selection || "No topic selected"}
                   </span>
                   <div className="toolbar">
-                    {widget.type === "time-series" && (
+                    {widget.type === "plot" && (
                       <div className="drag-mode" role="group" aria-label="Drag mode">
                         <button
                           aria-pressed={widget.mode === "pan"}
@@ -718,9 +745,12 @@ function TimeSeriesWindow({
                         </button>
                       </div>
                     )}
-                    {widget.type === "time-series" && (
+                    {(widget.type === "plot" || widget.type === "state") && (
                       <button
-                        disabled={!info || !canReset}
+                        disabled={
+                          !info ||
+                          !(widget.type === "state" ? !isDefaultView(widget.view.x) : canReset)
+                        }
                         onClick={() => onViewChange(() => defaultPlotView())}
                       >
                         Reset
@@ -826,7 +856,7 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
           </div>
         }
         renderTile={(id, path) => (
-          <TimeSeriesWindow key={id} {...workspaceProps} widget={state.widgets[id]} path={path} />
+          <WidgetWindow key={id} {...workspaceProps} widget={state.widgets[id]} path={path} />
         )}
       />
     </div>

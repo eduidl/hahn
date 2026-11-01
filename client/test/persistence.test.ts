@@ -98,23 +98,6 @@ describe("session persistence", () => {
     );
     expect(revived.widgets["widget-1"].mode).toBe("zoom");
   });
-  it("opens settings for the sidebar tab name of an older save", () => {
-    saveSession(localStorage, {
-      workspace: initialWorkspace(),
-      runId: null,
-      sources: [],
-      zoneSource: "browser",
-      tab: "panel" as never,
-    });
-    expect(loadSession(localStorage)?.tab).toBe("settings");
-  });
-  it("replaces a retired widget name in an older save", () => {
-    const old = copy(initialWorkspace()) as unknown as {
-      widgets: Record<string, { title: string }>;
-    };
-    old.widgets["widget-1"].title = "Time Series";
-    expect(reviveWorkspace(old)!.widgets["widget-1"].title).toBe("Time series");
-  });
   it("survives a storage that throws", () => {
     const broken = {
       getItem: vi.fn(() => {

@@ -73,7 +73,7 @@ Follow these rules for all text a user can see or hear, including tooltips and `
 
 ### Widget names
 
-Time series, State transition, Log, Table, Raw message, Image, 3D, Map, TF tree, Data source info, Tabs.
+Plot, State transition, Value changes, Table, Raw message, Image, 3D, Map, TF tree, Data source info, Tabs.
 
 Each name is defined once, as `label` in `widgetSpecs`. The widget list, title bar, and menus all use it.
 
@@ -91,7 +91,7 @@ Each name is defined once, as `label` in `widgetSpecs`. The widget list, title b
 
 ### Style
 
-- Use sentence case: `Time series`, not `Time Series`. Keep the usual form of proper nouns and abbreviations such as `TF`, `3D`, and `OpenStreetMap`.
+- Use sentence case: `State transition`, not `State Transition`. Keep the usual form of proper nouns and abbreviations such as `TF`, `3D`, and `OpenStreetMap`.
 - Write headings in sentence case in the source. Use CSS for all-caps display.
 - Start buttons and menu items with a verb. The exception is an add button, which uses `+ Noun` (`+ Widget`, `+ Field`, `+ Tab`) and has `aria-label="Add widget"` or similar.
 - End complete sentences with a period. Leave it off fragments and labels: `No errors`, `Show all`.
