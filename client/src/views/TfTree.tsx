@@ -49,6 +49,8 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
   const [selected, setSelected] = useState<{ run: string; id: string }>();
   const [view, setView] = useState<{ x: number; y: number; width: number; height: number }>();
   const drag = useRef<{ x: number; y: number }>(undefined);
+  const [poseOffset, setPoseOffset] = useState({ x: 0, y: 0 });
+  const poseDrag = useRef<{ x: number; y: number }>(undefined);
   useEffect(() => {
     if (!runId) return;
     const controller = new AbortController();
@@ -96,6 +98,15 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
         height,
       };
     });
+  const movePose = (handle: HTMLElement, dx: number, dy: number) => {
+    const panel = handle.parentElement!.getBoundingClientRect();
+    const container = handle.parentElement!.parentElement!.getBoundingClientRect();
+    if (container.width && container.height) {
+      dx = Math.max(container.left - panel.left, Math.min(dx, container.right - panel.right));
+      dy = Math.max(container.top - panel.top, Math.min(dy, container.bottom - panel.bottom));
+    }
+    setPoseOffset((offset) => ({ x: offset.x + dx, y: offset.y + dy }));
+  };
   if (!runId) return <p className="tf-tree-status">Open a run from the header</p>;
   if (!state) return <p className="tf-tree-status">Loading…</p>;
   if (state.error)
@@ -180,15 +191,56 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
         ))}
       </svg>
       {frame && (
-        <div className="tf-tree-pose">
-          <strong>{frame.id}</strong>
+        <div
+          className="tf-tree-pose"
+          style={{ transform: `translate(${poseOffset.x}px, ${poseOffset.y}px)` }}
+        >
+          <strong
+            className="tf-tree-pose-handle"
+            role="button"
+            tabIndex={0}
+            aria-label={`Move details for ${frame.id}`}
+            title="Drag or use arrow keys to move"
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              poseDrag.current = { x: event.clientX, y: event.clientY };
+            }}
+            onPointerMove={(event) => {
+              if (!poseDrag.current) return;
+              const dx = event.clientX - poseDrag.current.x;
+              const dy = event.clientY - poseDrag.current.y;
+              poseDrag.current = { x: event.clientX, y: event.clientY };
+              movePose(event.currentTarget, dx, dy);
+            }}
+            onPointerUp={() => {
+              poseDrag.current = undefined;
+            }}
+            onPointerCancel={() => {
+              poseDrag.current = undefined;
+            }}
+            onKeyDown={(event) => {
+              const delta: Record<string, [number, number]> = {
+                ArrowLeft: [-10, 0],
+                ArrowRight: [10, 0],
+                ArrowUp: [0, -10],
+                ArrowDown: [0, 10],
+              };
+              const movement = delta[event.key];
+              if (!movement) return;
+              event.preventDefault();
+              movePose(event.currentTarget, movement[0], movement[1]);
+            }}
+          >
+            {frame.id}
+          </strong>
           {frame.parent === null ? (
             <span>Root frame</span>
           ) : !parent ? (
             <span>Parent frame unavailable: {frame.parent}</span>
           ) : (
             <>
-              <span>Relative to last recorded parent: {parent}</span>
+              <span>Parent Frame: {parent}</span>
               {transformError ? (
                 <span role="alert">{transformError}</span>
               ) : !info ? (
@@ -200,8 +252,18 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
               ) : (
                 <>
                   <span>Time: {transforms.time_ns} ns</span>
-                  <span>Translation (m): {pose.translation.join(", ")}</span>
-                  <span>Rotation (x, y, z, w): {pose.rotation.join(", ")}</span>
+                  <span>Translation (m):</span>
+                  {pose.translation.map((value, i) => (
+                    <span key={i}>
+                      {["x", "y", "z"][i]}: {value}
+                    </span>
+                  ))}
+                  <span>Rotation:</span>
+                  {pose.rotation.map((value, i) => (
+                    <span key={i}>
+                      {["x", "y", "z", "w"][i]}: {value}
+                    </span>
+                  ))}
                 </>
               )}
             </>

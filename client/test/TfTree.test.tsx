@@ -104,10 +104,13 @@ it("shows the selected frame relative to its last recorded parent at playback ti
     </PlaybackContext.Provider>,
   );
   fireEvent.click(await screen.findByRole("button", { name: "base, parent world" }));
-  expect(await screen.findByText("Relative to last recorded parent: world")).toBeTruthy();
-  expect(await screen.findByText("Translation (m): 1, 2, 3")).toBeTruthy();
+  expect(await screen.findByText("Parent Frame: world")).toBeTruthy();
+  expect(await screen.findByText("x: 1")).toBeTruthy();
+  const handle = screen.getByRole("button", { name: "Move details for base" });
+  fireEvent.keyDown(handle, { key: "ArrowRight" });
+  expect(handle.parentElement?.style.transform).toBe("translate(10px, 0px)");
   act(() => store.seek(1));
-  expect(await screen.findByText("Translation (m): 2, 2, 3")).toBeTruthy();
+  expect(await screen.findByText("x: 2")).toBeTruthy();
   act(() => store.seek(2));
   expect(await screen.findByText("Transform unavailable at this time")).toBeTruthy();
   fireEvent.keyDown(screen.getByRole("button", { name: "world" }), { key: "Enter" });

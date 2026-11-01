@@ -2045,3 +2045,5 @@ header .add-widget {
 .view-image .projection-error {
   top: 38px;
 }
+
+.tf-tree-pose-handle { cursor: move; touch-action: none; }
