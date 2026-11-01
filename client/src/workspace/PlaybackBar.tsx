@@ -49,6 +49,9 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
   const playing = usePlayback((s) => s.playing);
   const preview = usePlayback((s) => s.preview);
   const buffering = useSyncExternalStore(store.subscribe, store.isBuffering);
+  const waiting = playing && buffering;
+  const active = busy || waiting;
+  const status = waiting ? "Buffering…" : busy ? "Receiving data" : "Ready";
   const speed = usePlayback((s) => s.speed);
   const loop = usePlayback((s) => s.loop);
   const disabled = info === null;
@@ -216,15 +219,10 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
         {icon("M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z")}
       </button>
       <div className="playback-status">
-        <span role="status">
-          <i className={busy || (playing && buffering) ? "pulse" : ""} />
-          {playing && buffering ? "Buffering…" : busy ? "Receiving data" : "READY"}
+        <span role="status" title={status}>
+          <i className={active ? "pulse" : ""} />
+          <span className="sr-only">{status}</span>
         </span>
-        {busy && (
-          <button className="stop-loading" onClick={stop}>
-            Stop
-          </button>
-        )}
       </div>
     </footer>
   );

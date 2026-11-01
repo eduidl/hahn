@@ -477,11 +477,12 @@ export function App() {
                   + Widget
                 </button>
                 <div
-                  id="widget-catalog"
-                  className="widget-catalog"
-                  popover="auto"
-                  role="dialog"
-                  aria-label="Add widget"
+                  className={sidebarOpen ? "workspace" : "workspace sidebar-closed"}
+                  style={
+                    sidebarWidth === null
+                      ? undefined
+                      : ({ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties)
+                  }
                 >
                   <p className="help">
                     Click to add next to the selected widget, or drag to a position.

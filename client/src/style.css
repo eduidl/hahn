@@ -86,7 +86,6 @@ header {
   height: 6px;
   border-radius: 50%;
   background: #91b8ff;
-  margin-right: 9px;
 }
 .workspace {
   display: grid;
@@ -514,6 +513,13 @@ canvas {
   gap: 8px;
   margin-bottom: 16px;
   font: 12px ui-monospace, monospace;
+}
+.target-summary.removable {
+  flex-direction: row;
+  align-items: center;
+}
+.target-summary.removable .series-ref-inline {
+  flex: 1;
 }
 .target-setting > .add-field {
   margin: 0;
@@ -1831,7 +1837,9 @@ header .add-widget {
   white-space: nowrap;
 }
 .playback-status > span {
-  min-width: 14ch;
+  display: flex;
+  align-items: center;
+  padding: 6px;
 }
 @media (max-width: 640px) {
   .playback-bar {
