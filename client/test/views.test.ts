@@ -24,6 +24,7 @@ const topic = (name: string, kinds: string[]): Topic => ({
 const index = buildFieldIndex([
   topic("/camera", ["image"]),
   topic("/lidar", ["pointcloud"]),
+  topic("/odom", ["pose"]),
   topic("/plain", []),
 ]);
 function widgetOf(type: Widget["type"]) {
@@ -42,7 +43,7 @@ describe("widgets showing views", () => {
     expect(addableFields(index, widgetOf("map").widgets["widget-1"])).toEqual([]);
     expect(
       addableFields(index, widgetOf("scene").widgets["widget-1"]).map((entry) => entry.topic.topic),
-    ).toEqual(["/camera", "/lidar"]);
+    ).toEqual(["/camera", "/lidar", "/odom"]);
     const plot = widgetOf("time-series").widgets["widget-1"];
     expect(addableFields(index, plot).map((entry) => entry.label)).toContain("/camera · x");
   });

@@ -120,6 +120,76 @@ function PointsLayer({
   ) : null;
 }
 
+/** The latest pose, with the arrow pointing along the body's positive x axis. */
+export function PoseLayer({
+  series,
+  info,
+  target,
+  stage,
+}: {
+  series: Selected;
+  info: Info | null;
+  target: string | null;
+  stage: Stage;
+}) {
+  const { frame, error } = useViewFrame(series, info);
+  const value = frame?.value?.kind === "pose" ? frame.value : undefined;
+  const frameId = value?.frame_id;
+  const { transforms, error: transformError } = useTransforms(
+    series.source,
+    target,
+    frame?.time_ns ?? null,
+  );
+  const placement =
+    target && frameId && target !== frameId ? transforms?.frames[frameId] : undefined;
+  const missing = !!target && !!frameId && target !== frameId && !!transforms && !placement;
+  const arrow = useMemo(() => {
+    const arrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(),
+      1,
+      series.color,
+    );
+    arrow.matrixAutoUpdate = false;
+    return arrow;
+  }, []);
+  useEffect(() => {
+    stage.scene.add(arrow);
+    return () => {
+      stage.scene.remove(arrow);
+      arrow.dispose();
+      stage.invalidate();
+    };
+  }, [arrow, stage]);
+  useEffect(() => {
+    arrow.visible =
+      !series.hidden && !!value && !!frameId && (!target || target === frameId || !!placement);
+    arrow.setColor(new THREE.Color(series.color));
+    if (value) {
+      const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
+      arrow.matrix.copy(placement ? matrixOf(placement).multiply(pose) : pose);
+      arrow.matrixWorldNeedsUpdate = true;
+    }
+    stage.invalidate();
+  }, [arrow, value, frameId, target, placement, series.hidden, series.color, stage]);
+  const problem =
+    error ||
+    frame?.error ||
+    transformError ||
+    (value && !frameId ? "Pose has no frame ID" : "") ||
+    (missing ? `No transform from ${frameId} to ${target} at this time` : "");
+  return (
+    <>
+      {info && <PoseTrail series={series} info={info} target={target} stage={stage} />}
+      {problem && (
+        <p className="view-error">
+          {series.topicName ?? series.topic}: {problem}
+        </p>
+      )}
+    </>
+  );
+}
+
 /** An image on its camera's pinhole image plane, one meter from the origin. */
 export function CameraLayer({
   series,
@@ -481,10 +551,11 @@ export default function Scene3D({
       <div className="view-problems">
         {problem && <p className="view-error">{problem}</p>}
         {stage &&
-          widget.series.map((series) =>
-            index.topics
+          widget.series.map((series) => {
+            const kind = index.topics
               .get(topicKey(series.source, series.topic))
-              ?.views.find((view) => view.id === series.view)?.kind === "image" ? (
+              ?.views.find((view) => view.id === series.view)?.kind;
+            return kind === "image" ? (
               <CameraLayer
                 key={series.key}
                 series={series}
@@ -492,6 +563,14 @@ export default function Scene3D({
                 target={target}
                 stage={stage}
                 index={index}
+              />
+            ) : kind === "pose" ? (
+              <PoseLayer
+                key={series.key}
+                series={series}
+                info={info}
+                target={target}
+                stage={stage}
               />
             ) : (
               <PointsLayer
@@ -501,8 +580,8 @@ export default function Scene3D({
                 target={target}
                 stage={stage}
               />
-            ),
-          )}
+            );
+          })}
       </div>
     </div>
   );
