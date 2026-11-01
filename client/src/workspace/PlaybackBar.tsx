@@ -47,6 +47,7 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
   const store = usePlaybackStore();
   const time = usePlayback((s) => s.time);
   const playing = usePlayback((s) => s.playing);
+  const preview = usePlayback((s) => s.preview);
   const buffering = useSyncExternalStore(store.subscribe, store.isBuffering);
   const speed = usePlayback((s) => s.speed);
   const loop = usePlayback((s) => s.loop);
@@ -179,6 +180,9 @@ export function PlaybackBar({ info, fullEnd, busy, stop }: Props) {
         <div className="playback-rail">
           <div className="playback-progress" style={{ width: percent(time) }} />
         </div>
+        {preview !== null && !disabled && preview >= 0 && preview <= fullEnd && (
+          <div className="playback-preview" style={{ left: percent(preview) }} />
+        )}
         <div className="playback-thumb" style={{ left: percent(time) }} />
         {hover !== null && !disabled && (
           <div className="playback-hover" style={{ left: percent(hover) }}>

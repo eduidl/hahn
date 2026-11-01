@@ -5,6 +5,7 @@ import {
   useContext,
   useCallback,
   useEffect,
+  type MouseEvent,
   useRef,
   useMemo,
   useState,
@@ -30,7 +31,7 @@ import type { OpenSource } from "../data/sources";
 import { ImageView } from "../views/ImageView";
 import { SeriesName } from "../SeriesName";
 import { SourceNames } from "../data/sources";
-import { usePlayback } from "./playback";
+import { usePlayback, usePlaybackStore } from "./playback";
 import { dragMime, type Info } from "../types";
 import {
   addAt,

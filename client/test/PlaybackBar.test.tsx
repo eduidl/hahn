@@ -63,6 +63,17 @@ describe("PlaybackBar", () => {
     expect(store.getState().time).toBeCloseTo(0.1);
   });
 
+  it("marks the previewed time, but only inside the recording", () => {
+    const store = renderBar();
+    const marker = () => document.querySelector<HTMLElement>(".playback-preview");
+    expect(marker()).toBeNull();
+    act(() => store.setPreview(2.5));
+    expect(marker()!.style.left).toBe("25%");
+    act(() => store.setPreview(11));
+    expect(marker()).toBeNull();
+    act(() => store.setPreview(null));
+    expect(marker()).toBeNull();
+  });
   it("ignores shortcuts typed into form controls", () => {
     const store = renderBar();
     fireEvent.keyDown(screen.getByRole("combobox"), { key: " " });

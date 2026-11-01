@@ -7,6 +7,8 @@ export type PlaybackState = {
   speed: number;
   loop: boolean;
   end: number;
+  /** Where a click on a plot would seek to, shown on the playback bar. */
+  preview: number | null;
 };
 
 export const playbackSpeeds = [0.1, 0.25, 0.5, 1, 2, 5, 10];
@@ -36,6 +38,7 @@ export function createPlaybackStore(
     speed: 1,
     loop: false,
     end: 0,
+    preview: null,
   };
   const listeners = new Set<() => void>();
   const waiting = new Set<symbol>();
@@ -92,12 +95,15 @@ export function createPlaybackStore(
     play,
     pause,
     toggle: () => (state.playing ? pause() : play()),
+    setPreview: (preview: number | null) => {
+      if (preview !== state.preview) set({ ...state, preview });
+    },
     seek: (time: number) => update({ time: clamp(time, state.end) }),
     step: (dt: number) => update({ time: clamp(state.time + dt, state.end) }),
     setSpeed: (speed: number) => update({ speed }),
     setLoop: (loop: boolean) => update({ loop }),
     /** Rewind and stop for a new recording, keeping speed and loop preferences. */
-    reset: (end: number) => update({ time: 0, playing: false, end }),
+    reset: (end: number) => update({ time: 0, playing: false, end, preview: null }),
   };
 }
 
