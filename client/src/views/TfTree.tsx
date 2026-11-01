@@ -142,9 +142,13 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
         onPointerMove={(event) => {
           if (!drag.current) return;
           const rect = event.currentTarget.getBoundingClientRect();
-          const dx = ((event.clientX - drag.current.x) * viewport.width) / Math.max(rect.width, 1);
-          const dy =
-            ((event.clientY - drag.current.y) * viewport.height) / Math.max(rect.height, 1);
+          // The tree keeps its aspect ratio, so both axes share the scale of the tighter one.
+          const unitsPerPixel = Math.max(
+            viewport.width / Math.max(rect.width, 1),
+            viewport.height / Math.max(rect.height, 1),
+          );
+          const dx = (event.clientX - drag.current.x) * unitsPerPixel;
+          const dy = (event.clientY - drag.current.y) * unitsPerPixel;
           drag.current = { x: event.clientX, y: event.clientY };
           setView((current) => ({
             ...(current ?? bounds),

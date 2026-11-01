@@ -116,3 +116,37 @@ it("shows the selected frame relative to its last recorded parent at playback ti
   fireEvent.keyDown(screen.getByRole("button", { name: "world" }), { key: "Enter" });
   expect(screen.getByText("Root frame")).toBeTruthy();
 });
+
+it("pans by the same amount on both axes when the tree is letterboxed", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        frames: [{ id: "world", parent: null, children: [] }],
+      }),
+    ),
+  );
+  const { container } = render(
+    <PlaybackContext.Provider value={createPlaybackStore()}>
+      <TfTree
+        runId="run"
+        info={{ start_ns: "1000000000", end_ns: "11000000000", message_count: 1 }}
+      />
+    </PlaybackContext.Provider>,
+  );
+  await screen.findByRole("button", { name: "world" });
+  const svg = container.querySelector("svg")!;
+  svg.setPointerCapture = () => {};
+  // Much wider than the tree, so that the height decides the scale.
+  svg.getBoundingClientRect = () => ({ width: 1000, height: 100 }) as DOMRect;
+  const [, , width, height] = svg.getAttribute("viewBox")!.split(" ").map(Number);
+  const unitsPerPixel = Math.max(width / 1000, height / 100);
+  const pointer = (type: string, clientX: number, clientY: number) =>
+    fireEvent(svg, new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY }));
+  pointer("pointerdown", 100, 50);
+  pointer("pointermove", 110, 60);
+  const [x, y] = svg.getAttribute("viewBox")!.split(" ").map(Number);
+  expect(x).toBeCloseTo(-10 * unitsPerPixel);
+  expect(y).toBeCloseTo(-10 * unitsPerPixel);
+});
+
