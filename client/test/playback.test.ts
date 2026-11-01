@@ -7,6 +7,7 @@ const state = (patch: Partial<PlaybackState> = {}): PlaybackState => ({
   speed: 1,
   loop: false,
   end: 10,
+  preview: null,
   ...patch,
 });
 
@@ -120,6 +121,14 @@ describe("createPlaybackStore", () => {
     expect(store.isBuffering()).toBe(false);
   });
 
+  it("sets and clears the preview without moving the playhead", () => {
+    const { store } = manualStore();
+    store.reset(10);
+    store.setPreview(4);
+    expect(store.getState()).toMatchObject({ preview: 4, time: 0 });
+    store.reset(10);
+    expect(store.getState().preview).toBeNull();
+  });
   it("reset rewinds and stops but keeps speed and loop", () => {
     const { store } = manualStore();
     store.reset(10);
@@ -134,6 +143,7 @@ describe("createPlaybackStore", () => {
       speed: 2,
       loop: true,
       end: 20,
+      preview: null,
     });
   });
 });

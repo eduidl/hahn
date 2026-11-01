@@ -99,11 +99,11 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
       };
     });
   const movePose = (handle: HTMLElement, dx: number, dy: number) => {
-    const panel = handle.parentElement!.getBoundingClientRect();
+    const box = handle.parentElement!.getBoundingClientRect();
     const container = handle.parentElement!.parentElement!.getBoundingClientRect();
     if (container.width && container.height) {
-      dx = Math.max(container.left - panel.left, Math.min(dx, container.right - panel.right));
-      dy = Math.max(container.top - panel.top, Math.min(dy, container.bottom - panel.bottom));
+      dx = Math.max(container.left - box.left, Math.min(dx, container.right - box.right));
+      dy = Math.max(container.top - box.top, Math.min(dy, container.bottom - box.bottom));
     }
     setPoseOffset((offset) => ({ x: offset.x + dx, y: offset.y + dy }));
   };

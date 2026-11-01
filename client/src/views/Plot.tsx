@@ -229,6 +229,7 @@ export function Plot({
     node.style.top = `${Math.max(0, y)}px`;
   });
   const xAt = (x: number) => domain[0] + ((x - left) / w) * (domain[1] - domain[0]);
+  useEffect(() => () => playback.setPreview(null), [playback]);
   const clearDrag = () => {
     dragRef.current = null;
     setDrag(null);
@@ -396,7 +397,7 @@ export function Plot({
     <div className="plot-wrap">
       <canvas
         ref={canvas}
-        aria-label={`Time series plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis. Double-click to reset.`}
+        aria-label={`Time series plot. Drag to ${mode === "pan" ? "pan" : "zoom the time range"}. Click to move the playback position. Scroll to zoom the horizontal axis, or Shift-scroll for the vertical axis. Double-click to reset.`}
         style={{
           cursor: mode === "pan" ? (drag ? "grabbing" : "grab") : "crosshair",
         }}
@@ -414,6 +415,9 @@ export function Plot({
           setCursor(x);
           setPointerY(e.clientY - e.currentTarget.getBoundingClientRect().top);
           const active = dragRef.current;
+          const canvasY = e.clientY - e.currentTarget.getBoundingClientRect().top;
+          const inPlot =
+            pointerX >= left && pointerX <= left + w && canvasY >= top && canvasY <= top + h;
           if (active) {
             const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
             const next = {
@@ -431,10 +435,12 @@ export function Plot({
               setYView(panAxis(active.yView, (y - active.startY) / h));
             }
           }
+          playback.setPreview(inPlot && !dragRef.current?.moved ? xAt(pointerX) : null);
         }}
         onPointerLeave={() => {
           setCursor(null);
           setPointerY(null);
+          playback.setPreview(null);
         }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;

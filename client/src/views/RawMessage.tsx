@@ -165,7 +165,7 @@ export function RawMessage({
               {formatter.tooltip(secondsFrom(message.time_ns, info!.start_ns))}
             </span>
             <button onClick={expandAll}>Expand all</button>
-            <button onClick={resetFolding}>Reset view</button>
+            <button onClick={resetFolding}>Reset</button>
           </div>
           <Node
             key={`${series.key}:${info?.start_ns}`}

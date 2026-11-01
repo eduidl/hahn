@@ -1725,6 +1725,15 @@ header .add-widget {
   height: 100%;
   background: #5f7fb3;
 }
+.playback-preview {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 16px;
+  background: #f5c542;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
 .playback-thumb {
   position: absolute;
   top: 50%;
