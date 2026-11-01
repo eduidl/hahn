@@ -196,6 +196,32 @@ it("zooms from the fitted view and returns to it with Fit", async () => {
   rect.mockRestore();
 });
 
+describe("zoomViewport", () => {
+  const size = { width: 400, height: 200 };
+  const limits: [number, number] = [100, 4000];
+  /** The unit shown at a pixel, for a view letterboxed and centered in `size`. */
+  const unitAt = (view: ReturnType<typeof fitViewport>, x: number, y: number) => {
+    const scale = Math.max(view.width / size.width, view.height / size.height);
+    return {
+      x: view.x + view.width / 2 + (x - size.width / 2) * scale,
+      y: view.y + view.height / 2 + (y - size.height / 2) * scale,
+    };
+  };
+  it.each([
+    ["matching", { x: 10, y: 20, width: 400, height: 200 }],
+    ["letterboxed", { x: 10, y: 20, width: 200, height: 200 }],
+  ])("keeps the unit under the pointer on a %s view", (_name, view) => {
+    const zoomed = zoomViewport(view, 0.8, { x: 50, y: 150 }, size, limits);
+    expect(zoomed.width).toBeCloseTo(view.width * 0.8);
+    expect(unitAt(zoomed, 50, 150).x).toBeCloseTo(unitAt(view, 50, 150).x);
+    expect(unitAt(zoomed, 50, 150).y).toBeCloseTo(unitAt(view, 50, 150).y);
+  });
+  it("does not move at the width limit", () => {
+    const view = { x: 10, y: 20, width: 100, height: 50 };
+    expect(zoomViewport(view, 0.8, { x: 50, y: 150 }, size, limits)).toEqual(view);
+  });
+});
+
 it("zooms at the pointer with the wheel and stops the page from scrolling", async () => {
   vi.stubGlobal(
     "fetch",

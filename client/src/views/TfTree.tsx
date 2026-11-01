@@ -66,6 +66,32 @@ export function fitViewport(bounds: Viewport, size: { width: number; height: num
   };
 }
 
+/**
+ * Scales a view while the unit under `pointer` stays put. `pointer` is in pixels
+ * from the element's corner; a view of another aspect ratio is letterboxed and
+ * centered, as the SVG default does. `width` is limited to `[minWidth, maxWidth]`.
+ */
+export function zoomViewport(
+  view: Viewport,
+  factor: number,
+  pointer: { x: number; y: number },
+  size: { width: number; height: number },
+  [minWidth, maxWidth]: [number, number],
+): Viewport {
+  const width = Math.max(minWidth, Math.min(maxWidth, view.width * factor));
+  const ratio = width / view.width;
+  const height = view.height * ratio;
+  const unitsPerPixel = Math.max(view.width / size.width, view.height / size.height);
+  const fromCenterX = (pointer.x - size.width / 2) * unitsPerPixel * (1 - ratio);
+  const fromCenterY = (pointer.y - size.height / 2) * unitsPerPixel * (1 - ratio);
+  return {
+    x: view.x + (view.width - width) / 2 + fromCenterX,
+    y: view.y + (view.height - height) / 2 + fromCenterY,
+    width,
+    height,
+  };
+}
+
 export function TfTree({ runId, info }: { runId: string | null; info: Info | null }) {
   const [loaded, setLoaded] = useState<{ run: string; frames: FrameInfo[]; error: string }>();
   const [selected, setSelected] = useState<{ run: string; id: string }>();
@@ -122,20 +148,32 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
     width: Math.max(220, ...nodes.map((n) => n.x + 110)),
     height: Math.max(80, ...nodes.map((n) => n.y + 40)),
   };
-  const viewport = view ?? bounds;
-  const zoom = (factor: number) =>
-    setView((current) => {
-      const old = current ?? bounds;
-      const width = Math.max(100, Math.min(bounds.width * 8, old.width * factor));
-      const ratio = width / old.width;
-      const height = old.height * ratio;
-      return {
-        x: old.x + (old.width - width) / 2,
-        y: old.y + (old.height - height) / 2,
-        width,
-        height,
-      };
-    });
+  const fitted = fitViewport(bounds, size);
+  const viewport = view ?? fitted;
+  /** Zooms around `pointer`, or the center without one. */
+  const zoom = (factor: number, pointer?: { x: number; y: number }) => {
+    const element = { width: size.width || 1, height: size.height || 1 };
+    const center = { x: element.width / 2, y: element.height / 2 };
+    setView((current) =>
+      zoomViewport(current ?? fitted, factor, pointer ?? center, element, [100, fitted.width * 8]),
+    );
+  };
+  const latestZoom = useRef(zoom);
+  latestZoom.current = zoom;
+  useEffect(() => {
+    if (!svg) return;
+    // Non-passive to stop the scroll, which React's onWheel cannot do.
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      latestZoom.current(event.deltaY < 0 ? 0.8 : 1.25, {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      });
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [svg]);
   const movePose = (handle: HTMLElement, dx: number, dy: number) => {
     const box = handle.parentElement!.getBoundingClientRect();
     const container = handle.parentElement!.parentElement!.getBoundingClientRect();
@@ -169,10 +207,6 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
         ref={setSvg}
         aria-label="Transform tree"
         viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
-        onWheel={(event) => {
-          event.preventDefault();
-          zoom(event.deltaY < 0 ? 0.8 : 1.25);
-        }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           event.currentTarget.setPointerCapture(event.pointerId);
