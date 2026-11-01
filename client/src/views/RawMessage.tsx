@@ -2,7 +2,7 @@ import { memo, useMemo, useRef } from "react";
 import { secondsFrom } from "../data/data";
 import { useCurrentMessage } from "../data/useCurrentMessage";
 import { useTimeFormatter } from "../timeDisplay";
-import { keyOf, type Info, type Selected } from "../types";
+import { keyOf, topicKey, type Info, type Selected } from "../types";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 
@@ -110,6 +110,17 @@ const Node = memo(function MessageNode({
   );
 });
 
+/** A JSON topic's only field holds the whole message, so its name adds nothing. */
+function shownValue(value: Json, series: Selected, index: FieldIndex): Json {
+  const topic = index.topics.get(topicKey(series.source, series.topic));
+  return topic?.schema_encoding === "jsonschema" &&
+    !series.path.length &&
+    isObject(value) &&
+    Object.hasOwn(value, "json")
+    ? value.json
+    : value;
+}
+
 /** The selected topic or field as it was at the playback position. */
 export function RawMessage({
   widget,
@@ -159,7 +170,7 @@ export function RawMessage({
           <Node
             key={`${series.key}:${info?.start_ns}`}
             name={series.path.length ? series.path.join(".") : (series.topicName ?? series.topic)}
-            value={message.value}
+            value={shownValue(message.value, series, index)}
             depth={0}
             path={[]}
             folding={folding}

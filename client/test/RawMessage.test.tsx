@@ -140,3 +140,40 @@ it("keeps individually opened nodes across loading and resets them for a differe
   rerender(<RawMessage widget={other} info={info} index={emptyIndex} />);
   expect(container.querySelectorAll("details")[1].open).toBe(false);
 });
+
+it("shows a JSON topic's document directly under the topic", () => {
+  const state = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "raw" });
+  const widget = state.widgets["widget-2"];
+  widget.series = [
+    {
+      key: keyOf("r/0", "/status", []),
+      source: "r/0",
+      topic: "/status",
+      path: [],
+      hidden: false,
+      color: "red",
+      lineWidth: 1,
+    },
+  ];
+  const topic = (schema_encoding: string): Topic => ({
+    source: "r/0",
+    topic: "/status",
+    schema_name: "Status",
+    schema_encoding,
+    views: [],
+    message_count: 1,
+    error: null,
+    fields: [{ path: ["json"], data_type: "string" }],
+  });
+  const info = { start_ns: "0", end_ns: "1", message_count: 1 };
+  current.message = { time_ns: "0", value: { json: { speed: 1.5 } } };
+  const keys = (root: HTMLElement) =>
+    [...root.querySelectorAll(".raw-key")].map((key) => key.textContent);
+  const { container, rerender } = render(
+    <RawMessage widget={widget} info={info} index={buildFieldIndex([topic("jsonschema")])} />,
+  );
+  expect(keys(container)).toEqual(["/status", "speed"]);
+  // Elsewhere, a field that happens to be called json is an ordinary field.
+  rerender(<RawMessage widget={widget} info={info} index={buildFieldIndex([topic("ros2msg")])} />);
+  expect(keys(container)).toEqual(["/status", "json", "speed"]);
+});
