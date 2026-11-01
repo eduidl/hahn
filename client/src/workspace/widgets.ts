@@ -237,7 +237,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     sameKind: false,
     maxSeries: Infinity,
     loadsSeries: false,
-    viewKinds: new Set(["pointcloud", "image"]),
+    viewKinds: new Set(["pointcloud", "image", "pose"]),
   },
   map: {
     label: "Map",

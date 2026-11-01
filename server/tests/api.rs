@@ -1882,3 +1882,57 @@ async fn raw_image_view_preserves_pixels_and_rejects_invalid_messages() {
     assert!(events[2].0["error"].as_str().unwrap().contains("encoding"));
     assert!(events[3].0["error"].as_str().unwrap().contains("even"));
 }
+
+#[tokio::test]
+async fn odometry_provides_a_validated_pose_view() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_odometry(&dir.path().join("odom.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    assert_eq!(topics[0]["views"][0]["kind"], "pose");
+    let (_, events) = frames(&app, &view_url("views", "/odometry", "pose", "")).await;
+    assert_eq!(
+        events[0].0["value"],
+        json!({"kind":"pose", "frame_id":"map", "pose":{"position":[2.,3.,4.], "orientation":[0.,0.,0.,1.]}})
+    );
+    assert!(events[1].0["error"].as_str().unwrap().contains("no pose"));
+    assert!(
+        events[2].0["error"]
+            .as_str()
+            .unwrap()
+            .contains("Non-finite")
+    );
+}
+
+#[tokio::test]
+async fn pose_history_resolves_transforms_at_each_recorded_time() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_odometry(&dir.path().join("odom.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, events) = frames(
+        &app,
+        &view_url("views", "/odometry", "pose", "&target_frame=fixed"),
+    )
+    .await;
+    assert_eq!(events[0].0["value"]["frame_id"], "fixed");
+    assert_eq!(
+        events[0].0["value"]["pose"]["position"],
+        json!([12., 3., 4.])
+    );
+    assert!(events[1].0["error"].is_string());
+    assert_eq!(
+        events[3].0["value"]["pose"]["position"],
+        json!([26., 0., 0.])
+    );
+    let (_, missing) = frames(
+        &app,
+        &view_url("views", "/odometry", "pose", "&target_frame=unknown"),
+    )
+    .await;
+    assert!(
+        missing[0].0["error"]
+            .as_str()
+            .unwrap()
+            .contains("No transform")
+    );
+}

@@ -28,6 +28,7 @@ pub(crate) fn converters() -> Vec<Arc<dyn Converter>> {
         Arc::new(RawImage),
         Arc::new(CameraCalibration),
         Arc::new(PointCloud),
+        Arc::new(Odometry),
         Arc::new(Geo),
     ]
 }
@@ -441,6 +442,34 @@ impl Converter for RawImage {
         );
         Ok(
             json!({"kind":"image", "frame_id":frame_id(message)?, "format":"raw", "width":width, "height":height, "step":step, "encoding":encoding, "data":payload.add(data)}),
+        )
+    }
+}
+
+/// The current body pose from `foxglove.Odometry`.
+struct Odometry;
+
+impl Converter for Odometry {
+    fn id(&self) -> &'static str {
+        "pose"
+    }
+    fn kind(&self) -> &'static str {
+        "pose"
+    }
+    fn name(&self) -> &'static str {
+        "Pose"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "foxglove.Odometry"
+            && has(defs, "frame_id", is_string)
+            && has(defs, "pose", is_struct)
+    }
+    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
+        let pose = message.child("pose")?.context("Odometry has no pose")?;
+        let position = vector(pose.child("position")?)?;
+        let orientation = quaternion(pose.child("orientation")?)?;
+        Ok(
+            json!({"kind":"pose", "frame_id":frame_id(message)?, "pose":{"position":position, "orientation":orientation}}),
         )
     }
 }

@@ -807,3 +807,115 @@ pub fn write_raw_images(path: &Path) -> anyhow::Result<()> {
     writer.finish()?;
     Ok(())
 }
+
+#[derive(Clone, PartialEq, Message)]
+struct Odometry {
+    #[prost(string, tag = "2")]
+    frame_id: String,
+    #[prost(string, tag = "3")]
+    body_frame_id: String,
+    #[prost(message, optional, tag = "4")]
+    pose: Option<Pose>,
+}
+
+#[allow(dead_code)]
+pub fn write_odometry(path: &Path) -> anyhow::Result<()> {
+    let mut descriptor = FileDescriptorSet::decode(foxglove_descriptor().as_slice())?;
+    descriptor.file[0].message_type.push(message(
+        "Odometry",
+        vec![
+            field("frame_id", 2, Type::String, None),
+            field("body_frame_id", 3, Type::String, None),
+            field("pose", 4, Type::Message, Some(".foxglove.Pose")),
+        ],
+    ));
+    let mut writer = mcap::Writer::new(File::create(path)?)?;
+    let schema = writer.add_schema("foxglove.Odometry", "protobuf", &descriptor.encode_to_vec())?;
+    let channel = writer.add_channel(schema, "/odometry", "protobuf", &Default::default())?;
+    for (time, pose) in [
+        (
+            1,
+            Some(Pose {
+                position: Some(Vector3 {
+                    x: 2.,
+                    y: 3.,
+                    z: 4.,
+                }),
+                orientation: Some(Quaternion {
+                    x: 0.,
+                    y: 0.,
+                    z: 0.,
+                    w: 2.,
+                }),
+            }),
+        ),
+        (2, None),
+        (
+            3,
+            Some(Pose {
+                position: Some(Vector3 {
+                    x: f64::NAN,
+                    y: 0.,
+                    z: 0.,
+                }),
+                orientation: None,
+            }),
+        ),
+        (
+            4,
+            Some(Pose {
+                position: Some(Vector3 {
+                    x: 1.,
+                    y: 0.,
+                    z: 0.,
+                }),
+                orientation: None,
+            }),
+        ),
+    ] {
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id: channel,
+                sequence: time as u32,
+                log_time: time,
+                publish_time: time,
+            },
+            &Odometry {
+                frame_id: "map".into(),
+                body_frame_id: "robot".into(),
+                pose,
+            }
+            .encode_to_vec(),
+        )?;
+    }
+    let tf_schema = writer.add_schema(
+        "foxglove.FrameTransform",
+        "protobuf",
+        &foxglove_descriptor(),
+    )?;
+    let tf_channel = writer.add_channel(tf_schema, "/tf", "protobuf", &Default::default())?;
+    for (time, x) in [(1, 10.), (5, 30.)] {
+        writer.write_to_known_channel(
+            &mcap::records::MessageHeader {
+                channel_id: tf_channel,
+                sequence: time as u32,
+                log_time: time,
+                publish_time: time,
+            },
+            &FrameTransform {
+                parent_frame_id: "fixed".into(),
+                child_frame_id: "map".into(),
+                translation: Some(Vector3 { x, y: 0., z: 0. }),
+                rotation: Some(Quaternion {
+                    x: 0.,
+                    y: 0.,
+                    z: 0.,
+                    w: 1.,
+                }),
+            }
+            .encode_to_vec(),
+        )?;
+    }
+    writer.finish()?;
+    Ok(())
+}
