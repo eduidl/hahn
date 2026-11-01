@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { TabBar } from "./TabControls";
+import { timeTicks } from "../views/ticks";
 import { Mosaic, MosaicWindow, type MosaicPath } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
 import { Plot, defaultPlotView, type PlotView, type Series } from "../views/Plot";
@@ -127,6 +128,53 @@ function StatePlayhead({ fullEnd }: { fullEnd: number }) {
   return <div className="playhead" style={{ left: `${ratio * 100}%`, top: 0, bottom: 0 }} />;
 }
 
+/** The time axis under the rows, with the same ticks as a Time series plot. */
+export function StateAxis({
+  formatter,
+  fullEnd,
+}: {
+  formatter: ReturnType<typeof useTimeFormatter>;
+  fullEnd: number;
+}) {
+  const axis = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const node = axis.current!;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const { values, step } = timeTicks(0, fullEnd, {
+    width,
+    minSpacing: formatter.minTickSpacing,
+    offset: formatter.tickOffset,
+    clock: formatter.clock,
+  });
+  let shownDate = "";
+  return (
+    <div className="state-row state-axis-row">
+      <div />
+      <div className="state-axis" ref={axis}>
+        {values.map((value) => {
+          const text = formatter.axisTime(value, step);
+          const { date } = formatter.tick(value);
+          const showDate = date && date !== shownDate;
+          if (showDate) shownDate = date;
+          // Keep edge labels inside the axis; 3.2px is about half a character here.
+          const half = Math.max(text.length, showDate ? date.length : 0) * 3.2;
+          const center = (value / fullEnd) * width;
+          return (
+            <span key={value} style={{ left: Math.max(half, Math.min(width - half, center)) }}>
+              {text}
+              {showDate && <small>{date}</small>}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StatePlot({
   widget,
   series,
@@ -189,11 +237,7 @@ function StatePlot({
           </div>
         </div>
       ))}
-      <div className="state-axis">
-        <span>{formatter.tick(0).time}</span>
-        <span>{formatter.tick(fullEnd / 2).time}</span>
-        <span>{formatter.tick(fullEnd).time}</span>
-      </div>
+      <StateAxis formatter={formatter} fullEnd={fullEnd} />
     </div>
   );
 }
