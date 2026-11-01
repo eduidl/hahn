@@ -196,8 +196,7 @@ export function StatePlot({
   zoom.current = { view: widget.view.x, onViewChange };
   useEffect(() => {
     const node = plot.current!;
-    // Non-passive to stop the scroll, which React's onWheel cannot do. Only bars and the axis
-    // zoom, so the wheel over a label can still scroll a long list of rows.
+    // Non-passive to stop the scroll, which React's onWheel cannot do.
     const onWheel = (event: WheelEvent) => {
       const target = (event.target as Element).closest(".state-track, .state-axis");
       const delta = event.deltaY || event.deltaX;

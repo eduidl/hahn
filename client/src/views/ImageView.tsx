@@ -138,6 +138,27 @@ export function ImageView({
       return { frame: imageFrame, calibration: matches[0], clouds: resolved };
     },
   );
+  const [view, setView] = useState(fullImage);
+  const root = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; y: number }>(undefined);
+  useEffect(() => setView(fullImage), [identity]);
+  useEffect(() => {
+    const node = root.current!;
+    // Non-passive to stop the scroll, which React's onWheel cannot do.
+    const onWheel = (event: WheelEvent) => {
+      if (!node.querySelector(".view-image-stage > img, .view-image-stage > canvas")) return;
+      event.preventDefault();
+      const rect = node.getBoundingClientRect();
+      const pointer = {
+        x: (event.clientX - rect.left) / Math.max(rect.width, 1),
+        y: (event.clientY - rect.top) / Math.max(rect.height, 1),
+      };
+      const factor = event.deltaY < 0 ? wheelZoomFactor : 1 / wheelZoomFactor;
+      setView((current) => zoomImage(current, factor, pointer));
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
   const [decodeError, setDecodeError] = useState("");
   const [display, setDisplay] = useState<{
     bundle: Bundle;
