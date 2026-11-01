@@ -469,8 +469,12 @@ export function App() {
                   </div>
                 </div>
 
-                <button className="add-widget" popoverTarget="widget-catalog">
-                  + Add widget
+                <button
+                  className="add-widget"
+                  aria-label="Add widget"
+                  popoverTarget="widget-catalog"
+                >
+                  + Widget
                 </button>
                 <div
                   id="widget-catalog"
