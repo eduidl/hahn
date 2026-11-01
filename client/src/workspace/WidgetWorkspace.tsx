@@ -446,7 +446,6 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
         revision={revision}
         mode={widget.mode}
         legend={widget.legend}
-        selectedCount={widget.series.length}
         view={widget.view}
         onViewChange={onViewChange}
         onCanReset={setCanReset}
@@ -725,8 +724,8 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
             <>
               {!selfContained && (
                 <div className="widget-plot-toolbar">
-                  <span className="widget-selection" title={selection || undefined}>
-                    {selection || "No topic selected"}
+                  <span className="widget-selection" title={selection}>
+                    {selection}
                   </span>
                   <div className="toolbar">
                     {widget.type === "plot" && (

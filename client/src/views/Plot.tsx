@@ -54,13 +54,20 @@ type Props = {
   mode: DragMode;
   legend: LegendSettings;
   /** Series chosen in the widget, including ones whose data has not arrived yet. */
-  selectedCount: number;
   onCanReset: (canReset: boolean) => void;
   onToggleSeries: (key: string) => void;
 };
 const right = 24,
   top = 30;
 export const wheelZoomFactor = 1.1;
+
+/** Floats to 6 significant digits; other values as they are, because integers must stay exact. */
+export function tooltipValue(raw: Point["raw"], dataType: string | undefined): string {
+  if (raw === null) return "—";
+  if (typeof raw === "number" && dataType?.startsWith("float") && Number.isFinite(raw))
+    return String(Number(raw.toPrecision(6)));
+  return String(raw);
+}
 const axisFont = "11px ui-monospace, monospace";
 let measureContext: CanvasRenderingContext2D | null | undefined;
 /** Rendered width of a tick label, measured once per call on a shared canvas. */
@@ -102,7 +109,6 @@ export function Plot({
   onViewChange,
   mode,
   legend,
-  selectedCount,
   onCanReset,
   onToggleSeries,
 }: Props) {
@@ -520,9 +526,8 @@ export function Plot({
         onDoubleClick={reset}
       />
       <Playhead domain={domain} left={left} top={top} w={w} h={h} />
-      {legend.visible && (
+      {legend.visible && series.length > 0 && (
         <div className="plot-legend" style={legendStyle}>
-          {!selectedCount && <span className="plot-legend-empty">Add a field</span>}
           {series.map((s) => (
             <button
               key={s.key}
