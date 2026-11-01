@@ -99,12 +99,13 @@ describe("message history loading", () => {
         ),
       ),
     );
-    const { result } = renderHook(() => useMessages("1000000000", widgets()));
+    const { result, rerender } = renderHook(({ selected }) => useMessages("1000000000", selected), {
+      initialProps: { selected: widgets() },
+    });
     await waitFor(() => expect(result.current.records[0]?.rows).toHaveLength(1));
-    act(() => result.current.stop());
+    rerender({ selected: {} });
     await waitFor(() => expect(result.current.busy).toBe(false));
-    expect(result.current.records[0].status).toBe("stopped");
-    expect(result.current.records[0].rows).toHaveLength(1);
+    expect(result.current.records).toEqual([]);
   });
   it("reports premature EOF and works under StrictMode", async () => {
     vi.stubGlobal(

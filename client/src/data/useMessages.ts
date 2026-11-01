@@ -10,7 +10,7 @@ export type MessageRecord = {
   topic: string;
   topicName?: string;
   rows: MessageRow[];
-  status: "loading" | "complete" | "stopped" | "error";
+  status: "loading" | "complete" | "error";
   received: number;
   error?: string;
 };
@@ -120,14 +120,5 @@ export function useMessages(
     const record = cache.current.get(s.key);
     return record ? [record] : [];
   });
-  const stop = () => {
-    for (const [key, controller] of requests.current) {
-      controller.abort();
-      const record = cache.current.get(key);
-      if (record) record.status = "stopped";
-    }
-    requests.current.clear();
-    dirty.current = true;
-  };
-  return { records, revision, stop, busy: records.some((r) => r.status === "loading") };
+  return { records, revision, busy: records.some((r) => r.status === "loading") };
 }

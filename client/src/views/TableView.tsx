@@ -162,9 +162,7 @@ export function TableView({
       ? "Loading…"
       : record.status === "error"
         ? `Loading error · ${record.error}`
-        : record.status === "stopped"
-          ? "Stopped · partial data"
-          : "Complete";
+        : "Complete";
   return (
     <div className="table-view">
       <div className="table-status" role="status">

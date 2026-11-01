@@ -105,7 +105,7 @@ export function App() {
   const [widgetDrag, setWidgetDrag] = useState<Widget["type"] | null>(null);
   const fieldCache = useMemo(() => new FieldCache(), [info?.start_ns]);
   useEffect(() => () => fieldCache.clear(), [fieldCache]);
-  const { plotted, records, revision, stop, busy } = useSeries(
+  const { plotted, records, revision, busy } = useSeries(
     info?.start_ns ?? null,
     demand,
     fieldCache,
