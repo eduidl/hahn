@@ -11,6 +11,8 @@ import {
 import {
   acceptsField,
   maxFieldsPerTopic,
+  selectedViewKind,
+  viewFor,
   widgetSpecs,
   type Widget,
   type WidgetSpec,
