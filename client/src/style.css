@@ -70,7 +70,7 @@ header {
 }
 .brand-detail {
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     monospace;
   letter-spacing: 1.2px;
   color: #909090;
@@ -181,7 +181,7 @@ header .add-widget {
 }
 .eyebrow {
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     monospace;
   letter-spacing: 1.6px;
   text-transform: uppercase;
@@ -230,13 +230,13 @@ select {
 .group-option small {
   grid-column: 2;
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     monospace;
   color: #7c7c7c;
 }
 .file-detail {
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
   color: #919191;
   margin-top: 12px;
@@ -246,7 +246,7 @@ select {
   justify-content: space-between;
   align-items: center;
   padding: 25px 22px 15px;
-  font-size: 11px;
+  font-size: 12px;
   color: #939393;
 }
 .search {
@@ -261,7 +261,7 @@ select {
 }
 .collapse-topics {
   padding: 4px 6px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .search::placeholder {
   color: #818181;
@@ -293,7 +293,7 @@ summary span {
   gap: 9px;
   padding: 9px 12px 9px 24px;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
   align-items: center;
   cursor: pointer;
@@ -317,7 +317,7 @@ summary span {
   flex: 1 1 0;
   min-width: 0;
   color: #6f6f6f;
-  font-size: 10px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -339,7 +339,7 @@ summary span {
   margin: 0;
   padding: 10px 22px;
   border-top: 1px solid #333333;
-  font-size: 11px;
+  font-size: 12px;
   color: #ddab91;
 }
 .sidebar-status:empty {
@@ -350,7 +350,7 @@ input[type="checkbox"] {
   margin: 0;
 }
 .topic-error {
-  font-size: 11px;
+  font-size: 12px;
   color: #ddab91;
   padding: 0 12px;
   overflow-wrap: anywhere;
@@ -358,7 +358,7 @@ input[type="checkbox"] {
 .sidebar-footer {
   padding: 17px 22px;
   border-top: 1px solid #333333;
-  font-size: 10px;
+  font-size: 12px;
   color: #8c8c8c;
   display: flex;
   justify-content: space-between;
@@ -459,7 +459,7 @@ canvas {
   padding: 12px 0 22px;
   color: #8b8b8b;
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     monospace;
 }
 .legend {
@@ -476,7 +476,7 @@ canvas {
   padding: 18px 0 14px;
   color: #989898;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
 }
 .legend-row {
@@ -549,7 +549,7 @@ canvas {
 }
 .table-column-actions button {
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .table-column-option {
   display: flex;
@@ -612,7 +612,7 @@ canvas {
   background: none;
   text-align: left;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
 }
 .field-option + .field-option {
@@ -632,7 +632,7 @@ canvas {
 .series-ref-source,
 .series-ref-type {
   color: #6f6f6f;
-  font-size: 10px;
+  font-size: 12px;
 }
 .series-toggle.dim {
   opacity: 0.35;
@@ -640,7 +640,7 @@ canvas {
 .series-status {
   grid-column: 1 / -1;
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     monospace;
   color: #a0a0a0;
   overflow-wrap: anywhere;
@@ -654,7 +654,7 @@ canvas {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 10px;
+  font-size: 12px;
   color: #a0a0a0;
 }
 .series-style label {
@@ -711,7 +711,7 @@ canvas {
   pointer-events: none;
   max-width: 85%;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
   z-index: 1;
 }
@@ -908,7 +908,7 @@ aside {
   border-bottom: 2px solid transparent;
   background: transparent;
   color: #909090;
-  font-size: 11px;
+  font-size: 12px;
   padding: 14px 3px;
 }
 .sidebar-tabs button[aria-selected="true"] {
@@ -924,7 +924,7 @@ aside {
 }
 .badge {
   font:
-    9px ui-monospace,
+    12px ui-monospace,
     monospace;
   padding: 2px 4px;
   background: #35231e;
@@ -956,7 +956,7 @@ aside {
 .source-heading {
   margin: 12px 4px 6px;
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     monospace;
   letter-spacing: 0.6px;
   color: #9e9e9e;
@@ -971,7 +971,7 @@ aside {
   gap: 7px;
   padding: 11px 12px;
   line-height: 1.6;
-  font-size: 11px;
+  font-size: 12px;
 }
 .topic-group > summary::before {
   content: "›";
@@ -1008,7 +1008,7 @@ summary .topic-name {
 summary .topic-type {
   float: none;
   color: #6f6f6f;
-  font-size: 10px;
+  font-size: 12px;
 }
 /* Topics without messages stay listed but read as unavailable. */
 .topic-group.no-messages {
@@ -1018,10 +1018,10 @@ summary .unreadable {
   float: none;
   flex-shrink: 0;
   color: #d3a28d;
-  font-size: 9px;
+  font-size: 12px;
 }
 .help {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #919191;
   padding: 0 20px;
@@ -1032,7 +1032,7 @@ summary .unreadable {
   align-items: center;
   gap: 8px;
   margin: 0 20px 16px;
-  font-size: 11px;
+  font-size: 12px;
   color: #aaa;
   cursor: pointer;
 }
@@ -1048,7 +1048,7 @@ summary .unreadable {
   margin: 0;
 }
 .configured-topic > summary {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #d4d4d4;
 }
@@ -1058,7 +1058,7 @@ summary .unreadable {
 .remove-source {
   border: 0;
   background: none;
-  font-size: 10px;
+  font-size: 12px;
   color: #888;
   padding: 5px 12px;
   margin-bottom: 10px;
@@ -1074,19 +1074,19 @@ summary .unreadable {
   display: block;
   color: #d5d5d5;
   font:
-    11px/1.7 ui-monospace,
+    12px/1.7 ui-monospace,
     monospace;
   overflow-wrap: anywhere;
 }
 .error-item > span {
   display: block;
   color: #d3a28d;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 7px;
 }
 .error-item p {
   font:
-    10px/1.8 ui-monospace,
+    12px/1.8 ui-monospace,
     monospace;
   color: #999;
   overflow-wrap: anywhere;
@@ -1207,7 +1207,7 @@ header .add-widget {
 }
 .widget-catalog-item span {
   color: #a0a0a0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .widget-shell {
   position: relative;
@@ -1241,7 +1241,7 @@ header .add-widget {
 .widget-drop-label {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   padding: 6px 10px; border: 1px solid #738db8; border-radius: 4px;
-  background: #182337; color: #dfebff; font-size: 11px; white-space: nowrap;
+  background: #182337; color: #dfebff; font-size: 12px; white-space: nowrap;
 }
 .workspace-empty.drop-ready {
   outline: 1px dashed #91b8ff;
@@ -1294,7 +1294,7 @@ header .add-widget {
   color: #c5c5c5;
   box-shadow: none;
   border-bottom: 1px solid #2b2b2b;
-  font-size: 11px;
+  font-size: 12px;
 }
 /* Direct children only: a selected Tabs widget must not light up the widgets inside it. */
 .hahn-mosaic .widget-active > .mosaic-window-toolbar {
@@ -1353,7 +1353,7 @@ header .add-widget {
   position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
   padding: 6px 10px;
   width: max-content;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
   color: #ddd;
   background: #202020;
@@ -1411,7 +1411,7 @@ header .add-widget {
   display: block;
   margin-top: 2px;
   color: #a0a0a0;
-  font-size: 10px;
+  font-size: 12px;
 }
 .widget-actions button {
   display: block;
@@ -1433,7 +1433,7 @@ header .add-widget {
   justify-content: space-between;
   gap: 8px;
   padding: 7px 9px 0;
-  font-size: 10px;
+  font-size: 12px;
   color: #858585;
   flex-shrink: 0;
 }
@@ -1459,7 +1459,7 @@ header .add-widget {
 .source-info-topics th, .source-info-topics td { padding: 4px 12px; border-top: 1px solid #333; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 .source-info-topics th { position: sticky; top: 0; background: #171717; color: #a4a4a4; font-weight: 500; }
 .source-info-topics .number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.tf-tree-pose { width: 260px; box-sizing: border-box; position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; padding: 8px; background: #171717ee; border: 1px solid #3f3f3f; color: #ddd; font: 11px ui-monospace, monospace; overflow-wrap: anywhere; }
+.tf-tree-pose { width: 260px; box-sizing: border-box; position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; padding: 8px; background: #171717ee; border: 1px solid #3f3f3f; color: #ddd; font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
 .tf-tree g[role="button"] { cursor: pointer; }
 .tf-tree g[aria-pressed="true"] rect { stroke: white; stroke-width: 3; }
 .widget-selection {
@@ -1476,7 +1476,7 @@ header .add-widget {
   border-top: 0;
 }
 .widget-content .empty p {
-  font-size: 11px;
+  font-size: 12px;
   padding: 12px;
   text-align: center;
 }
@@ -1489,7 +1489,7 @@ header .add-widget {
   overflow: auto;
   padding: 12px 14px 8px;
   color: #bdbdbd;
-  font-size: 11px;
+  font-size: 12px;
 }
 .state-row {
   display: flex;
@@ -1502,7 +1502,7 @@ header .add-widget {
 .state-label {
   display: flex;
   min-width: 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .state-track {
   position: relative;
@@ -1523,7 +1523,7 @@ header .add-widget {
   overflow: hidden;
   border-right: 1px solid #101317;
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   text-shadow: 0 1px 2px #000;
 }
@@ -1538,7 +1538,7 @@ header .add-widget {
   min-height: 34px;
   margin-top: 7px;
   color: #858585;
-  font-size: 10px;
+  font-size: 12px;
 }
 .state-axis span {
   position: absolute;
@@ -1552,7 +1552,7 @@ header .add-widget {
 }
 .state-axis small {
   color: #6f6f6f;
-  font-size: 10px;
+  font-size: 12px;
 }
 /* Value changes: in time order, one fixed-height row each. */
 .value-changes-view {
@@ -1561,7 +1561,7 @@ header .add-widget {
   display: flex;
   flex-direction: column;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
 }
 .value-changes-header,
@@ -1576,7 +1576,7 @@ header .add-widget {
   padding-top: 6px;
   padding-bottom: 6px;
   color: #858585;
-  font-size: 10px;
+  font-size: 12px;
   border-bottom: 1px solid #242424;
 }
 .value-changes-rows {
@@ -1638,14 +1638,14 @@ header .add-widget {
   overflow: auto;
   padding: 8px 12px 12px;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
   color: #cecece;
 }
 .raw-status {
   margin: 0 0 8px;
   color: #858585;
-  font-size: 10px;
+  font-size: 12px;
 }
 .raw-toolbar {
   position: sticky;
@@ -1666,7 +1666,7 @@ header .add-widget {
 .raw-toolbar button {
   padding: 3px 7px;
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 12px;
 }
 .raw-node > summary {
   display: flex;
@@ -1740,7 +1740,7 @@ header .add-widget {
     gap: 12px;
   }
   header .add-widget {
-    font-size: 11px;
+    font-size: 12px;
     padding: 7px;
   }
 }
@@ -1749,7 +1749,7 @@ header .add-widget {
   flex-direction: column;
   gap: 8px;
   padding: 6px 16px 20px;
-  font-size: 11px;
+  font-size: 12px;
   color: #a0a0a0;
   flex-shrink: 0;
 }
@@ -1760,7 +1760,7 @@ header .add-widget {
   margin: 0;
   padding: 0 16px 20px;
   border: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #a0a0a0;
   flex-shrink: 0;
 }
@@ -1800,7 +1800,7 @@ header .add-widget {
   background: #101010;
   color: #8c8c8c;
   font:
-    11px ui-monospace,
+    12px ui-monospace,
     monospace;
 }
 .playback-controls {
@@ -1832,7 +1832,7 @@ header .add-widget {
 .playback-time small {
   white-space: nowrap;
   color: #808080;
-  font-size: 10px;
+  font-size: 12px;
 }
 .playback-track {
   position: relative;
@@ -1904,7 +1904,7 @@ header .add-widget {
 .playback-speed select {
   width: auto;
   padding: 5px 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .playback-status {
   display: flex;
@@ -1940,7 +1940,7 @@ header .add-widget {
   display: flex;
   flex-direction: column;
   color: #cecece;
-  font: 11px ui-monospace, monospace;
+  font: 12px ui-monospace, monospace;
 }
 .table-status { padding: 6px 12px; color: #858585; flex-shrink: 0; }
 .table-scroll { min-height: 0; flex: 1; overflow: auto; }
@@ -2060,7 +2060,7 @@ header .add-widget {
 .empty-widget-options button { text-align: left; padding: 12px; background: #181818; border: 1px solid #303030; }
 .empty-widget-options button:hover { background: #222; border-color: #738db8; }
 .empty-widget-options strong { display: block; font-size: 12px; font-weight: 500; color: #ddd; }
-.empty-widget-options span { display: block; margin-top: 6px; color: #888; font-size: 11px; line-height: 1.5; }
+.empty-widget-options span { display: block; margin-top: 6px; color: #888; font-size: 12px; line-height: 1.5; }
 .workspace-empty:has(.empty-widget-catalog) { overflow: auto; justify-content: safe center; }
 /* Mosaic wraps custom toolbar content; let our row occupy that full wrapper. */
 .widget-toolbar {

@@ -21,3 +21,10 @@ it("defines every fixed class name the components use", () => {
   );
   expect(missing).toEqual([]);
 });
+
+it("writes no text smaller than 12px", () => {
+  const small = [...css.matchAll(/font(?:-size)?:[^;]*?\b(\d+(?:\.\d+)?)px/g)].filter(
+    (match) => Number(match[1]) < 12,
+  );
+  expect(small.map((match) => match[0])).toEqual([]);
+});

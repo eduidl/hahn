@@ -113,7 +113,7 @@ export function tooltipValue(raw: Point["raw"], dataType: string | undefined): s
     return String(Number(raw.toPrecision(6)));
   return String(raw);
 }
-const axisFont = "11px ui-monospace, monospace";
+const axisFont = "12px ui-monospace, monospace";
 let measureContext: CanvasRenderingContext2D | null | undefined;
 /** Rendered width of a tick label, measured once per call on a shared canvas. */
 function labelWidth(text: string) {
