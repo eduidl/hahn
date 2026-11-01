@@ -584,7 +584,7 @@ export function Plot({
               aria-label={`Toggle visibility for ${[s.topicName ?? s.topic, ...s.path].join(" ")}`}
               onClick={() => onToggleSeries(s.key)}
             >
-              <i style={{ background: s.color }} />
+              <i className="series-dot" style={{ background: s.color }} />
               <SeriesName inline source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
             </button>
           ))}
@@ -600,7 +600,7 @@ export function Plot({
               const p = nearest(s.points, xAt(cursor));
               return (
                 <div key={s.key} className="tooltip-row">
-                  <i style={{ background: s.color }} />
+                  <i className="series-dot" style={{ background: s.color }} />
                   <strong title={p?.ns}>{p ? tooltipValue(p.raw, s.dataType) : "—"}</strong>
                 </div>
               );

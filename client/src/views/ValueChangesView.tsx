@@ -102,7 +102,7 @@ export function ValueChangesView({
         ref={list}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        {!rows.length && <p className="value-changes-empty">No values</p>}
+        {!rows.length && <p className="widget-status">No values</p>}
         <div style={{ height: rows.length * rowHeight, position: "relative" }}>
           {rows.slice(first, last).map((row, offset) => {
             const index = first + offset;
@@ -116,7 +116,7 @@ export function ValueChangesView({
               >
                 <span className="value-changes-time">{formatter.tick(row.x).time}</span>
                 <span className="value-changes-series">
-                  <i style={{ background: s.color }} />
+                  <i className="series-dot" style={{ background: s.color }} />
                   <SeriesName
                     inline
                     source={s.source}
