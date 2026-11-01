@@ -10,11 +10,21 @@ export function TimeZoneSelect({
   serverZone: string | null;
   onChange: (source: TimeZoneSource) => void;
 }) {
+  const browserZone = browserTimeZone();
+  // With nothing to choose between, just say which zone times are shown in.
+  if (!serverZone || serverZone === browserZone)
+    return (
+      <div className="timezone-select">
+        <span>Time zone</span>
+        <span className={`timezone-name ${disabled ? "disabled" : ""}`}>{browserZone}</span>
+      </div>
+    );
   return (
     <label className="timezone-select">
       <span>Time zone</span>
       <select
-        value={serverZone ? source : "browser"}
+        disabled={disabled}
+        value={source}
         onChange={(event) => onChange(event.target.value === "server" ? "server" : "browser")}
       >
         <option value="browser">Browser: {browserZone}</option>
