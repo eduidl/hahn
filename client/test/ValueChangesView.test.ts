@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changes, rowAt } from "../src/views/LogView";
+import { changes, rowAt } from "../src/views/ValueChangesView";
 import type { Series } from "../src/views/Plot";
 
 const series = (

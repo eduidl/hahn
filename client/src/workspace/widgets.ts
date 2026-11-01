@@ -47,10 +47,10 @@ export type Widget = WidgetBase &
   (
     | {
         type:
-          | "time-series"
+          | "plot"
           | "state"
           | "raw"
-          | "log"
+          | "value-changes"
           | "table"
           | "image"
           | "scene"
@@ -169,8 +169,8 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     maxSeries: 0,
     loadsSeries: false,
   },
-  "time-series": {
-    label: "Time series",
+  plot: {
+    label: "Plot",
     description: "Overlay numeric, bool, or enum time series",
     help: "Add numeric, bool, or enum fields. Only fields matching the first series can be combined.",
     emptyHint: "Drop a numeric, bool, or enum field",
@@ -189,8 +189,8 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     maxSeries: Infinity,
     loadsSeries: true,
   },
-  log: {
-    label: "Log",
+  "value-changes": {
+    label: "Value changes",
     description: "List string, enum, or bool value changes in time order",
     help: "Add string, enum, or bool fields. Changes are listed in time order.",
     emptyHint: "Drop a string, enum, or bool field",
@@ -353,7 +353,7 @@ export const addAt = (
   before: edge === "left" || edge === "top",
 });
 
-export const widget = (number: number, type: Widget["type"] = "time-series"): Widget => ({
+export const widget = (number: number, type: Widget["type"] = "plot"): Widget => ({
   id: `widget-${number}`,
   ...(type === "tabs"
     ? {
@@ -599,8 +599,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "add": {
       const target = state.widgets[action.target ?? (action.container ? "" : state.activeId) ?? ""];
       const container = action.container ?? (target ? ownerOf(state, target.id) : undefined);
-      const addedType =
-        action.duplicate && target ? target.type : (action.widgetType ?? "time-series");
+      const addedType = action.duplicate && target ? target.type : (action.widgetType ?? "plot");
       if (!containerExists(state, container) || !canPlaceWidget(addedType, container)) return state;
       const widgets = { ...state.widgets };
       let nextNumber = state.nextNumber;

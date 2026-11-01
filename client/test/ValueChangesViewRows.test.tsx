@@ -37,3 +37,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("names the topic so that the same field of two topics can be told apart", () => {
+  render(
+    <PlaybackContext.Provider value={createPlaybackStore()}>
+      <ValueChangesView
+        widget={initialWorkspace().widgets["widget-1"]}
+        series={[series("/a"), series("/b")]}
+        originNs="0"
+        revision={0}
+      />
+    </PlaybackContext.Provider>,
+  );
+  act(() => resize(500));
+  const names = screen
+    .getAllByRole("button")
+    .map((row) => row.querySelector(".value-changes-series"));
+  expect(names.map((name) => name?.textContent)).toEqual(["/a · mode", "/b · mode"]);
+});

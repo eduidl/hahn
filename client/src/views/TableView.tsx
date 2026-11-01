@@ -292,7 +292,9 @@ export function TableView({
             )}
           </tbody>
         </table>
-        {record?.status === "complete" && !rows.length && <p className="log-empty">No messages</p>}
+        {record?.status === "complete" && !rows.length && (
+          <p className="value-changes-empty">No messages</p>
+        )}
       </div>
     </div>
   );
