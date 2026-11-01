@@ -1,0 +1,5 @@
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
