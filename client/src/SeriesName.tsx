@@ -31,10 +31,13 @@ export function SeriesName({
 }) {
   const label = useSourceLabel(source);
   if (inline) {
-    const name = [label, topic, path.join(".")].filter(Boolean).join(" · ");
+    const field = path.join(".");
+    const parent = label ? `${label} · ${topic}` : topic;
+    // When space runs out the parent gives way, because the field tells series apart.
     return (
-      <span className="series-ref-inline" title={name}>
-        {name}
+      <span className="series-ref-inline" title={field ? `${parent} · ${field}` : parent}>
+        <span className="series-ref-parent">{field ? `${parent} · ` : parent}</span>
+        {field && <span className="series-ref-field">{field}</span>}
       </span>
     );
   }

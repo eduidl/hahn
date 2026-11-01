@@ -35,6 +35,10 @@ export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZo
     return {
       tick: (seconds: number) => ({ time: relative(seconds), date: "" }),
       tooltip: (seconds: number) => `${relative(seconds)} s`,
+      axisTime: (seconds: number) => relative(seconds),
+      tickOffset: 0,
+      minTickSpacing: 70,
+      clock: false,
       axisLabel: "Seconds from run start",
     };
   const clock = new Intl.DateTimeFormat("en-GB", {
@@ -66,8 +70,19 @@ export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZo
       date: `${part("year")}-${part("month")}-${part("day")}`,
     };
   };
+  // The clock time at the axis origin, so ticks can land on round times in this zone.
+  const [hours, minutes, secs] = tick(0).time.split(":").map(Number);
+  const tickOffset = hours * 3600 + minutes * 60 + secs || 0;
   return {
     tick,
+    /** The clock time with only the fraction digits that `step` needs. */
+    axisTime: (seconds: number, step: number) => {
+      const digits = step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3;
+      return tick(seconds).time.slice(0, digits ? 9 + digits : 8);
+    },
+    tickOffset,
+    minTickSpacing: 110,
+    clock: true,
     tooltip: (seconds: number) => {
       const label = tick(seconds);
       return label.date ? `${label.date} ${label.time} (${zone})` : "—";

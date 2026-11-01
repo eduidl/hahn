@@ -42,4 +42,16 @@ describe("usableTimeZone", () => {
     expect(usableTimeZone("Mars/Olympus")).toBeNull();
     expect(usableTimeZone(null)).toBeNull();
   });
+
+  it("trims axis labels to what the tick step needs and exposes the clock offset", () => {
+    const format = timeFormatter("1000000000123000000", "absolute", "UTC");
+    expect(format.tick(0).time).toBe("01:46:40.123");
+    expect(format.tickOffset).toBeCloseTo(6400.123);
+    expect(format.axisTime(0, 5)).toBe("01:46:40");
+    expect(format.axisTime(0, 0.5)).toBe("01:46:40.1");
+    expect(format.axisTime(0, 0.05)).toBe("01:46:40.12");
+    expect(format.axisTime(0, 0.002)).toBe("01:46:40.123");
+    expect(timeFormatter(null, "absolute").tickOffset).toBe(0);
+    expect(timeFormatter("0", "relative").tickOffset).toBe(0);
+  });
 });
