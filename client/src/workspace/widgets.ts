@@ -235,7 +235,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     sameKind: false,
     maxSeries: Infinity,
     loadsSeries: false,
-    viewKinds: new Set(["pointcloud"]),
+    viewKinds: new Set(["pointcloud", "image"]),
   },
   map: {
     label: "Map",
@@ -298,6 +298,12 @@ export function addSeries(
     },
   ];
 }
+/** The selected view kind, independent of converter IDs and topic names. */
+export const selectedViewKind = (index: FieldIndex, series: Selected) =>
+  index.topics
+    .get(topicKey(series.source, series.topic))
+    ?.views.find((view) => view.id === series.view)?.kind;
+
 export const addFieldAction = (
   widget: Widget,
   topic: Pick<Topic, "source" | "topic" | "views" | "topicName">,

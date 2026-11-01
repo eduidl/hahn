@@ -382,10 +382,10 @@ function TimeSeriesWindow({
       />
     ),
     raw: () => <RawMessage widget={widget} info={info} index={props.fieldIndex} />,
-    image: () => <ImageView widget={widget} info={info} />,
+    image: () => <ImageView widget={widget} info={info} index={props.fieldIndex} />,
     scene: () => (
       <Suspense fallback={null}>
-        <Scene3D widget={widget} info={info} />
+        <Scene3D widget={widget} info={info} index={props.fieldIndex} />
       </Suspense>
     ),
     map: () => (

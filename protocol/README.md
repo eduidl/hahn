@@ -70,9 +70,9 @@ Time Series and Table can show a topic from its schema alone, since a number is 
 
 So Hahn defines common types for images, point clouds and the like (Hahn types), and the server converts messages of user types to them. This conversion is called a view. The client deals only in Hahn types and does not need to know user types.
 
-The current views are encoded images, point clouds and GeoJSON (`image`, `pointcloud`, `geo`). The Rust server converts `foxglove.CompressedImage`, `foxglove.PointCloud` and `foxglove.LocationFix`. Other kinds, camera calibration and raw images are design proposals, not implemented capabilities.
+The current views are encoded or raw images, camera calibration, point clouds and GeoJSON (`image`, `camera_calibration`, `pointcloud`, `geo`). The Rust server converts `foxglove.CompressedImage`, `foxglove.RawImage`, `foxglove.CameraCalibration`, `foxglove.PointCloud` and `foxglove.LocationFix`.
 
-The API is the same for these types: `/views` and `/views/latest`, with the views of a topic listed in `/topics`. An image supports `jpeg`, `png`, `webp` and `avif`; `jpg` is normalized to `jpeg`.
+The API is the same for these types: `/views` and `/views/latest`, with the views of a topic listed in `/topics`. An encoded image supports `jpeg`, `png`, `webp` and `avif`; `jpg` is normalized to `jpeg`. Raw images retain their recorded pixels and row stride. Their supported encodings and required dimensions are in the schema.
 
 **In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example.
 
@@ -110,7 +110,7 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 
 A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. Point clouds omit points with non-finite positions. Missing poses use identity; zero-length quaternions also mean identity. These are current converter behaviors, not a general validation policy for future kinds.
 
-The client selects views by supported `kind`. Images in an unsupported format show an error. Current view values do not carry measurement stamps or camera calibration.
+The client selects views by supported `kind`. Images in an unsupported format show an error. Current view values do not carry measurement stamps. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image recording time. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
 
 ## Coordinate frames
 
@@ -158,5 +158,5 @@ Not compressing is faster locally, and compressing wins on slow links. When comp
 - A shortened string cannot be recognized reliably
 - `/messages` transfers a lot (rows of JSON)
 - `known_time_ns` saves the transfer but not the server's work of reading the message
-- Measurement timestamps, clock resets and camera calibration are not implemented
+- Measurement timestamps and clock resets are not implemented
 - Transform and point-cloud placement use recording time, so recording delay can cause spatial errors

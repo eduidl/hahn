@@ -25,6 +25,8 @@ pub(crate) trait Converter: Send + Sync {
 pub(crate) fn converters() -> Vec<Arc<dyn Converter>> {
     vec![
         Arc::new(ImageAdapter(Arc::new(Image))),
+        Arc::new(RawImage),
+        Arc::new(CameraCalibration),
         Arc::new(PointCloud),
         Arc::new(Geo),
     ]
@@ -287,6 +289,51 @@ pub(crate) fn vector(message: Option<Message>) -> anyhow::Result<[f64; 3]> {
     ];
     ensure!(v.iter().all(|v| v.is_finite()), "Non-finite vector");
     Ok(v)
+}
+
+/// `foxglove.CameraCalibration`.
+struct CameraCalibration;
+
+impl Converter for CameraCalibration {
+    fn id(&self) -> &'static str {
+        "camera_calibration"
+    }
+    fn kind(&self) -> &'static str {
+        "camera_calibration"
+    }
+    fn name(&self) -> &'static str {
+        "Camera calibration"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "foxglove.CameraCalibration"
+            && has(defs, "frame_id", is_string)
+            && has(defs, "width", is_number)
+            && has(defs, "height", is_number)
+            && has(defs, "K", is_list)
+            && has(defs, "D", is_list)
+            && has(defs, "distortion_model", is_string)
+    }
+    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
+        let width = message.number("width")?;
+        let height = message.number("height")?;
+        let k = message.numbers("K")?;
+        let d = message.numbers("D")?;
+        ensure!(
+            width.is_finite() && width > 0. && height.is_finite() && height > 0.,
+            "Invalid camera dimensions"
+        );
+        ensure!(
+            k.len() == 9 && k.iter().all(|v| v.is_finite()) && k[0] > 0. && k[4] > 0.,
+            "Invalid camera matrix"
+        );
+        ensure!(
+            d.iter().all(|v| v.is_finite()),
+            "Invalid distortion coefficients"
+        );
+        Ok(
+            json!({"kind":"camera_calibration", "frame_id":frame_id(message)?, "width":width, "height":height, "intrinsics":k, "distortion":d, "distortion_model":message.string("distortion_model")?}),
+        )
+    }
 }
 
 /// `foxglove.CompressedImage`.

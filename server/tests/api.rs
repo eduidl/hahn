@@ -1837,3 +1837,29 @@ async fn gzip_leaves_frames_alone() {
     assert_eq!(response.status(), StatusCode::OK);
     assert!(response.headers().get("content-encoding").is_none());
 }
+
+#[tokio::test]
+async fn camera_calibration_view_validates_and_converts() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_camera_calibration(&dir.path().join("camera.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, events) = frames(
+        &app,
+        &view_url("views", "/calibration", "camera_calibration", ""),
+    )
+    .await;
+    assert_eq!(events[0].0["value"]["frame_id"], "camera");
+    assert_eq!(
+        events[0].0["value"]["intrinsics"],
+        json!([400., 0., 320., 0., 400., 240., 0., 0., 1.])
+    );
+    assert_eq!(events[0].0["value"]["distortion"], json!([0.1]));
+    assert_eq!(events[0].0["value"]["distortion_model"], "plumb_bob");
+    assert!(
+        events[1].0["error"]
+            .as_str()
+            .unwrap()
+            .contains("camera matrix")
+    );
+}
+

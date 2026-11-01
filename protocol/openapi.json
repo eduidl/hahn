@@ -1288,6 +1288,9 @@
           },
           {
             "$ref": "#/components/schemas/GeoValue"
+          },
+          {
+            "$ref": "#/components/schemas/CameraCalibrationValue"
           }
         ]
       },
@@ -1304,7 +1307,7 @@
         }
       },
       "ImageValue": {
-        "description": "An encoded image. The current converter reads foxglove.CompressedImage; raw pixels and calibration are not implemented.",
+        "description": "An encoded image or raw pixel image.",
         "allOf": [
           {
             "$ref": "#/components/schemas/FramedValue"
@@ -1324,18 +1327,19 @@
                 ]
               },
               "format": {
-                "description": "Encoding of the image file. jpg is normalized to jpeg.",
+                "description": "Image file encoding, or raw for pixel data. jpg is normalized to jpeg.",
                 "type": "string",
                 "enum": [
                   "jpeg",
                   "png",
                   "webp",
-                  "avif"
+                  "avif",
+                  "raw"
                 ]
               },
               "data": {
                 "$ref": "#/components/schemas/BlobRef",
-                "description": "Blob of the encoded image file."
+                "description": "Blob of image file bytes, or raw pixel bytes when format is raw."
               },
               "role": {
                 "type": "string",
@@ -1343,8 +1347,70 @@
                   "color"
                 ],
                 "description": "The current converter emits color images."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Raw image width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Raw image height in pixels."
+              },
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Raw image row stride in bytes."
+              },
+              "encoding": {
+                "type": "string",
+                "enum": [
+                  "rgb8",
+                  "rgba8",
+                  "bgr8",
+                  "8UC3",
+                  "bgra8",
+                  "mono8",
+                  "8UC1",
+                  "mono16",
+                  "16UC1",
+                  "32FC1",
+                  "yuv422",
+                  "uyvy",
+                  "yuv422_yuy2",
+                  "yuyv",
+                  "nv12",
+                  "bayer_rggb8",
+                  "bayer_bggr8",
+                  "bayer_gbrg8",
+                  "bayer_grbg8"
+                ],
+                "description": "Pixel encoding for a raw image."
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "format": {
+                      "const": "raw"
+                    }
+                  },
+                  "required": [
+                    "format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "width",
+                    "height",
+                    "step",
+                    "encoding"
+                  ]
+                }
+              }
+            ]
           }
         ],
         "examples": [
@@ -1546,6 +1612,58 @@
             ]
           }
         ]
+      },
+      "CameraCalibrationValue": {
+        "description": "Pinhole camera calibration. Image coordinates have x right and y down; the optical axis is positive z.",
+        "type": "object",
+        "required": [
+          "kind",
+          "frame_id",
+          "width",
+          "height",
+          "intrinsics",
+          "distortion",
+          "distortion_model"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "camera_calibration"
+            ]
+          },
+          "frame_id": {
+            "$ref": "#/components/schemas/FrameId"
+          },
+          "width": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "height": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "intrinsics": {
+            "description": "Row-major 3 by 3 camera matrix K.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 9,
+            "maxItems": 9
+          },
+          "distortion": {
+            "description": "Distortion coefficients; an empty or all-zero array means no distortion.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "distortion_model": {
+            "type": "string",
+            "description": "Name of the distortion model, such as plumb_bob."
+          }
+        }
       }
     },
     "parameters": {

@@ -57,7 +57,13 @@ function FieldPicker({ widget, dispatch, index }: PanelProps) {
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const popover = useRef<HTMLDivElement>(null);
-  const candidates = useMemo(() => addableFields(index, widget), [index, widget]);
+  const candidates = useMemo(
+    () =>
+      addableFields(index, widget).filter(
+        (entry) => !kind || viewFor(widgetSpecs[widget.type], entry.topic)?.kind === kind,
+      ),
+    [index, widget, kind],
+  );
   const needle = query.trim().toLowerCase();
   const matches = needle
     ? candidates.filter((entry) => entry.label.toLowerCase().includes(needle))
