@@ -615,10 +615,15 @@ export default function Scene3D({
   widget,
   info,
   index,
+  onFixedFrame,
+  resetCount,
 }: {
   widget: Widget;
   info: Info | null;
   index: FieldIndex;
+  onFixedFrame: (frame: string) => void;
+  /** Each change returns the camera to its starting place in the current frame. */
+  resetCount: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<Stage>();
@@ -632,9 +637,30 @@ export default function Scene3D({
       setFailure(`Could not start 3D view: ${error instanceof Error ? error.message : error}`);
     }
   }, []);
+  useEffect(() => {
+    if (resetCount) stage?.resetView();
+  }, [resetCount]);
   const sources = widget.series.map((s) => s.source);
   const { frames, error } = useFrames(sources);
-  const requested = fixedFrameOf(widget.fixedFrame, frames);
+  // Unless one was chosen, the scene follows the frame of the first topic added.
+  const { frame: firstFrame } = useViewFrame(
+    widget.fixedFrame === null ? widget.series[0] : undefined,
+    info,
+  );
+  const firstFrameId =
+    firstFrame?.value && "frame_id" in firstFrame.value ? firstFrame.value.frame_id : null;
+  useEffect(() => {
+    if (firstFrameId && frames.some((frame) => frame.id === firstFrameId))
+      onFixedFrame(firstFrameId);
+  }, [firstFrameId, frames]);
+  const world = fixedFrameOf(null, frames);
+  const adopted = firstFrameId && frames.some((frame) => frame.id === firstFrameId);
+  // Held back until the first topic's frame is known: starting from another frame would
+  // carry its view over, away from the data.
+  const deciding = widget.fixedFrame === null && !!widget.series[0] && firstFrame === undefined;
+  const requested = deciding
+    ? null
+    : fixedFrameOf(widget.fixedFrame ?? (adopted ? firstFrameId : null), frames);
   const { target, error: frameError } = useSceneFrame(stage, sources[0], requested, info);
   const problem = failure || error || frameError;
   return (

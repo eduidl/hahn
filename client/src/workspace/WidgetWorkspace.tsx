@@ -497,7 +497,13 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     image: () => <ImageView widget={widget} info={info} index={props.fieldIndex} />,
     scene: () => (
       <Suspense fallback={null}>
-        <Scene3D widget={widget} info={info} index={props.fieldIndex} />
+        <Scene3D
+          widget={widget}
+          info={info}
+          index={props.fieldIndex}
+          onFixedFrame={(value) => dispatch({ type: "fixed-frame", id: widget.id, value })}
+          resetCount={sceneResetCount}
+        />
       </Suspense>
     ),
     map: () => (
