@@ -41,3 +41,12 @@ export function useCameraCalibration(
   return { calibration: matches.length === 1 ? matches[0] : undefined, error };
 }
 
+export function cameraCandidates(index: FieldIndex, series: Selected | undefined) {
+  return [...index.topics.values()]
+    .filter((topic) => series && runUrl(topic.source) === runUrl(series.source))
+    .flatMap((topic) =>
+      topic.views
+        .filter((view) => view.kind === "camera_calibration")
+        .map((view) => ({ source: topic.source, topic: topic.topic, view: view.id })),
+    );
+}

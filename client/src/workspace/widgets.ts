@@ -308,6 +308,7 @@ export const addFieldAction = (
   widget: Widget,
   topic: Pick<Topic, "source" | "topic" | "views" | "topicName">,
   field: Field,
+  index: FieldIndex,
 ): WorkspaceAction => ({
   type: "series",
   id: widget.id,
