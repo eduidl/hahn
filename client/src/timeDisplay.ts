@@ -35,7 +35,7 @@ export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZo
     return {
       tick: (seconds: number) => ({ time: relative(seconds), date: "" }),
       tooltip: (seconds: number) => `${relative(seconds)} s`,
-      axisLabel: "Seconds from recording start",
+      axisLabel: "Seconds from run start",
     };
   const clock = new Intl.DateTimeFormat("en-GB", {
     timeZone,

@@ -171,10 +171,12 @@ describe("Tab widget interactions", () => {
   });
   it("adds, switches, renames and deletes tabs with keyboard navigation", () => {
     render(<Harness />);
-    expect(
-      screen.getByRole("button", { name: "Close Untitled tab" }).hasAttribute("disabled"),
-    ).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Add tab to Tab" }));
+    expect(document.querySelector(".widget-tab-close")!.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(
+      within(screen.getByRole("tablist", { name: "Tabs" })).getByRole("button", {
+        name: "Add tab",
+      }),
+    );
     expect(tab("tab-2").getAttribute("aria-selected")).toBe("true");
     const close = screen.getByRole("button", { name: "Close Untitled tab" });
     expect(close.parentElement).toBe(tab("tab-2").parentElement);

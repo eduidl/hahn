@@ -299,6 +299,21 @@ summary span {
 .topic-field {
   cursor: grab;
 }
+.topic-field:focus-visible,
+.topic-group summary:focus-visible {
+  outline: 2px solid #91b8ff;
+  outline-offset: -2px;
+}
+.sidebar-status {
+  margin: 0;
+  padding: 10px 22px;
+  border-top: 1px solid #333333;
+  font-size: 11px;
+  color: #ddab91;
+}
+.sidebar-status:empty {
+  display: none;
+}
 input[type="checkbox"] {
   accent-color: #91b8ff;
   margin: 0;
@@ -561,6 +576,11 @@ canvas {
 }
 .field-picker-results .muted {
   margin: 8px 10px;
+}
+.field-option[aria-selected="true"] {
+  background: #2a2a2a;
+  outline: 1px solid #91b8ff;
+  outline-offset: -1px;
 }
 .field-option {
   display: flex;
@@ -1031,7 +1051,7 @@ summary .unreadable {
   font-size: 12px;
   border: 1px dashed #5a3a3a;
 }
-.panel-settings:empty {
+.widget-settings:empty {
   min-height: 180px;
 }
 @media (max-width: 900px) and (min-width: 641px) {
@@ -1081,11 +1101,15 @@ header .add-widget {
   padding: 10px;
   border: 1px solid #333;
   border-radius: 4px;
-  cursor: grab;
+  cursor: pointer;
   user-select: none;
 }
 .widget-catalog-item + .widget-catalog-item {
   margin-top: 6px;
+}
+.widget-catalog-item:focus-visible {
+  outline: 2px solid #91b8ff;
+  outline-offset: -1px;
 }
 .widget-catalog-item:hover {
   border-color: #91b8ff;
@@ -1357,6 +1381,7 @@ header .add-widget {
 }
 .state-track {
   position: relative;
+  cursor: pointer;
   height: 24px;
   background: #252a30;
   border-radius: 3px;
