@@ -342,7 +342,11 @@ export function App() {
               <header>
                 <div className="header-start">
                   <div className="brand">
-                    <img className="brand-mark" src="/favicon.svg" alt="" />
+                    <img
+                      className="brand-mark"
+                      src={new URL("./assets/favicon.svg", import.meta.url).href}
+                      alt=""
+                    />
                     hahn
                   </div>
                   <button className="runs-trigger" onClick={() => setRunsOpen(true)}>
