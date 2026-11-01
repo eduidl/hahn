@@ -104,6 +104,19 @@ aside {
   display: flex;
   align-items: center;
   gap: 22px;
+  min-width: 0;
+}
+.runs-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 320px;
+}
+.runs-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .recording-trigger {
   display: grid;

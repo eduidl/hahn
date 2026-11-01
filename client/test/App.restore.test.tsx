@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import { keyOf, type Selected } from "../src/types";
@@ -107,6 +107,30 @@ describe("App session restore", () => {
     const widget = shown().widgets["widget-1"];
     expect(widget.series).toEqual([series]);
     expect(widget.view.x).toEqual({ center: 0.2, zoom: 4 });
+  });
+  it("shows the open run in the header and asks when none is open", async () => {
+    server(() => json(run));
+    const { unmount } = render(<App />);
+    expect(screen.getByRole("button", { name: "Select run" })).toBeTruthy();
+    unmount();
+
+    save();
+    render(<App />);
+    const trigger = await screen.findByRole("button", { name: "Select run: Synthetic" });
+    expect(trigger.textContent).toContain("Synthetic");
+  });
+  it("closes the widget list once a drag has begun, not during dragstart", () => {
+    server(() => json(run));
+    vi.useFakeTimers();
+    render(<App />);
+    const list = document.getElementById("widget-catalog")!;
+    list.hidePopover = vi.fn();
+    fireEvent.dragStart(screen.getByText("Time Series").parentElement!, {
+      dataTransfer: { setData: vi.fn() },
+    });
+    expect(list.hidePopover).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(0);
+    expect(list.hidePopover).toHaveBeenCalledTimes(1);
   });
   it("does not overwrite the session before the restore finishes", async () => {
     save();
