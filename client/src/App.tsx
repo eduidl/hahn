@@ -367,8 +367,20 @@ export function App() {
                     />
                     hahn
                   </div>
-                  <button className="runs-trigger" onClick={() => setRunsOpen(true)}>
-                    Select run
+                  <button
+                    className="runs-trigger"
+                    aria-label={run ? `Select run: ${run.name}` : undefined}
+                    title={run?.name}
+                    onClick={() => setRunsOpen(true)}
+                  >
+                    {run ? (
+                      <>
+                        <span className="runs-trigger-name">{run.name}</span>
+                        <span aria-hidden="true">▾</span>
+                      </>
+                    ) : (
+                      "Select run"
+                    )}
                   </button>
                   {groups.length > 1 && (
                     <button
