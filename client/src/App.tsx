@@ -534,7 +534,7 @@ export function App() {
                       aria-selected={tab === "settings"}
                       onClick={() => setTab("settings")}
                     >
-                      Panel settings
+                      Settings
                     </button>
                     <button
                       id="tab-topics"
@@ -564,7 +564,7 @@ export function App() {
                       aria-labelledby="tab-topics"
                     >
                       <div className="field-heading">
-                        <span className="eyebrow">TOPICS</span>
+                        <span className="eyebrow">Topics</span>
                         <button
                           className="collapse-topics"
                           onClick={() => setExpandedTopics(new Set())}
@@ -665,17 +665,17 @@ export function App() {
                           ];
                         })}
                         {!loadingInfo && info && !visibleTopics.length && (
-                          <p className="muted">No topics to display.</p>
+                          <p className="muted">No topics to display</p>
                         )}
                       </div>
                     </div>
                   )}
-                  {tab === "panel" && (
+                  {tab === "settings" && (
                     <div
-                      id="sidebar-panel"
-                      className="sidebar-content panel-settings"
+                      id="sidebar-settings"
+                      className="sidebar-content widget-settings"
                       role="tabpanel"
-                      aria-labelledby="tab-panel"
+                      aria-labelledby="tab-settings"
                       onDragOver={acceptDrag}
                       onDrop={(event) => drop(event)}
                     >

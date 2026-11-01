@@ -178,10 +178,12 @@ describe("Tab widget interactions", () => {
       }),
     );
     expect(tab("tab-2").getAttribute("aria-selected")).toBe("true");
-    const close = screen.getByRole("button", { name: "Close Untitled tab" });
+    const close = document.querySelector(".widget-tab-close")!;
     expect(close.parentElement).toBe(tab("tab-2").parentElement);
     expect(
-      within(tab("tab-1").parentElement!).queryByRole("button", { name: "Close Untitled tab" }),
+      within(tab("tab-1").parentElement!).queryByRole("button", {
+        name: "Delete tab Untitled tab",
+      }),
     ).toBeNull();
     fireEvent.doubleClick(tab("tab-2"));
     const name = screen.getAllByRole("textbox", { name: "Untitled tab name" })[0];
@@ -190,7 +192,7 @@ describe("Tab widget interactions", () => {
     expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
     fireEvent.keyDown(screen.getByRole("tab", { name: "Details" }), { key: "ArrowLeft" });
     expect(tab("tab-1").getAttribute("aria-selected")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "Close Untitled tab" }));
+    fireEvent.click(document.querySelector(".widget-tab-close")!);
     expect(document.getElementById("widget-1-tab-1")).toBeNull();
     expect(screen.getByRole("tab", { name: "Details" }).getAttribute("aria-selected")).toBe("true");
   });
@@ -219,9 +221,9 @@ describe("Tab widget interactions", () => {
     render(<Harness initialState={state} />);
     const catalog = screen.getByLabelText("Widgets to add");
     expect(within(catalog).getAllByRole("button")).toHaveLength(11);
-    fireEvent.click(within(catalog).getByRole("button", { name: "Add Tab" }));
+    fireEvent.click(within(catalog).getByRole("button", { name: "Add Tabs" }));
     const tabPanel = panel("widget-2");
-    expect(within(tabPanel).queryByRole("button", { name: "Add Tab" })).toBeNull();
+    expect(within(tabPanel).queryByRole("button", { name: "Add Tabs" })).toBeNull();
     expect(
       within(tabPanel).getByLabelText("Widgets to add").querySelectorAll("button"),
     ).toHaveLength(10);
@@ -233,11 +235,11 @@ describe("Tab widget interactions", () => {
   it("places the tab list and widget controls in the same toolbar row", () => {
     const { container } = render(<Harness />);
     const toolbar = container.querySelector(".widget-tabs-toolbar")!;
-    expect(toolbar.contains(screen.getByRole("tablist", { name: "Tab tabs" }))).toBe(true);
-    expect(toolbar.contains(screen.getByRole("button", { name: "Maximize Tab" }))).toBe(true);
+    expect(toolbar.contains(screen.getByRole("tablist", { name: "Tabs" }))).toBe(true);
+    expect(toolbar.contains(screen.getByRole("button", { name: "Maximize Tabs" }))).toBe(true);
     expect(toolbar.querySelector(".mosaic-window-controls")).not.toBeNull();
-    expect(within(toolbar as HTMLElement).queryByText("Tab")).toBeNull();
-    expect(within(toolbar as HTMLElement).getByLabelText("Move tab widget")).toBeDefined();
+    expect(within(toolbar as HTMLElement).queryByText("Tabs")).toBeNull();
+    expect(within(toolbar as HTMLElement).getByLabelText("Move Tabs widget")).toBeDefined();
   });
 
   it("accepts a catalog widget in an empty tab without adding it at the root", () => {
@@ -258,12 +260,12 @@ describe("Tab widget interactions", () => {
     expect(drag).toBe(true);
     fireEvent.drop(empty, { dataTransfer });
     fireEvent.drop(tab("tab-1"), { dataTransfer });
-    expect(screen.getAllByRole("region", { name: "Tab" })).toHaveLength(1);
+    expect(screen.getAllByRole("region", { name: "Tabs" })).toHaveLength(1);
     const edge = container.querySelector(
       '[data-widget-id="widget-1"] > .tab-frame-drop > .widget-drop-edge.right',
     )!;
     fireEvent.drop(edge, { dataTransfer });
-    expect(screen.getAllByRole("region", { name: "Tab" })).toHaveLength(2);
+    expect(screen.getAllByRole("region", { name: "Tabs" })).toHaveLength(2);
   });
 
   it("omits Tab from a child widget's type menu while keeping it available at the root", () => {
@@ -274,13 +276,13 @@ describe("Tab widget interactions", () => {
     fireEvent.click(child.querySelector(".submenu-host > button")!);
     const childTypes = within(child).getAllByRole("menuitemradio", { hidden: true });
     expect(childTypes).toHaveLength(10);
-    expect(childTypes.some((item) => item.firstChild?.textContent === "Tab")).toBe(false);
+    expect(childTypes.some((item) => item.firstChild?.textContent === "Tabs")).toBe(false);
     const root = container.querySelector<HTMLElement>('[data-widget-id="widget-3"]')!;
     fireEvent.click(root.querySelector(".submenu-host > button")!);
     expect(
       within(root)
         .getAllByRole("menuitemradio", { hidden: true })
-        .some((item) => item.firstChild?.textContent === "Tab"),
+        .some((item) => item.firstChild?.textContent === "Tabs"),
     ).toBe(true);
   });
 
@@ -295,8 +297,8 @@ describe("Tab widget interactions", () => {
     fireEvent.drop(empty, { dataTransfer });
     expect(fireEvent.dragOver(tab("tab-1"), { dataTransfer })).toBe(true);
     fireEvent.drop(tab("tab-1"), { dataTransfer });
-    expect(within(panel()).queryByRole("region", { name: "Tab" })).toBeNull();
-    expect(screen.getAllByRole("region", { name: "Tab" })).toHaveLength(2);
+    expect(within(panel()).queryByRole("region", { name: "Tabs" })).toBeNull();
+    expect(screen.getAllByRole("region", { name: "Tabs" })).toHaveLength(2);
     fireEvent.dragEnd(title);
   });
 
@@ -376,7 +378,7 @@ describe("Tab widget interactions", () => {
     expect(
       within(document.getElementById("widget-1-tab-2-panel")!).getByLabelText("Widgets to add"),
     ).toBeDefined();
-    expect(screen.getAllByRole("region", { name: "Tab" })).toHaveLength(2);
+    expect(screen.getAllByRole("region", { name: "Tabs" })).toHaveLength(2);
   });
 
   it("accepts tabs on the destination bar's blank space and appends them", () => {
@@ -413,11 +415,11 @@ describe("Tab widget interactions", () => {
   it("maximizes a root Tab and restores its sibling widget with Escape", () => {
     const state = reduce(initial(), { type: "add", target: "widget-1" });
     render(<Harness initialState={state} />);
-    fireEvent.click(screen.getByRole("button", { name: "Maximize Tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Maximize Tabs" }));
     expect(document.querySelector('[data-widget-id="widget-2"]')).toBeNull();
-    expect(screen.getByRole("region", { name: "Tab" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Tabs" })).toBeDefined();
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.getByRole("region", { name: "Tab" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Tabs" })).toBeDefined();
     expect(document.querySelector('[data-widget-id="widget-2"]')).not.toBeNull();
   });
 });

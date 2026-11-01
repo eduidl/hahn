@@ -91,7 +91,7 @@ describe("Tab workspace", () => {
     state = reduce(state, { type: "change-type", id: "widget-1", widgetType: "tabs" });
     state = reduce(state, { type: "tab-add", id: "widget-1" });
     const w = state.widgets["widget-1"];
-    expect(w.title).toBe("Tab");
+    expect(w.title).toBe("Tabs");
     expect(w.type === "tabs" && w.tabs.map((tab) => [tab.id, tab.title])).toEqual([
       ["tab-1", ""],
       ["tab-2", ""],

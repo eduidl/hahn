@@ -33,7 +33,7 @@ function mismatchReason(current: ValueKind | null, added: ValueKind | null) {
 
 /** Checks that depend on the widget's current series; null when the field fits. */
 function widgetReason(entry: IndexedField, widget: Widget, spec: WidgetSpec, index: FieldIndex) {
-  if (widget.series.some((s) => s.key === entry.key)) return "Already added.";
+  if (widget.series.some((s) => s.key === entry.key)) return "Already added";
   if (
     widget.type === "image" &&
     viewFor(spec, entry.topic)?.kind !== "image" &&
@@ -68,15 +68,15 @@ export function dropVerdict(
   spec: WidgetSpec = widgetSpecs[widget.type],
 ): DropVerdict {
   const topic = index.topics.get(topicKey(drag.source, drag.topic));
-  if (!topic) return { ok: false, reason: "Topic not found." };
+  if (!topic) return { ok: false, reason: "Topic not found" };
   if (topic.error) return { ok: false, reason: "This topic cannot be read." };
-  if (topic.message_count === 0) return { ok: false, reason: "No messages." };
+  if (topic.message_count === 0) return { ok: false, reason: "No messages" };
   if (!spec.accepts.size && !spec.viewKinds?.size)
     return { ok: false, reason: "This widget does not take topics." };
   const accepted = [...spec.accepts].map(kindLabel).join(", ");
   // A dragged topic stands for its root message (empty path).
   const entry = index.byKey.get(keyOf(drag.source, drag.topic, drag.path ?? []));
-  if (!entry) return { ok: false, reason: "Field not found." };
+  if (!entry) return { ok: false, reason: "Field not found" };
   if (spec.viewKinds && !acceptsField(spec, topic, entry.field.path, entry.kind))
     return {
       ok: false,
@@ -88,7 +88,7 @@ export function dropVerdict(
     return {
       ok: false,
       // The primitive name (`struct`, `uint32`, ...) keeps the reason short.
-      reason: `${displayType(entry.field.data_type, topic.schema_encoding)} is not supported. Select ${accepted}.`,
+      reason: `${displayType(entry.field.data_type, topic.schema_encoding)} is not supported. This widget accepts ${accepted} fields.`,
     };
   const reason = widgetReason(entry, widget, spec, index);
   if (reason) return { ok: false, reason };

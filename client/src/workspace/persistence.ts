@@ -10,7 +10,7 @@ export type Session = {
   zoneSource: TimeZoneSource;
   tab: SidebarTab;
 };
-export type SidebarTab = "panel" | "topics" | "errors";
+export type SidebarTab = "settings" | "topics" | "errors";
 
 const storageKey = "hahn.session";
 const version = 1;
@@ -34,7 +34,8 @@ function reviveWidget(id: string, saved: unknown): Widget | null {
   if (!isRecord(saved) || saved.id !== id) return null;
   const type = saved.type as Widget["type"];
   if (typeof type !== "string" || !Object.hasOwn(widgetSpecs, type)) return null;
-  const revived = { ...widget(0, type), ...saved } as Widget;
+  // The title is the current name of the type; older saves hold retired names.
+  const revived = { ...widget(0, type), ...saved, title: widgetSpecs[type].label } as Widget;
   if (!Array.isArray(revived.series)) return null;
   if (revived.type === "tabs") {
     const { tabs, activeTabId } = revived;
@@ -96,7 +97,7 @@ export function loadSession(storage: Storage | null): Session | null {
       runId: typeof saved.runId === "string" ? saved.runId : null,
       sources: isStringArray(saved.sources) ? saved.sources : [],
       zoneSource: saved.zoneSource === "server" ? "server" : "browser",
-      tab: saved.tab === "topics" || saved.tab === "errors" ? saved.tab : "panel",
+      tab: saved.tab === "topics" || saved.tab === "errors" ? saved.tab : "settings",
     };
   } catch {
     return null;

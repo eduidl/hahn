@@ -68,7 +68,7 @@ function RemoveTabButton({
       </button>
       <ConfirmDialog
         open={confirming}
-        title={`Delete ${tabLabel(tab)}?`}
+        title={`Delete tab "${tabLabel(tab)}"?`}
         message={`This removes ${count === 1 ? "1 widget in this tab and its series" : `${count} widgets in this tab and their series`}. This cannot be undone.`}
         confirmLabel="Delete"
         onConfirm={remove}
@@ -124,11 +124,13 @@ export function TabSettings({ widget, dispatch }: Props) {
             widget={widget}
             tab={tab}
             dispatch={dispatch}
-            label={`Delete ${tabLabel(tab)}`}
+            label={`Delete tab ${tabLabel(tab)}`}
           />
         </div>
       ))}
-      <button onClick={() => dispatch({ type: "tab-add", id: widget.id })}>+ Add tab</button>
+      <button aria-label="Add tab" onClick={() => dispatch({ type: "tab-add", id: widget.id })}>
+        + Tab
+      </button>
     </div>
   );
 }
@@ -184,7 +186,7 @@ export function TabBar({
     <div
       className="widget-tab-bar"
       role="tablist"
-      aria-label={`${widget.title} tabs`}
+      aria-label="Tabs"
       onDragOver={(event) => {
         if (!event.dataTransfer.types.includes(tabDragMime)) return;
         event.preventDefault();
@@ -278,16 +280,13 @@ export function TabBar({
               widget={widget}
               tab={tab}
               dispatch={dispatch}
-              label={`Close ${tabLabel(tab)}`}
+              label={`Delete tab ${tabLabel(tab)}`}
               className="widget-tab-close"
             />
           )}
         </div>
       ))}
-      <button
-        aria-label={`Add tab to ${widget.title}`}
-        onClick={() => dispatch({ type: "tab-add", id: widget.id })}
-      >
+      <button aria-label="Add tab" onClick={() => dispatch({ type: "tab-add", id: widget.id })}>
         +
       </button>
     </div>
