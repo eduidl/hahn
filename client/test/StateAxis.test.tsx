@@ -48,7 +48,7 @@ it("shows the date again where it changes", () => {
   ]);
 });
 it("keeps edge labels inside the axis", () => {
-  render(<StateAxis formatter={timeFormatter("0", "relative")} domain={[0, 10]} />);
+  render(<StateAxis formatter={timeFormatter("0", "offset")} domain={[0, 10]} />);
   act(() => resize(1000));
   const first = labels()[0] as HTMLElement;
   const last = labels().at(-1) as HTMLElement;
@@ -58,7 +58,7 @@ it("keeps edge labels inside the axis", () => {
   expect(parseFloat(last.style.left)).toBeLessThan(1000);
 });
 it("follows the visible range", () => {
-  render(<StateAxis formatter={timeFormatter("0", "relative")} domain={[4, 6]} />);
+  render(<StateAxis formatter={timeFormatter("0", "offset")} domain={[4, 6]} />);
   act(() => resize(1000));
   const ticks = labels().map((label) => label.firstChild?.textContent);
   expect(ticks[0]).toBe("4");

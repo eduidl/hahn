@@ -2,7 +2,6 @@ import type { FieldIndex } from "./fieldIndex";
 import type { MosaicDirection, MosaicNode } from "react-mosaic-component";
 import type { DragMode, PlotView } from "../views/Plot";
 import { defaultPlotView } from "../views/Plot";
-import type { TimeDisplay } from "../timeDisplay";
 import { clampColumnWidth } from "../views/table";
 import {
   colors,
@@ -29,7 +28,6 @@ type WidgetBase = {
   title: string;
   series: Selected[];
   mode: DragMode;
-  timeDisplay: TimeDisplay;
   legend: LegendSettings;
   /** JSON-encoded column paths relative to the Table target. Time stays visible. */
   hiddenColumns: string[];
@@ -103,7 +101,6 @@ export type WorkspaceAction =
   | { type: "series"; id: string; update: (series: Selected[]) => Selected[] }
   | { type: "view"; id: string; update: (view: PlotView) => PlotView }
   | { type: "mode"; id: string; mode: DragMode }
-  | { type: "time-display"; id: string; value: TimeDisplay }
   | { type: "legend"; id: string; value: Partial<LegendSettings> }
   | { type: "fixed-frame"; id: string; value: string | null }
   | { type: "tile-url"; id: string; value: string }
@@ -366,7 +363,6 @@ export const widget = (number: number, type: Widget["type"] = "plot"): Widget =>
   title: widgetSpecs[type].label,
   series: [],
   mode: "pan",
-  timeDisplay: "absolute",
   legend: { visible: true, position: "top-left" },
   hiddenColumns: [],
   columnWidths: {},
@@ -606,7 +602,6 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const makeCopy = (original: Widget): Widget => {
         const copy = widget(nextNumber++, original.type);
         Object.assign(copy, {
-          timeDisplay: original.timeDisplay,
           legend: { ...original.legend },
           hiddenColumns: [...original.hiddenColumns],
           columnWidths: { ...original.columnWidths },
@@ -912,15 +907,13 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                   columnWidths: {},
                   view: defaultPlotView(),
                 }
-              : action.type === "time-display"
-                ? { ...current, timeDisplay: action.value }
-                : action.type === "legend"
-                  ? { ...current, legend: { ...current.legend, ...action.value } }
-                  : action.type === "fixed-frame"
-                    ? { ...current, fixedFrame: action.value }
-                    : action.type === "tile-url"
-                      ? { ...current, tileUrl: action.value }
-                      : { ...current, mode: action.mode };
+              : action.type === "legend"
+                ? { ...current, legend: { ...current.legend, ...action.value } }
+                : action.type === "fixed-frame"
+                  ? { ...current, fixedFrame: action.value }
+                  : action.type === "tile-url"
+                    ? { ...current, tileUrl: action.value }
+                    : { ...current, mode: action.mode };
       return { ...state, widgets: { ...state.widgets, [action.id]: updated } };
     }
   }

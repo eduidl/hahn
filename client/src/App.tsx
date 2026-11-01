@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type DragEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type DragEvent,
+  type CSSProperties,
+} from "react";
+import { SidebarResizer } from "./workspace/SidebarResizer";
 import { WidgetWorkspace, widgetSeries } from "./workspace/WidgetWorkspace";
 import { WidgetSettings } from "./workspace/WidgetSettings";
 import {
@@ -30,8 +39,14 @@ import {
 } from "./workspace/persistence";
 import { ConfirmDialog } from "./workspace/ConfirmDialog";
 import { RunsDialog } from "./workspace/RunsDialog";
-import { TimeZoneSelect } from "./workspace/TimeZoneSelect";
-import { DisplayTimeZone, usableTimeZone, type TimeZoneSource } from "./timeDisplay";
+import { TimeDisplaySelect, TimeZoneSelect } from "./workspace/TimeZoneSelect";
+import {
+  DisplayTimeMode,
+  DisplayTimeZone,
+  usableTimeZone,
+  type TimeDisplay,
+  type TimeZoneSource,
+} from "./timeDisplay";
 import {
   HttpError,
   SourceNames,
@@ -62,6 +77,9 @@ export function App() {
   const [runsOpen, setRunsOpen] = useState(!saved?.runId);
   const [resetOpen, setResetOpen] = useState(false);
   const [zoneSource, setZoneSource] = useState<TimeZoneSource>(saved?.zoneSource ?? "browser");
+  const [timeDisplay, setTimeDisplay] = useState<TimeDisplay>(saved?.timeDisplay ?? "absolute");
+  const [sidebarWidth, setSidebarWidth] = useState(saved?.sidebarWidth ?? null);
+  const [sidebarOpen, setSidebarOpen] = useState(saved?.sidebarOpen ?? true);
   const [runId, setRunId] = useState<string | null>(saved?.runId ?? null);
   // The saved session until its run is confirmed. Saving waits for that, so a
   // half-restored state cannot overwrite the session.
@@ -188,7 +206,17 @@ export function App() {
     session.current = restoring ? null : { workspace, runId, sources, zoneSource, tab };
     const timer = setTimeout(saveCurrent, 300);
     return () => clearTimeout(timer);
-  }, [restoring, workspace, runId, sources, zoneSource, tab]);
+  }, [
+    restoring,
+    workspace,
+    runId,
+    sources,
+    zoneSource,
+    timeDisplay,
+    tab,
+    sidebarWidth,
+    sidebarOpen,
+  ]);
   useEffect(() => {
     window.addEventListener("pagehide", saveCurrent);
     return () => window.removeEventListener("pagehide", saveCurrent);
@@ -206,6 +234,7 @@ export function App() {
       runId,
       sources,
       zoneSource,
+      timeDisplay,
       tab,
     });
     location.reload();
@@ -774,17 +803,8 @@ export function App() {
                   />
                 </main>
               </div>
-              <PlaybackBar
-                info={info}
-                fullEnd={fullEnd}
-                busy={busy || messages.busy}
-                stop={() => {
-                  stop();
-                  messages.stop();
-                }}
-              />
-            </div>
-          </SourceNames.Provider>
+            </SourceNames.Provider>
+          </DisplayTimeMode.Provider>
         </DisplayTimeZone.Provider>
       </PlaybackContext.Provider>
     </FieldCacheContext.Provider>

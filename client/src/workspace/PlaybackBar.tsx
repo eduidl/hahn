@@ -5,8 +5,9 @@ import {
   useState,
   useSyncExternalStore,
   type PointerEvent,
+  useContext,
 } from "react";
-import { useTimeFormatter } from "../timeDisplay";
+import { DisplayTimeMode, useTimeFormatter } from "../timeDisplay";
 import { playbackSpeeds, usePlayback, usePlaybackStore } from "./playback";
 import type { Info } from "../types";
 
@@ -85,6 +86,10 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
     `${disabled ? 0 : Math.max(0, Math.min(100, (value / fullEnd) * 100))}%`;
   const label = clock.tooltip(time);
   const now = clock.tick(time);
+  // Both are always shown; the workspace's choice comes first.
+  const mode = useContext(DisplayTimeMode);
+  const clockText = `${now.date} ${now.time}`;
+  const offsetText = `${seconds(time)} / ${seconds(fullEnd)} s`;
 
   return (
     <footer className="playback-bar" aria-label="Playback">
@@ -132,8 +137,8 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
         </button>
       </div>
       <div className="playback-time" aria-live="off">
-        <span title={label}>{disabled ? "—" : `${now.date} ${now.time}`}</span>
-        <small>{disabled ? "—" : `${seconds(time)} / ${seconds(fullEnd)} s`}</small>
+        <span title={label}>{disabled ? "—" : mode === "offset" ? offsetText : clockText}</span>
+        <small>{disabled ? "—" : mode === "offset" ? clockText : offsetText}</small>
       </div>
       <div
         ref={track}

@@ -15,6 +15,7 @@ const session = (): Session => ({
   runId: "run",
   sources: ["run/group"],
   zoneSource: "server",
+  timeDisplay: "offset",
   tab: "topics",
 });
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value));

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { DisplayTimeMode } from "../src/timeDisplay";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useReducer } from "react";
@@ -47,7 +48,6 @@ describe("table playback", () => {
     );
     const state = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "table" });
     const widget = state.widgets["widget-2"];
-    widget.timeDisplay = "relative";
     widget.series = [
       {
         key: keyOf("r/0", "/t", []),
@@ -66,25 +66,27 @@ describe("table playback", () => {
     );
     store.reset(1000);
     const { container } = render(
-      <PlaybackContext.Provider value={store}>
-        <TableView
-          widget={widget}
-          dispatch={vi.fn()}
-          index={buildFieldIndex([topic])}
-          originNs="0"
-          record={{
-            key: widget.series[0].key,
-            source: "r/0",
-            topic: "/t",
-            received: 1000,
-            status: "complete",
-            rows: Array.from({ length: 1000 }, (_, i) => ({
-              time_ns: String(BigInt(i) * 1000000000n),
-              value: { x: `value-${i}` },
-            })),
-          }}
-        />
-      </PlaybackContext.Provider>,
+      <DisplayTimeMode.Provider value="offset">
+        <PlaybackContext.Provider value={store}>
+          <TableView
+            widget={widget}
+            dispatch={vi.fn()}
+            index={buildFieldIndex([topic])}
+            originNs="0"
+            record={{
+              key: widget.series[0].key,
+              source: "r/0",
+              topic: "/t",
+              received: 1000,
+              status: "complete",
+              rows: Array.from({ length: 1000 }, (_, i) => ({
+                time_ns: String(BigInt(i) * 1000000000n),
+                value: { x: `value-${i}` },
+              })),
+            }}
+          />
+        </PlaybackContext.Provider>
+      </DisplayTimeMode.Provider>,
     );
     expect(screen.getAllByRole("columnheader").map((n) => n.textContent)).toEqual(["Time", "x"]);
     expect(container.querySelectorAll("tbody tr").length).toBeLessThan(40);
