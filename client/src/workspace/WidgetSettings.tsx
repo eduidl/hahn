@@ -377,7 +377,7 @@ function PlotSettings(props: WidgetSettingsProps) {
             key={s.key}
             {...props}
             series={s}
-            marker={<i style={{ background: s.color }} />}
+            marker={<i className="series-dot" style={{ background: s.color }} />}
           >
             <SeriesStyle {...props} series={s} />
           </SeriesRow>
@@ -411,7 +411,7 @@ function ValueChangesSettings(props: WidgetSettingsProps) {
             key={s.key}
             {...props}
             series={s}
-            marker={<i style={{ background: s.color }} />}
+            marker={<i className="series-dot" style={{ background: s.color }} />}
           />
         )}
       />
@@ -523,7 +523,7 @@ function ViewSeriesList(props: WidgetSettingsProps) {
           {...props}
           series={s}
           showStatus={false}
-          marker={<i style={{ background: s.color }} />}
+          marker={<i className="series-dot" style={{ background: s.color }} />}
         >
           {props.widget.type === "scene" && selectedViewKind(props.index, s) === "image" && (
             <label className="series-style">
@@ -627,7 +627,7 @@ function ImageSettings(props: WidgetSettingsProps) {
             {...props}
             series={series}
             showStatus={false}
-            marker={<i style={{ background: series.color }} />}
+            marker={<i className="series-dot" style={{ background: series.color }} />}
           />
         ))}
         <FieldPicker {...props} kind="pointcloud" />
