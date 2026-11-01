@@ -518,6 +518,36 @@ function ViewSeriesList(props: PanelProps) {
               />
             </label>
           )}
+          {props.widget.type === "scene" && selectedViewKind(props.index, s) === "pose" && (
+            <label className="series-style">
+              Trail duration (s)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                placeholder="All"
+                aria-label={`Trail duration for ${name(s)}`}
+                defaultValue={s.trailDuration ?? ""}
+                onChange={(event) => {
+                  const input = event.currentTarget;
+                  const duration = input.value === "" ? undefined : input.valueAsNumber;
+                  if (duration === undefined || (Number.isFinite(duration) && duration > 0))
+                    props.dispatch({
+                      type: "series",
+                      id: props.widget.id,
+                      update: (list) =>
+                        list.map((item) =>
+                          item.key === s.key ? { ...item, trailDuration: duration } : item,
+                        ),
+                    });
+                }}
+                onBlur={(event) => {
+                  event.currentTarget.value =
+                    s.trailDuration === undefined ? "" : String(s.trailDuration);
+                }}
+              />
+            </label>
+          )}
         </SeriesRow>
       )}
     />

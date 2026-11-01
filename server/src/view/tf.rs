@@ -289,6 +289,27 @@ impl TfIndex {
         name
     }
 
+    /// Resolve one pose at its recording time, without changing the pose's local frame.
+    pub(super) fn pose_in_target(
+        &self,
+        target: &str,
+        source: &str,
+        time: u64,
+        position: [f64; 3],
+        orientation: [f64; 4],
+    ) -> Option<([f64; 3], [f64; 4])> {
+        let placement = if source == target {
+            IDENTITY
+        } else {
+            *self.resolve(target, time).get(source)?
+        };
+        let pose = placement.then(Transform {
+            translation: position,
+            rotation: orientation,
+        });
+        Some((pose.translation, pose.rotation))
+    }
+
     fn frames(&self) -> Vec<FrameInfo<'_>> {
         let mut frames: Vec<_> = self
             .names

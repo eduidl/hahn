@@ -13,11 +13,18 @@ import {
   useTransforms,
   useViewFrame,
 } from "../data/useViewData";
-import { pointBuffers, type PointCloudValue, type Transform } from "../data/viewFrames";
+import {
+  fetchViewHistory,
+  pointBuffers,
+  type PointCloudValue,
+  type Transform,
+  type ViewFrame,
+} from "../data/viewFrames";
 import type { Widget } from "../workspace/widgets";
 import { cameraSurface, defaultImageDistance } from "./camera";
 import { useCameraCalibration } from "./useCameraCalibration";
 import { reframeCamera } from "./sceneCamera";
+import { poseTrail, trailWindow } from "./poseTrail";
 
 type Stage = {
   scene: THREE.Scene;
@@ -113,6 +120,91 @@ function PointsLayer({
     frame?.error ||
     transformError ||
     (unresolved ? `No transform from ${frameId} to ${target} at this time` : "");
+  return problem ? (
+    <p className="view-error">
+      {series.topicName ?? series.topic}: {problem}
+    </p>
+  ) : null;
+}
+
+/** The recorded pose history up to the playback position. */
+export function PoseTrail({
+  series,
+  info,
+  target,
+  stage,
+}: {
+  series: Selected;
+  info: Info | null;
+  target: string | null;
+  stage: Stage;
+}) {
+  const ns = usePlaybackNs(info);
+  const identity = JSON.stringify([series.key, series.view, info?.start_ns, target]);
+  const [loaded, setLoaded] = useState<{ identity: string; frames: ViewFrame[]; error: string }>();
+  useEffect(() => {
+    if (!info) return;
+    const controller = new AbortController();
+    fetchViewHistory(series, controller.signal, target ?? undefined)
+      .then((frames) => {
+        if (!controller.signal.aborted) setLoaded({ identity, frames, error: "" });
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setLoaded({ identity, frames: [], error: errorMessage(error) });
+      });
+    return () => controller.abort();
+  }, [identity]);
+  const history = loaded?.identity === identity ? loaded : undefined;
+  const trail = useMemo(() => poseTrail(history?.frames ?? []), [history]);
+  const line = useMemo(
+    () => new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial()),
+    [],
+  );
+  const clipped = useRef<number | null>(null);
+  useEffect(() => {
+    stage.scene.add(line);
+    return () => {
+      stage.scene.remove(line);
+      line.geometry.dispose();
+      line.material.dispose();
+      stage.invalidate();
+    };
+  }, [stage, line]);
+  useEffect(() => {
+    line.geometry.dispose();
+    line.geometry = new THREE.BufferGeometry();
+    line.geometry.setAttribute("position", new THREE.BufferAttribute(trail.positions.slice(), 3));
+    clipped.current = null;
+    stage.invalidate();
+  }, [line, trail, stage]);
+  useEffect(() => {
+    const window = trailWindow(trail, ns, series.trailDuration);
+    const attribute = line.geometry.getAttribute("position") as THREE.BufferAttribute;
+    if (clipped.current !== null) {
+      const i = clipped.current * 6;
+      attribute.addUpdateRange(i, 3);
+      attribute.setXYZ(
+        clipped.current * 2,
+        trail.positions[i],
+        trail.positions[i + 1],
+        trail.positions[i + 2],
+      );
+    }
+    const changed = clipped.current !== null || !!window.point;
+    clipped.current = window.point ? window.start : null;
+    if (window.point) {
+      attribute.addUpdateRange(window.start * 6, 3);
+      attribute.setXYZ(window.start * 2, window.point[0], window.point[1], window.point[2]);
+    }
+    if (changed) attribute.needsUpdate = true;
+    line.geometry.setDrawRange(window.start * 2, window.count * 2);
+    line.material.color.set(series.color);
+    line.visible = !series.hidden;
+    stage.invalidate();
+  }, [line, trail, ns, series.color, series.hidden, series.trailDuration, stage]);
+  const problem =
+    history?.error || (trail.gaps ? "Some trajectory samples could not be placed" : "");
   return problem ? (
     <p className="view-error">
       {series.topicName ?? series.topic}: {problem}

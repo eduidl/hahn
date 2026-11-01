@@ -88,6 +88,8 @@ export type Selected = {
   enumValues?: EnumValue[];
   /** Distance in meters of an image plane in a 3D view. */
   imageDistance?: number;
+  /** How many seconds of pose history to show; absent means all history. */
+  trailDuration?: number;
   /** The view of the topic to read, in widgets that show converted values. */
   view?: string;
 };

@@ -154,10 +154,30 @@ fn frame(
     defs: &FieldDefs,
     times: MessageTimes,
     value: &Value,
+    target: Option<(&str, &TfIndex)>,
 ) -> anyhow::Result<Vec<Bytes>> {
     let mut payload = Payload::default();
     let converted = Message::new(defs, value).and_then(|message| {
-        let value = converter.convert(&message, &mut payload)?;
+        let mut value = converter.convert(&message, &mut payload)?;
+        if let Some((target, tf)) = target {
+            anyhow::ensure!(
+                value["kind"] == "pose",
+                "Target frame is only supported for pose views"
+            );
+            let source = value["frame_id"]
+                .as_str()
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| anyhow::anyhow!("Pose has no frame ID"))?;
+            let position = serde_json::from_value(value["pose"]["position"].clone())?;
+            let orientation = serde_json::from_value(value["pose"]["orientation"].clone())?;
+            let (position, orientation) = tf
+                .pose_in_target(target, source, times.log_time, position, orientation)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No transform from {source} to {target} at this time")
+                })?;
+            value["frame_id"] = target.into();
+            value["pose"] = serde_json::json!({"position":position,"orientation":orientation});
+        }
         anyhow::ensure!(payload.fits(), "The message is too large for a frame");
         Ok(value)
     });
@@ -198,6 +218,7 @@ pub(crate) struct ViewsQuery {
     start_ns: Option<String>,
     /// Exclusive upper bound. Omit to include the last timestamp of a recording.
     end_ns: Option<String>,
+    target_frame: Option<String>,
 }
 
 /// Converted messages in a time range, one frame per message.
@@ -208,11 +229,28 @@ pub(crate) async fn views(
 ) -> Result<Response, ApiError> {
     let group = state.group(&run, &group)?;
     let range = parse_range(&query.start_ns, &query.end_ns)?;
-    let (topic, view) = (query.topic, query.view);
-    let (source, topic, defs, converter) = blocking(move || {
+    let (topic, view, target) = (query.topic, query.view, query.target_frame);
+    let (source, topic, defs, converter, target) = blocking(move || {
         let source = group.source()?;
         let (defs, converter) = group.views(&state.converters)?.get(&topic, &view)?;
-        Ok((source, topic, defs, converter))
+        if target.is_some() {
+            anyhow::ensure!(
+                converter.kind() == "pose",
+                "Target frame is only supported for pose views"
+            );
+        }
+        let target = target
+            .map(|target| {
+                anyhow::ensure!(!target.is_empty(), "Target frame must not be empty");
+                let run = state
+                    .runs
+                    .iter()
+                    .find(|item| item.id == run)
+                    .expect("run checked by group");
+                Ok::<_, anyhow::Error>((target, run.tf()?))
+            })
+            .transpose()?;
+        Ok((source, topic, defs, converter, target))
     })
     .await?;
     let (tx, rx) = mpsc::channel(4);
@@ -230,7 +268,15 @@ pub(crate) async fn views(
                 return Err(disconnected().into());
             }
             scanned += 1;
-            send(frame(&*converter, &defs, times, &value)?)?;
+            send(frame(
+                &*converter,
+                &defs,
+                times,
+                &value,
+                target
+                    .as_ref()
+                    .map(|(name, tf)| (name.as_str(), tf.as_ref())),
+            )?)?;
             Ok(())
         });
         if tx.is_closed() {
@@ -280,7 +326,7 @@ pub(crate) async fn latest(
             if known == Some(times.log_time) {
                 chunks.extend(control(&Header::Unchanged)?);
             } else {
-                chunks.extend(frame(&*converter, &defs, *times, value)?);
+                chunks.extend(frame(&*converter, &defs, *times, value, None)?);
             }
         }
         chunks.extend(control(&Header::Complete {

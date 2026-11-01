@@ -110,3 +110,53 @@ it("sets an independent image distance in the 3D panel", () => {
   fireEvent.change(input, { target: { value: "0" } });
   expect(screen.getByTestId("distance").textContent).toBe("5");
 });
+
+it("sets and clears a pose topic's trail duration", () => {
+  const topic: Topic = {
+    source: "r/0",
+    topic: "/odom",
+    schema_name: "T",
+    schema_encoding: null,
+    views: [{ id: "pose", kind: "pose", name: "Pose" }],
+    message_count: 1,
+    error: null,
+    fields: [],
+  };
+  const index = buildFieldIndex([topic]);
+  let state = workspaceReducer(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "scene",
+  });
+  const entry = index.candidates.scene[0];
+  state = workspaceReducer(
+    state,
+    addFieldAction(state.widgets["widget-1"], entry.topic, entry.field, index),
+  );
+  function Harness() {
+    const [current, dispatch] = useReducer(workspaceReducer, state);
+    return (
+      <>
+        <PanelSettings
+          widget={current.widgets["widget-1"]}
+          dispatch={dispatch}
+          records={[]}
+          pointCount={0}
+          index={index}
+        />
+        <output data-testid="duration">
+          {current.widgets["widget-1"].series[0].trailDuration ?? "all"}
+        </output>
+      </>
+    );
+  }
+  render(<Harness />);
+  const input = screen.getByRole("spinbutton", { name: /Trail duration for/ }) as HTMLInputElement;
+  expect(input.value).toBe("");
+  fireEvent.change(input, { target: { value: "2.5" } });
+  expect(screen.getByTestId("duration").textContent).toBe("2.5");
+  fireEvent.change(input, { target: { value: "0" } });
+  expect(screen.getByTestId("duration").textContent).toBe("2.5");
+  fireEvent.change(input, { target: { value: "" } });
+  expect(screen.getByTestId("duration").textContent).toBe("all");
+});

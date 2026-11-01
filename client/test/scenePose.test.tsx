@@ -17,6 +17,11 @@ vi.mock("../src/data/useViewData", async (original) => ({
   usePlaybackNs: () => mocks.ns,
 }));
 
+vi.mock("../src/data/viewFrames", async (original) => ({
+  ...(await original<typeof import("../src/data/viewFrames")>()),
+  fetchViewHistory: mocks.history,
+}));
+
 it("places the latest pose in the fixed frame and hides it if the transform is missing", () => {
   const stage = { scene: new THREE.Scene(), invalidate: vi.fn(), fit: vi.fn(), reframe: vi.fn() };
   const series = {
