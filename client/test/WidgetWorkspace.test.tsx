@@ -80,6 +80,7 @@ function Harness({
         messageRecords={[]}
         fieldIndex={index}
         info={null}
+        sources={[]}
         fullEnd={1}
         revision={0}
         dragVerdict={() => null}
@@ -116,6 +117,19 @@ const panel = (widgetId = "widget-1") => document.getElementById(`${widgetId}-ta
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+});
+
+describe("Data Source Info widget", () => {
+  it("shows its own content without the series toolbar or empty state", () => {
+    const initialState = reduce(initialWorkspace(), {
+      type: "change-type",
+      id: "widget-1",
+      widgetType: "source-info",
+    });
+    render(<Harness initialState={initialState} />);
+    expect(screen.getByText("Open a run from the header")).toBeTruthy();
+    expect(screen.queryByText("No topic selected")).toBeNull();
+  });
 });
 
 it("shows selected topics and field paths in the widget toolbar", () => {
@@ -202,13 +216,13 @@ describe("Tab widget interactions", () => {
     const state = reduce(initialWorkspace(), { type: "remove", id: "widget-1" });
     render(<Harness initialState={state} />);
     const catalog = screen.getByLabelText("Widgets to add");
-    expect(within(catalog).getAllByRole("button")).toHaveLength(10);
+    expect(within(catalog).getAllByRole("button")).toHaveLength(11);
     fireEvent.click(within(catalog).getByRole("button", { name: "Add Tab" }));
     const tabPanel = panel("widget-2");
     expect(within(tabPanel).queryByRole("button", { name: "Add Tab" })).toBeNull();
     expect(
       within(tabPanel).getByLabelText("Widgets to add").querySelectorAll("button"),
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     fireEvent.click(within(tabPanel).getByRole("button", { name: "Add Table" }));
     expect(within(tabPanel).getByRole("region", { name: "Table" })).toBeDefined();
     expect(within(tabPanel).queryByLabelText("Widgets to add")).toBeNull();
@@ -257,7 +271,7 @@ describe("Tab widget interactions", () => {
     const child = container.querySelector<HTMLElement>('[data-widget-id="widget-2"]')!;
     fireEvent.click(child.querySelector(".submenu-host > button")!);
     const childTypes = within(child).getAllByRole("menuitemradio", { hidden: true });
-    expect(childTypes).toHaveLength(9);
+    expect(childTypes).toHaveLength(10);
     expect(childTypes.some((item) => item.firstChild?.textContent === "Tab")).toBe(false);
     const root = container.querySelector<HTMLElement>('[data-widget-id="widget-3"]')!;
     fireEvent.click(root.querySelector(".submenu-host > button")!);

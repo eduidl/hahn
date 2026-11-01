@@ -55,7 +55,8 @@ export type Widget = WidgetBase &
           | "image"
           | "scene"
           | "map"
-          | "tf-tree";
+          | "tf-tree"
+          | "source-info";
       }
     | { type: "tabs"; tabs: WidgetTab[]; activeTabId: string; nextTabNumber: number }
   );
@@ -150,6 +151,17 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     maxSeries: 0,
     loadsSeries: false,
   },
+  "source-info": {
+    label: "Data Source Info",
+    titlePrefix: "Data Source Info",
+    description: "Show the time range and topics of the open groups",
+    help: "Shows the open groups. There is nothing to configure.",
+    emptyHint: "No data source",
+    accepts: new Set(),
+    sameKind: false,
+    maxSeries: 0,
+    loadsSeries: false,
+  },
   tabs: {
     label: "Tab",
     titlePrefix: "Tab",
@@ -231,9 +243,9 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   scene: {
     label: "3D",
     titlePrefix: "3D",
-    description: "Show point clouds, cameras and coordinate frames in 3D",
-    help: "Add point cloud or image topics. Drag to rotate, right-drag to pan, and scroll to zoom.",
-    emptyHint: "Drop a point cloud or image topic",
+    description: "Show point clouds, cameras, poses and coordinate frames in 3D",
+    help: "Add point cloud, image or pose topics. Drag to rotate, right-drag to pan, and scroll to zoom.",
+    emptyHint: "Drop a point cloud, image or pose topic",
     accepts: new Set(),
     sameKind: false,
     maxSeries: Infinity,

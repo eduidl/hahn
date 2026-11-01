@@ -93,6 +93,12 @@ describe("drop verdict", () => {
     });
   });
 
+  it("explains that widgets without topic input take no topics", () => {
+    expect(verdict(undefined, widget("source-info"))).toEqual({
+      ok: false,
+      reason: "This widget does not take topics.",
+    });
+  });
   it("rejects duplicates, structs, topics and unreadable topics", () => {
     expect(verdict(["speed"], widget("time-series", [fields[0]]))).toMatchObject({
       reason: "Already added.",

@@ -95,6 +95,9 @@ export type LoadedSource = {
   loading: boolean;
 };
 
+/** A group the user has open, with whatever has loaded of it so far. */
+export type OpenSource = LoadedSource & { id: string };
+
 /**
  * The shared time axis of the open groups: earliest start to latest end.
  * Null until every group has settled, so the origin does not move while
