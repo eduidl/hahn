@@ -75,7 +75,7 @@ describe("drop verdict", () => {
     });
     expect(verdict(["flag"], widget("plot", [fields[0]]))).toEqual({
       ok: false,
-      reason: "Cannot combine bool with numeric series.",
+      reason: "Only numeric fields can be added.",
     });
     expect(verdict(["other_mode"], widget("plot", [fields[2]]))).toEqual({
       ok: false,

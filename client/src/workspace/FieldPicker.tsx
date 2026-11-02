@@ -3,6 +3,7 @@ import { type WidgetSettingsProps } from "./WidgetSettings";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { addableFields } from "./drop";
 import { SeriesName } from "../SeriesName";
+import { matchesTerms, searchTerms } from "../search";
 import { type IndexedField } from "./fieldIndex";
 import { addFieldAction, viewFor, widgetSpecs } from "./widgets";
 
@@ -33,29 +34,30 @@ export function FieldPicker({
   const input = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLDivElement>(null);
   const popover = useRef<HTMLDivElement>(null);
-  const candidates = useMemo(
-    () =>
-      addableFields(index, widget).filter(
-        (entry) => !kind || viewFor(widgetSpecs[widget.type], entry.topic)?.kind === kind,
-      ),
-    [index, widget, kind],
-  );
-  const one = candidates.length === 1;
-  const candidateNoun = takesTopics
-    ? one
-      ? "topic"
-      : "topics"
-    : singleTarget
-      ? one
-        ? "topic or field"
-        : "topics and fields"
-      : one
-        ? "field"
-        : "fields";
-  const needle = query.trim().toLowerCase();
-  const matches = needle
-    ? candidates.filter((entry) => entry.label.toLowerCase().includes(needle))
-    : candidates;
+  const { candidates, unavailable } = useMemo(() => {
+    const fits = (entry: IndexedField) =>
+      !kind || viewFor(widgetSpecs[widget.type], entry.topic)?.kind === kind;
+    const { addable, unavailable } = pickableFields(index, widget);
+    return {
+      candidates: addable.filter(fits),
+      unavailable: unavailable.filter((item) => fits(item.entry)),
+    };
+  }, [index, widget, kind]);
+  const nounFor = (count: number) =>
+    takesTopics
+      ? count === 1
+        ? "topic"
+        : "topics"
+      : singleTarget
+        ? count === 1
+          ? "topic or field"
+          : "topics and fields"
+        : count === 1
+          ? "field"
+          : "fields";
+  const candidateNoun = nounFor(candidates.length);
+  const terms = searchTerms(query);
+  const matches = candidates.filter((entry) => matchesTerms(entry.label, terms));
   const shown = matches.slice(0, pickerLimit);
   // Candidates can shrink while the list is open, so never point past the end.
   const activeIndex = Math.min(active, shown.length - 1);

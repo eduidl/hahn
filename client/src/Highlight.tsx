@@ -1,13 +1,19 @@
-/** `text` with every case-insensitive occurrence of `query` marked. */
+import { searchTerms } from "./search";
+
+const escaped = (term: string) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `text` with every case-insensitive occurrence of a word of `query` marked. */
 export function Highlight({ text, query }: { text: string; query: string }) {
-  if (!query) return text;
-  const lower = text.toLowerCase();
-  const needle = query.toLowerCase();
+  const terms = searchTerms(query);
+  if (!terms.length) return text;
+  // Longest first, so that a word is not cut short by another that starts it.
+  const pattern = [...terms].sort((a, b) => b.length - a.length).map(escaped);
   const parts = [];
   let from = 0;
-  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
-    parts.push(text.slice(from, at), <mark key={at}>{text.slice(at, at + needle.length)}</mark>);
-    from = at + needle.length;
+  for (const match of text.matchAll(new RegExp(pattern.join("|"), "gi"))) {
+    const at = match.index;
+    parts.push(text.slice(from, at), <mark key={at}>{match[0]}</mark>);
+    from = at + match[0].length;
   }
   parts.push(text.slice(from));
   return <>{parts}</>;
