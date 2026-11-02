@@ -168,24 +168,23 @@ export function TimeZoneSelect({
 }
 
 /** Whether times read as clock times or as offsets from the start of the run. */
-export function TimeDisplaySelect({
+export function TimeDisplayToggle({
   value,
   onChange,
 }: {
   value: TimeDisplay;
   onChange: (value: TimeDisplay) => void;
 }) {
+  const next = value === "offset" ? "absolute" : "offset";
+  const action = `Switch to ${next} time`;
   return (
-    <label className="timezone-select">
-      <span>Time</span>
-      <select
-        className="text-input"
-        value={value}
-        onChange={(event) => onChange(event.target.value === "offset" ? "offset" : "absolute")}
-      >
-        <option value="absolute">Absolute</option>
-        <option value="offset">Offset</option>
-      </select>
-    </label>
+    <button
+      className="time-display-toggle"
+      aria-label={action}
+      title={action}
+      onClick={() => onChange(next)}
+    >
+      {value === "offset" ? "Offset" : "Absolute"}
+    </button>
   );
 }

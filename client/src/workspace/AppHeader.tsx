@@ -1,6 +1,6 @@
 import "./AppHeader.css";
 import { widgetDragMime, widgetSpecs, widgetTypes, type Widget } from "./widgets";
-import { TimeDisplaySelect, TimeZoneSelect } from "./TimeZoneSelect";
+import { TimeDisplayToggle, TimeZoneSelect } from "./TimeZoneSelect";
 import type { TimeDisplay, TimeZoneSource } from "../timeDisplay";
 import type { Info, Run } from "../types";
 
@@ -206,7 +206,7 @@ export function AppHeader({
           </div>
         ))}
       </div>
-      <TimeDisplaySelect value={timeDisplay} onChange={onTimeDisplay} />
+      <TimeDisplayToggle value={timeDisplay} onChange={onTimeDisplay} />
       <TimeZoneSelect
         source={zoneSource}
         serverZone={serverZone}

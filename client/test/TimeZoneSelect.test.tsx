@@ -95,11 +95,16 @@ describe("TimeZoneSelect", () => {
   });
 });
 
-describe("TimeDisplaySelect", () => {
-  it("reports the choice", () => {
+describe("TimeDisplayToggle", () => {
+  it("shows the current mode, and switches to the other", () => {
     const onChange = vi.fn();
-    render(<TimeDisplaySelect value="absolute" onChange={onChange} />);
-    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "offset" } });
+    const { rerender } = render(<TimeDisplayToggle value="absolute" onChange={onChange} />);
+    const button = screen.getByRole("button", { name: "Switch to offset time" });
+    expect(button.textContent).toBe("Absolute");
+    fireEvent.click(button);
     expect(onChange).toHaveBeenCalledWith("offset");
+    rerender(<TimeDisplayToggle value="offset" onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Switch to absolute time" }));
+    expect(onChange).toHaveBeenLastCalledWith("absolute");
   });
 });
