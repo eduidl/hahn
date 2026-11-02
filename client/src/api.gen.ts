@@ -305,7 +305,7 @@ export interface components {
              * @description The kind of value, which decides how a client reads it. Details such as bounds belong in `type_name`.
              * @enum {string}
              */
-            data_type: "null" | "bool" | "int8" | "int16" | "int32" | "int64" | "uint8" | "uint16" | "uint32" | "uint64" | "float32" | "float64" | "string" | "wstring" | "bytes" | "enum" | "struct" | "list" | "array" | "map";
+            data_type: "null" | "bool" | "int8" | "int16" | "int32" | "int64" | "uint8" | "uint16" | "uint32" | "uint64" | "float32" | "float64" | "string" | "wstring" | "json" | "bytes" | "enum" | "struct" | "list" | "array" | "map";
             /** @description The type name for display. */
             type_name?: string;
             /** @description The names and values of an enum. */

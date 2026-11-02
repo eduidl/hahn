@@ -143,6 +143,9 @@ header .add-widget {
 /* The central work surface is tiled; plotting gestures stay inside each pane. */
 .widget-catalog {
   position-anchor: --add-widget;
+  /* The button sits near the right edge, and the list is often taller than the window. */
+  position-area: bottom span-left;
+  position-try-fallbacks: none;
   width: min(280px, calc(100vw - 32px));
   padding: 8px;
 }

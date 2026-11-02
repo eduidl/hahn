@@ -171,28 +171,9 @@ export function AppHeader({
         disabled={timeDisplay === "offset"}
         source={zoneSource}
         serverZone={serverZone}
+        atMs={info ? Number(BigInt(info.start_ns) / 1_000_000n) : undefined}
         onChange={onZoneSource}
       />
-      <button
-        className="sidebar-toggle"
-        aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-        title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-        aria-expanded={sidebarOpen}
-        onClick={onToggleSidebar}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M9 4v16" />
-        </svg>
-      </button>
     </header>
   );
 }

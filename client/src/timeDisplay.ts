@@ -3,8 +3,11 @@ import { createContext, useContext, useMemo } from "react";
 /** How times are written: on the clock, or as seconds from the start of the run. */
 export type TimeDisplay = "absolute" | "offset";
 
-/** Where the displayed timezone comes from, chosen once for the whole workspace. */
-export type TimeZoneSource = "browser" | "server";
+/**
+ * The displayed timezone, chosen once for the whole workspace: the browser's,
+ * the one the server declares, or a named IANA zone.
+ */
+export type TimeZoneSource = "browser" | "server" | (string & {});
 
 /** The timezone clock times are shown in; undefined means the browser's. */
 export const DisplayTimeZone = createContext<string | undefined>(undefined);
@@ -22,6 +25,30 @@ export function usableTimeZone(zone: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** Every zone that can be chosen by name. Browsers may leave UTC out of the list. */
+export const namedTimeZones = () => [
+  "UTC",
+  ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC"),
+];
+
+/** The zone a choice stands for; undefined means the browser's. */
+export function chosenTimeZone(source: TimeZoneSource, serverZone: string | null) {
+  if (source === "browser") return undefined;
+  if (source === "server") return serverZone ?? undefined;
+  return usableTimeZone(source) ?? undefined;
+}
+
+/** A zone's UTC offset at a moment, such as `UTC+9` or `UTC+5:30`; it can change with the date. */
+export function zoneOffset(timeZone: string, atMs: number) {
+  const name = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
+    .formatToParts(atMs)
+    .find((part) => part.type === "timeZoneName")?.value;
+  // `GMT+09:00`, or plain `GMT` in some browsers, with seconds in old dates.
+  const [, sign, hours, rest] = name?.match(/^GMT([+-])(\d+)(?::(.+))?$/) ?? [];
+  if (!sign || (Number(hours) === 0 && (!rest || /^00(:00)?$/.test(rest)))) return "UTC";
+  return `UTC${sign}${Number(hours)}${rest && rest !== "00" ? `:${rest}` : ""}`;
 }
 
 /** `mode` overrides the workspace's choice, for places that always need one form. */

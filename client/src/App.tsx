@@ -5,7 +5,7 @@ import { ConfirmDialog } from "./workspace/ConfirmDialog";
 import { PlaybackBar } from "./workspace/PlaybackBar";
 import { RunsDialog } from "./workspace/RunsDialog";
 import { Sidebar } from "./workspace/Sidebar";
-import { WidgetWorkspace, widgetSeries } from "./workspace/WidgetWorkspace";
+import { WidgetWorkspace } from "./workspace/WidgetWorkspace";
 import { buildFieldIndex } from "./workspace/fieldIndex";
 import { browserStorage, loadSession, type SidebarTab } from "./workspace/persistence";
 import { PlaybackContext, createPlaybackStore } from "./workspace/playback";
@@ -26,6 +26,7 @@ import { useMessages } from "./data/useMessages";
 import { useSeries } from "./data/useSeries";
 import {
   DisplayTimeMode,
+  chosenTimeZone,
   DisplayTimeZone,
   usableTimeZone,
   type TimeDisplay,
