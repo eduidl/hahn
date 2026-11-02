@@ -1,6 +1,6 @@
 // What a 3D widget draws: point clouds, poses, camera images and frame axes.
 import { ReportSeriesProblem } from "./seriesViewProblem";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
@@ -37,9 +37,18 @@ export const matrixOf = ({ translation, rotation }: Transform) =>
     new THREE.Vector3(1, 1, 1),
   );
 
+/** The frame the camera follows and where it is now in the scene's frame. */
+export type FollowAnchor = { frame: string; pose: Transform } | null;
+
+/** Set by a 3D view while its camera follows a frame other than the one it renders in. */
+export const FollowContext = createContext<FollowAnchor>(null);
+
 /**
  * Where the latest data of `frameId` sits in `target`, by the transform at the data's own time.
  * It counts as the present, so what is rigid to `target` stays still between messages.
+ * While the camera follows a frame, data is placed relative to that frame at the data's time,
+ * which then sits where it is now: what is rigid to it, such as its own sensors, stays still
+ * in view rather than falling behind until the next message.
  */
 export function useFramePlacement(
   source: string | undefined,
@@ -47,24 +56,28 @@ export function useFramePlacement(
   target: string | null,
   dataNs: string | null,
 ) {
+  const anchor = useContext(FollowContext);
   const placed = !!frameId && !!target;
+  const via = anchor?.frame ?? target;
   const { transforms, error } = useTransforms(
     source,
-    placed && frameId !== target ? target : null,
+    placed && frameId !== via ? via : null,
     dataNs,
     true,
   );
   const transform = frameId ? transforms?.frames[frameId] : undefined;
   const matrix = useMemo(() => {
     if (!placed) return undefined;
-    if (frameId === target) return new THREE.Matrix4();
-    return transform ? matrixOf(transform) : undefined;
-  }, [placed, frameId, target, transform]);
+    const local =
+      frameId === via ? new THREE.Matrix4() : transform ? matrixOf(transform) : undefined;
+    if (!local || !anchor) return local;
+    return matrixOf(anchor.pose).multiply(local);
+  }, [placed, frameId, via, transform, anchor]);
   // Data arrives ahead of its transform; placed by the previous one, it would jump and return.
-  const settled = !placed || frameId === target || transforms?.time_ns === dataNs || !!error;
+  const settled = !placed || frameId === via || transforms?.time_ns === dataNs || !!error;
   return {
     matrix,
-    missing: placed && frameId !== target && !!transforms && !transform,
+    missing: placed && frameId !== via && !!transforms && !transform,
     error,
     settled,
   };
