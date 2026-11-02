@@ -18,7 +18,6 @@ export function Sidebar({
   activeWidget,
   dispatch,
   records,
-  pointCount,
   index,
   topics,
   sourceNames,

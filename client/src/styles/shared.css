@@ -1,15 +1,3 @@
-.eyebrow {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.field-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 25px 22px 15px;
-  font-size: 12px;
-  color: var(--text-faint);
-}
 /* Roomier than a plain input: it heads a list. */
 .text-input.search {
   margin: 0 17px 16px;

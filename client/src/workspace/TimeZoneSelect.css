@@ -1,8 +1,9 @@
-.timezone-name {
-  color: var(--text);
-}
-.timezone-name.disabled {
-  color: var(--text-faint);
+/* A fixed width, so that switching does not move the button beside it. */
+.time-display-toggle {
+  flex-shrink: 0;
+  width: 72px;
+  margin-left: 12px;
+  padding: 5px 0;
 }
 .timezone-select {
   display: flex;

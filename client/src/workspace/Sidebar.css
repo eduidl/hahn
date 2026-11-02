@@ -5,6 +5,17 @@ aside {
   background: var(--bg-base);
   min-width: 0;
 }
+/* The list's own row: what it shows, and the action that applies to all of it. */
+.topics-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .collapse-topics {
   padding: 4px 6px;
   font-size: 12px;

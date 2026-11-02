@@ -1,4 +1,4 @@
-.legend {
+.settings-title {
   flex-shrink: 0;
   margin: 0;
   padding: 16px;
@@ -18,7 +18,7 @@
 .settings-section:last-child {
   border-bottom: 0;
 }
-.legend-heading {
+.settings-section-heading {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -34,6 +34,15 @@
 }
 .settings-label {
   font-size: 12px;
+  color: var(--text-muted);
+}
+.settings-section > .muted,
+.settings-section > .help {
+  margin: 0;
+  padding: 0;
+}
+.settings-section > .text-input.search {
+  margin: 0;
 }
 .legend-row {
   display: grid;
@@ -58,16 +67,11 @@
 .add-field {
   anchor-name: --add-field;
   align-self: flex-start;
-  margin: 0 16px 16px;
-}
-.target-setting {
-  margin: 0 16px 16px;
 }
 .target-summary {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 16px;
   font: 12px var(--font-mono);
 }
 .target-summary.removable {
@@ -77,9 +81,6 @@
 .target-summary.removable .series-ref-inline {
   flex: 1;
 }
-.target-setting > .add-field {
-  margin: 0;
-}
 .table-column-options {
   display: flex;
   flex-direction: column;
@@ -88,7 +89,6 @@
 .table-column-actions {
   display: flex;
   gap: 6px;
-  margin-bottom: 12px;
 }
 .table-column-option {
   display: flex;
@@ -204,7 +204,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 6px 16px 20px;
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
@@ -214,7 +213,7 @@
   align-items: center;
   gap: 12px;
   margin: 0;
-  padding: 0 16px 20px;
+  padding: 0;
   border: 0;
   font-size: 12px;
   color: var(--text-muted);
