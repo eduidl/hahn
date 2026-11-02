@@ -1,5 +1,12 @@
-import { type Stage, PointsLayer, PoseLayer, CameraLayer, FrameAxes } from "./sceneLayers";
-import { useEffect, useRef, useState } from "react";
+import {
+  type Stage,
+  PointsLayer,
+  PoseLayer,
+  CameraLayer,
+  FrameAxes,
+  FollowContext,
+} from "./sceneLayers";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { errorMessage, topicKey, type Info, type Schemas } from "../types";

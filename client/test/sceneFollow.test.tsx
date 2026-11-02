@@ -63,3 +63,28 @@ it("forgets a saved fixed frame and a broken followed frame", () => {
   expect("fixedFrame" in revived).toBe(false);
 });
 
+it("places data relative to the followed frame, which sits where it is now", () => {
+  const seen: (string | null)[] = [];
+  transformMocks.frames = { camera: { translation: [0, 1, 0], rotation: [0, 0, 0, 1] } };
+  const anchor = {
+    frame: "lidar",
+    pose: { translation: [10, 0, 0], rotation: turned(Math.PI / 2) },
+  };
+  const { result } = renderHook(
+    () => {
+      const placement = useFramePlacement("r/0", "camera", "map", "5");
+      seen.push(transformMocks.lastTarget);
+      return placement;
+    },
+    {
+      wrapper: ({ children }) => (
+        <FollowContext.Provider value={anchor}>{children}</FollowContext.Provider>
+      ),
+    },
+  );
+  // Asked for the camera in the followed frame at the data's time, not in the scene's.
+  expect(seen.at(-1)).toBe("lidar");
+  // One meter along lidar's y, which now points along -x of the map.
+  close(new THREE.Vector3().applyMatrix4(result.current.matrix!), [9, 0, 0]);
+  expect(result.current.settled).toBe(true);
+});
