@@ -69,13 +69,16 @@ describe("TimeZoneSelect", () => {
     expect(options()[0]).toBe("UTC");
   });
 
-  it.each([
-    ["declares none", null],
-    ["uses the browser's zone", browserTimeZone()],
-  ])("shows the zone without a choice when the server %s", (_, serverZone) => {
-    render(<TimeZoneSelect source="server" serverZone={serverZone} onChange={() => {}} />);
-    expect(screen.queryByRole("combobox")).toBeNull();
-    expect(screen.getByText(browserTimeZone())).toBeTruthy();
+  it("opens on the zone in use", () => {
+    render(<TimeZoneSelect source="Europe/Paris" serverZone={null} onChange={() => {}} />);
+    const opened = Object.assign(new Event("toggle"), { newState: "open" });
+    act(() => {
+      screen.getByRole("dialog", { hidden: true }).dispatchEvent(opened);
+    });
+    const selected = screen
+      .getAllByRole("option", { hidden: true })
+      .find((option) => option.getAttribute("aria-selected") === "true");
+    expect(selected?.textContent).toContain("Europe/Paris");
   });
 
   it("lists each zone with its offset, and finds zones by it", () => {

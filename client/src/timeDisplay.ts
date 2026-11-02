@@ -95,11 +95,11 @@ export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZo
     day: "2-digit",
   });
   const zone = clock.resolvedOptions().timeZone;
+  const dateAt = (seconds: number) =>
+    new Date(Number((BigInt(originNs!) + BigInt(Math.round(seconds * 1e9))) / 1_000_000n));
   const tick = (seconds: number) => {
     if (originNs === null || !Number.isFinite(seconds * 1e9)) return { time: "—", date: "" };
-    const date = new Date(
-      Number((BigInt(originNs) + BigInt(Math.round(seconds * 1e9))) / 1_000_000n),
-    );
+    const date = dateAt(seconds);
     if (!Number.isFinite(date.getTime())) return { time: "—", date: "" };
     const parts = calendar.formatToParts(date);
     const part = (name: Intl.DateTimeFormatPartTypes) =>
@@ -124,8 +124,11 @@ export function timeFormatter(originNs: string | null, mode: TimeDisplay, timeZo
     clock: true,
     tooltip: (seconds: number) => {
       const label = tick(seconds);
-      return label.date ? `${label.date} ${label.time} (${zone})` : "—";
+      return label.date
+        ? `${label.date} ${label.time} (${zoneOffset(zone, dateAt(seconds).getTime())})`
+        : "—";
     },
-    axisLabel: `Absolute time (${zone})`,
+    // Named at the start of the run; the ticks still follow any later clock change.
+    axisLabel: `Absolute time (${zoneOffset(zone, originNs === null ? Date.now() : dateAt(0).getTime())})`,
   };
 }

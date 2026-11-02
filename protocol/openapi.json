@@ -844,6 +844,7 @@
               "float64",
               "string",
               "wstring",
+              "json",
               "bytes",
               "enum",
               "struct",

@@ -25,7 +25,7 @@ describe("time display", () => {
       time: "08:59:59.123",
       date: "2026-01-05",
     });
-    expect(format.axisLabel).toContain("Asia/Tokyo");
+    expect(format.axisLabel).toBe("Absolute time (UTC+9)");
   });
   it("supports relative seconds and absent or out of range timestamps", () => {
     const relative = timeFormatter(origin, "offset");
@@ -37,6 +37,16 @@ describe("time display", () => {
     expect(relative.axisTime(0.5, 0.5)).toBe("0.5");
     expect(timeFormatter(null, "absolute").tick(0).time).toBe("—");
     expect(timeFormatter(origin, "absolute").tick(1e308).time).toBe("—");
+  });
+});
+
+describe("time labels across a clock change", () => {
+  it("write the offset in force at each moment, and the run's first on the axis", () => {
+    const start = BigInt(Date.UTC(2025, 2, 9, 6)) * 1_000_000n; // 1 am in New York, in winter.
+    const format = timeFormatter(String(start), "absolute", "America/New_York");
+    expect(format.axisLabel).toBe("Absolute time (UTC-5)");
+    expect(format.tooltip(0)).toContain("(UTC-5)");
+    expect(format.tooltip(2 * 3600)).toContain("(UTC-4)");
   });
 });
 
