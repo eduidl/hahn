@@ -80,9 +80,6 @@ export function App() {
   const fullEnd = info ? Math.max(1e-9, secondsFrom(info.end_ns, info.start_ns)) : 1;
   const [playback] = useState(createPlaybackStore);
   const serverZone = usableTimeZone(run?.timezone);
-  const count = activeWidget
-    ? widgetSeries(activeWidget, plotted).reduce((n, s) => n + s.points.length, 0)
-    : 0;
   const resetWorkspace = useSession(
     { workspace, runId, sources, zoneSource, timeDisplay, tab, sidebarWidth, sidebarOpen },
     restoring,
@@ -101,9 +98,7 @@ export function App() {
   return (
     <FieldCacheContext.Provider value={fieldCache}>
       <PlaybackContext.Provider value={playback}>
-        <DisplayTimeZone.Provider
-          value={zoneSource === "server" ? (serverZone ?? undefined) : undefined}
-        >
+        <DisplayTimeZone.Provider value={chosenTimeZone(zoneSource, serverZone)}>
           <DisplayTimeMode.Provider value={timeDisplay}>
             <SourceNames.Provider value={sourceNames}>
               <div className="app">
@@ -160,7 +155,6 @@ export function App() {
                     activeWidget={activeWidget}
                     dispatch={dispatch}
                     records={[...records, ...messages.records]}
-                    pointCount={count}
                     index={index}
                     topics={topics}
                     sourceNames={sourceNames}

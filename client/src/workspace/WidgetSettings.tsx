@@ -29,7 +29,6 @@ export type WidgetSettingsProps = {
   widget: Widget;
   dispatch: Dispatch<WorkspaceAction>;
   records: Pick<CachedSeries, "key" | "status" | "received">[];
-  pointCount: number;
   index: FieldIndex;
 };
 
@@ -229,7 +228,6 @@ function ViewSeriesList(props: WidgetSettingsProps) {
   return (
     <SeriesList
       {...props}
-      showPoints={false}
       row={(s) => (
         <SeriesRow
           key={s.key}
