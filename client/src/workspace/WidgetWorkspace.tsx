@@ -27,7 +27,7 @@ import { TfTree } from "../views/TfTree";
 import { SourceInfo } from "../views/SourceInfo";
 import type { OpenSource } from "../data/sources";
 import { ImageView } from "../views/ImageView";
-import { widgetDragImage } from "./widgetDragImage";
+import { hideOverflowForDragImage } from "./widgetDragImage";
 import { flattenMapsForDragImage } from "../views/mapDragImage";
 import { SourceNames } from "../data/sources";
 import { dragMime, type Info } from "../types";
@@ -272,12 +272,12 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 const { left, top } = frame.getBoundingClientRect();
                 // Maps first: their tiles beyond the view would count as overflow.
                 const restoreMaps = flattenMapsForDragImage(frame);
-                const { image, cleanup } = widgetDragImage(frame, widget.title);
-                event.dataTransfer.setDragImage(image, event.clientX - left, event.clientY - top);
+                const restoreOverflow = hideOverflowForDragImage(frame);
+                event.dataTransfer.setDragImage(frame, event.clientX - left, event.clientY - top);
                 // The browser takes the image once this handler has returned.
                 setTimeout(() => {
+                  restoreOverflow();
                   restoreMaps();
-                  cleanup();
                 });
                 moving.setId(widget.id);
                 dispatch({ type: "select", id: widget.id });
