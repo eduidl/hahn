@@ -27,6 +27,7 @@ import { TfTree } from "../views/TfTree";
 import { SourceInfo } from "../views/SourceInfo";
 import type { OpenSource } from "../data/sources";
 import { ImageView } from "../views/ImageView";
+import { widgetDragImage } from "./widgetDragImage";
 import { flattenMapsForDragImage } from "../views/mapDragImage";
 import { SourceNames } from "../data/sources";
 import { dragMime, type Info } from "../types";
@@ -269,7 +270,10 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 // The whole widget follows the pointer, held where it was grabbed.
                 const frame = event.currentTarget.closest(".widget-shell")!;
                 const { left, top } = frame.getBoundingClientRect();
-                event.dataTransfer.setDragImage(frame, event.clientX - left, event.clientY - top);
+                // Maps first: their tiles beyond the view would count as overflow.
+                const restoreMaps = flattenMapsForDragImage(frame);
+                const { image, cleanup } = widgetDragImage(frame, widget.title);
+                event.dataTransfer.setDragImage(image, event.clientX - left, event.clientY - top);
                 // The browser takes the image once this handler has returned.
                 setTimeout(() => {
                   restoreMaps();
