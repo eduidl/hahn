@@ -64,7 +64,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   state: {
     label: "State timeline",
-    controls: ["Wheel: zoom"],
+    controls: ["Wheel: zoom", "Drag: pan while zoomed"],
     description: "Show how bool, enum, or string values stay and change along a time axis",
     emptyHint: "Drop a bool, enum, or string field",
     accepts: new Set(["bool", "enum", "string"]),

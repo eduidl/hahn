@@ -33,7 +33,7 @@ it("follows keyboard focus", () => {
   expect(toggle).toHaveBeenLastCalledWith(false);
 });
 it("gives each operable widget its own list, and none to the rest", () => {
-  expect(widgetSpecs.state.controls).toEqual(["Wheel: zoom"]);
+  expect(widgetSpecs.state.controls).toEqual(["Wheel: zoom", "Drag: pan while zoomed"]);
   expect(widgetSpecs.scene.controls).toEqual(["Drag: rotate", "Right-drag: pan", "Wheel: zoom"]);
   expect(widgetSpecs["tf-tree"].controls).toEqual(["Drag: pan", "Wheel: zoom"]);
   expect(widgetSpecs.map.controls).toEqual(["Drag: pan", "Wheel: zoom"]);

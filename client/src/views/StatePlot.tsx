@@ -1,6 +1,6 @@
 import "./StatePlot.css";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { axisRange, clampAxis, zoomAxis, type AxisRange } from "./axes";
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { axisRange, clampAxis, panAxis, zoomAxis, type AxisRange } from "./axes";
 import { wheelZoomFactor, type PlotView, type Series } from "./Plot";
 import { timeTicks } from "./ticks";
 import { stateLabel } from "../data/data";
@@ -210,6 +210,33 @@ export function StatePlot({
     const rect = event.currentTarget.getBoundingClientRect();
     return domain[0] + ((event.clientX - rect.left) / rect.width) * (domain[1] - domain[0]);
   };
+  const drag = useRef<{ x: number; view: PlotView["x"]; moved: boolean } | null>(null);
+  // The click that ends a drag must not also move the playback position.
+  const dragged = useRef(false);
+  const zoomed = widget.view.x.zoom > 1;
+  const onPointerDown = (event: PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !zoomed) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { x: event.clientX, view: widget.view.x, moved: false };
+  };
+  const onPointerMove = (event: PointerEvent<HTMLElement>) => {
+    const active = drag.current;
+    if (active) {
+      const distance = event.clientX - active.x;
+      active.moved ||= Math.abs(distance) > dragPixels;
+      if (active.moved) {
+        const delta = -distance / event.currentTarget.getBoundingClientRect().width;
+        onViewChange((current) => ({ ...current, x: clampAxis(panAxis(active.view, delta)) }));
+        playback.setPreview(null);
+        return;
+      }
+    }
+    playback.setPreview(timeAt(event));
+  };
+  const endDrag = () => {
+    dragged.current = Boolean(drag.current?.moved);
+    drag.current = null;
+  };
   const visible = series.filter((s) => !s.hidden);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -248,9 +275,15 @@ export function StatePlot({
             <SeriesName inline source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
           </div>
           <div
-            className="state-track"
-            onClick={(event) => playback.seek(timeAt(event))}
-            onPointerMove={(event) => playback.setPreview(timeAt(event))}
+            className={zoomed ? "state-track state-track-pannable" : "state-track"}
+            onClick={(event) => {
+              if (!dragged.current) playback.seek(timeAt(event));
+              dragged.current = false;
+            }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
             onPointerLeave={() => playback.setPreview(null)}
           >
             {stateBands(segmentsOf(s), domain, width).map((band, i) => {
