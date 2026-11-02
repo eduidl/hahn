@@ -12,14 +12,14 @@
   /* For names and values only: topics, fields, series, frames, message contents. */
   --font-mono: ui-monospace, monospace;
 
-  --bg-base: #0d0d0d;
-  --bg-raised: #181818;
-  --bg-control: #242424;
-  --bg-hover: #2a2a2a;
+  --bg-base: #161616;
+  --bg-raised: #1f1f1f;
+  --bg-control: #2a2a2a;
+  --bg-hover: #303030;
   --bg-accent: #243047;
-  --bg-overlay: rgb(24 24 24 / 90%);
-  --line: #333;
-  --line-strong: #444;
+  --bg-overlay: rgb(31 31 31 / 90%);
+  --line: #383838;
+  --line-strong: #4a4a4a;
   --text: #e4e4e4;
   --text-muted: #a0a0a0;
   --text-faint: #858585;

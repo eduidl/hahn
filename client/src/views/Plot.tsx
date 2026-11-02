@@ -336,7 +336,7 @@ export function Plot({
     }
     for (const tick of yTicks) {
       const y = tick.y;
-      ctx.strokeStyle = "#242424";
+      ctx.strokeStyle = "#2c2c2c";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(left, y);
@@ -356,7 +356,7 @@ export function Plot({
     ctx.textAlign = "center";
     for (const value of values) {
       const x = px(value);
-      ctx.strokeStyle = "#202020";
+      ctx.strokeStyle = "#282828";
       ctx.beginPath();
       ctx.moveTo(x, top);
       ctx.lineTo(x, top + h);
