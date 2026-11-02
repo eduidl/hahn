@@ -50,21 +50,6 @@
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   border: 1px dashed var(--accent);
 }
-/* Kept off screen; the browser only copies it for the drag. Its own overflow stays inside. */
-.widget-drag-image {
-  position: fixed;
-  top: -10000px;
-  left: -10000px;
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid var(--accent);
-  background: var(--bg-base);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 32px;
-  text-indent: 10px;
-  white-space: nowrap;
-}
 .widget-shell.lifted {
   visibility: hidden;
 }
