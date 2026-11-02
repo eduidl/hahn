@@ -498,9 +498,8 @@ export function FrameAxes({
   stage,
   settings,
 }: {
-  source: string | undefined;
-  target: string | null;
-  info: Info | null;
+  /** Every frame placed in the fixed frame at the playback position. */
+  transforms: Schemas["Transforms"] | undefined;
   stage: Stage;
   settings: FrameAxesSettings;
 }) {

@@ -6,7 +6,13 @@ import { errorMessage, topicKey, type Info, type Schemas } from "../types";
 import { get, runUrl } from "../data/sources";
 import { usePlaybackStore } from "../workspace/playback";
 import { type FieldIndex } from "../workspace/fieldIndex";
-import { fixedFrameOf, useFrames, useViewFrame } from "../data/useViewData";
+import {
+  fixedFrameOf,
+  useFrames,
+  usePlaybackNs,
+  useTransforms,
+  useViewFrame,
+} from "../data/useViewData";
 import { type Transform } from "../data/viewFrames";
 import { type Widget } from "../workspace/widgets";
 import { reframeCamera } from "./sceneCamera";
@@ -102,10 +108,11 @@ function createStage(host: HTMLDivElement) {
   const reframe = (transform: Transform) => {
     const target = controls.target.clone();
     reframeCamera(camera, target, transform);
+    // The new fixed frame's z axis is up, whatever the old one's was.
+    camera.up.set(0, 0, 1);
     replaceControls(target);
   };
   const resetView = () => {
-    camera.up.set(0, 0, 1);
     camera.position.copy(homePosition);
     grid.scale.setScalar(1);
     replaceControls(new THREE.Vector3());
@@ -220,54 +227,67 @@ export default function Scene3D({
       onFixedFrame(firstFrameId);
   }, [firstFrameId, frames]);
   const world = fixedFrameOf(null, frames);
-  const adopted = firstFrameId && frames.some((frame) => frame.id === firstFrameId);
-  // Held back until the first topic's frame is known: starting from another frame would
-  // carry its view over, away from the data.
-  const deciding = widget.fixedFrame === null && !!widget.series[0] && firstFrame === undefined;
-  const requested = deciding
-    ? null
-    : fixedFrameOf(widget.fixedFrame ?? (adopted ? firstFrameId : null), frames);
-  const { target, error: frameError } = useSceneFrame(stage, sources[0], requested, info);
+  const { target, error: frameError } = useSceneFrame(stage, sources[0], world, info);
+  const ns = usePlaybackNs(info);
+  const { transforms } = useTransforms(sources[0], target, ns === null ? null : String(ns), true);
+  const followed = fixedFrameOf(widget.followFrame, frames);
+  // Following the root itself leaves the scene around the root's origin.
+  const pose =
+    followed !== null && followed !== target && transforms?.target === target
+      ? (transforms.frames[followed] ?? null)
+      : null;
+  useEffect(() => {
+    if (!stage) return;
+    if (followed === null || followed === target) stage.setOrigin(null);
+    // Until the frame is placed again, the scene stays around where it was.
+    else if (pose) stage.setOrigin(pose.translation);
+  }, [stage, followed, target, pose]);
+  const anchor = useMemo(
+    () => (pose && followed !== null ? { frame: followed, pose } : null),
+    [followed, pose],
+  );
   const problem = failure || error || frameError;
   return (
     <div className="view-scene" ref={host}>
-      {stage && <FrameAxes source={sources[0]} target={target} info={info} stage={stage} />}
-      <div className="view-problems">
-        {problem && <p className="view-error">{problem}</p>}
-        {stage &&
-          widget.series.map((series) => {
-            const kind = index.topics
-              .get(topicKey(series.source, series.topic))
-              ?.views.find((view) => view.id === series.view)?.kind;
-            return kind === "image" ? (
-              <CameraLayer
-                key={series.key}
-                series={series}
-                info={info}
-                target={target}
-                stage={stage}
-                index={index}
-              />
-            ) : kind === "pose" ? (
-              <PoseLayer
-                key={series.key}
-                series={series}
-                info={info}
-                target={target}
-                world={world}
-                stage={stage}
-              />
-            ) : (
-              <PointsLayer
-                key={series.key}
-                series={series}
-                info={info}
-                target={target}
-                stage={stage}
-              />
-            );
-          })}
-      </div>
+      {stage && <FrameAxes transforms={transforms} stage={stage} settings={widget.frameAxes} />}
+      <FollowContext.Provider value={anchor}>
+        <div className="view-problems">
+          {problem && <p className="view-error">{problem}</p>}
+          {stage &&
+            widget.series.map((series) => {
+              const kind = index.topics
+                .get(topicKey(series.source, series.topic))
+                ?.views.find((view) => view.id === series.view)?.kind;
+              return kind === "image" ? (
+                <CameraLayer
+                  key={series.key}
+                  series={series}
+                  info={info}
+                  target={target}
+                  stage={stage}
+                  index={index}
+                />
+              ) : kind === "pose" ? (
+                <PoseLayer
+                  key={series.key}
+                  series={series}
+                  info={info}
+                  target={target}
+                  world={world}
+                  stage={stage}
+                />
+              ) : (
+                <PointsLayer
+                  key={series.key}
+                  series={series}
+                  info={info}
+                  target={target}
+                  stage={stage}
+                />
+              );
+            })}
+        </div>
+      </FollowContext.Provider>
     </div>
   );
 }
