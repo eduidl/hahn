@@ -1,0 +1,40 @@
+# Versions the project is developed and checked with. README.md states the minimums.
+[tools]
+node = "26.13.0"
+rust = "1.97.1"
+
+[tasks."client:install"]
+description = "Install client dependencies"
+run = "npm --prefix client ci"
+
+[tasks."client:dev"]
+description = "Run the client dev server; /api goes to port 3000"
+run = "npm --prefix client run dev"
+
+[tasks."client:build"]
+description = "Build the client"
+run = "npm --prefix client run build"
+
+[tasks.format]
+description = "Format the client"
+run = "npm --prefix client run format"
+
+[tasks."test:server"]
+description = "Run the server tests"
+run = "cargo test --manifest-path server/Cargo.toml --locked"
+
+[tasks."test:client"]
+description = "Run the client tests and check the generated API types"
+run = "npm --prefix client test"
+
+[tasks.conformance]
+description = "Run the conformance tests against synthetic recordings"
+run = "scripts/conformance.sh"
+
+[tasks.check]
+description = "Run the checks in DEVELOPMENT.md"
+depends = ["test:server", "test:client", "client:build", "format:check", "conformance"]
+
+[tasks."format:check"]
+description = "Check the client formatting"
+run = "npm --prefix client run format:check"

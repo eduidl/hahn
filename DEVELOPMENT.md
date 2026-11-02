@@ -25,6 +25,8 @@ scripts/conformance.sh                   # 合成録画の生成・起動・削�
 
 Run `npm --prefix client run format` to format the client. Generated API types are excluded.
 
+With mise, `mise run check` runs all of the checks above. `mise tasks` lists the individual tasks.
+
 適合性テストは既定で `127.0.0.1:3918` を使います。使用中なら `CONFORMANCE_PORT=3919 scripts/conformance.sh` のように変更します。
 
 別のサーバを検査する合成録画は、次のコマンドで生成できます。出力先は `data/` 以下かリポジトリ外にしてください。
