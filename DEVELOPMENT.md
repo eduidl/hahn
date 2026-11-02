@@ -75,9 +75,9 @@ Follow these rules for all text a user can see or hear, including tooltips and `
 
 ### Widget names
 
-Plot, State transition, Value changes, Table, Raw message, Image, 3D, Map, TF tree, Data source info, Tabs.
+3D, Data source info, Image, Map, Plot, Raw message, State table, State timeline, Table, Tabs, TF tree.
 
-Each name is defined once, as `label` in `widgetSpecs`. The widget list, title bar, and menus all use it.
+Each name is defined once, as `label` in `widgetSpecs`. The widget list, title bar, and menus all use it. Widget lists show the names in this alphabetical order.
 
 ### Actions
 
@@ -93,9 +93,9 @@ Each name is defined once, as `label` in `widgetSpecs`. The widget list, title b
 
 ### Style
 
-- Use sentence case: `State transition`, not `State Transition`. Keep the usual form of proper nouns and abbreviations such as `TF`, `3D`, and `OpenStreetMap`.
+- Use sentence case: `State timeline`, not `State Timeline`. Keep the usual form of proper nouns and abbreviations such as `TF`, `3D`, and `OpenStreetMap`.
 - Write headings in sentence case in the source. Use CSS for all-caps display.
-- Start buttons and menu items with a verb. The exception is an add button, which uses `+ Noun` (`+ Widget`, `+ Field`, `+ Tab`) and has `aria-label="Add widget"` or similar.
+- Start buttons and menu items with a verb. The exception is an add button, which uses `+ Noun` (`+ Field`, `+ Tab`) and has `aria-label="Add field"` or similar. The header's add widget button is an icon, with `aria-label` and `title` set to `Add widget`. A button that switches between two modes shows the current mode, and its `aria-label` and `title` start with a verb (`Switch to offset time`).
 - End complete sentences with a period. Leave it off fragments and labels: `No errors`, `Show all`.
 - End search placeholders with an ellipsis: `Search runs…`.
 - In a confirmation dialog, ask a question in the title and use the action's verb on the confirm button (`Delete tab?` and `Delete`). State what will be lost.

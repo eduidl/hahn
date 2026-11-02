@@ -146,7 +146,10 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
 };
 
-export const widgetTypes = Object.keys(widgetSpecs) as Widget["type"][];
+/** Every widget type, in the alphabetical order the widget lists show them. */
+export const widgetTypes = (Object.keys(widgetSpecs) as Widget["type"][]).sort((a, b) =>
+  widgetSpecs[a].label.localeCompare(widgetSpecs[b].label, "en"),
+);
 
 /** Fields per topic and widget; mirrors the series API batch limit. */
 export const maxFieldsPerTopic = 64;
