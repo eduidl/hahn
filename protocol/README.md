@@ -64,7 +64,7 @@ These are the values of `/messages` and `/messages/latest`.
 
 At present, a shortened string can only be recognized by the trailing `…`.
 
-A `jsonschema` + `json` MCAP topic has one string field, `json`, holding the message text. Its preview value is the parsed document instead of the text, under the same limits, with integers beyond ±(2^53 − 1) as strings. Text that is not valid JSON stays a string, and `preview=false` always returns the text.
+A field with `data_type` `json` holds a JSON document as text. A `jsonschema` + `json` MCAP topic has one such field, `json`, holding the message text. Its preview value is the parsed document instead of the text, under the same limits, with integers beyond ±(2^53 − 1) as strings. Text that is not valid JSON stays a string, and `preview=false` always returns the text.
 
 ## Views
 
