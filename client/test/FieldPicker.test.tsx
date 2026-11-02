@@ -73,6 +73,49 @@ describe("field picker", () => {
     fireEvent.change(search(), { target: { value: "a" } });
     expect(selected()[0]).toContain("alpha");
   });
+  it("finds a field from words of its topic and name, in any order", () => {
+    fireEvent.change(search(), { target: { value: " beta  /t " } });
+    expect(document.querySelectorAll(".field-option")).toHaveLength(1);
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(latest.widgets["widget-1"].series.map((s) => s.path)).toEqual([["beta"]]);
+  });
+  describe("after adding a bool field", () => {
+    beforeEach(() => {
+      fireEvent.change(search(), { target: { value: "flag" } });
+      fireEvent.keyDown(search(), { key: "Enter" });
+    });
+    it("says why a searched field cannot be added", () => {
+      fireEvent.change(search(), { target: { value: "alpha" } });
+      expect(screen.getByText("Only bool fields can be added.")).toBeTruthy();
+      expect(screen.queryByText("No matching fields")).toBeNull();
+    });
+    it("says a searched field is already added", () => {
+      fireEvent.change(search(), { target: { value: "flag" } });
+      expect(screen.getByText("Already added")).toBeTruthy();
+    });
+    it("disables the button with the reason when nothing else fits", () => {
+      fireEvent.change(search(), { target: { value: "ready" } });
+      fireEvent.keyDown(search(), { key: "Enter" });
+      const button = screen.getByRole<HTMLButtonElement>("button", {
+        name: "Add field",
+        hidden: true,
+      });
+      expect(button.disabled).toBe(true);
+      expect(button.title).toBe("Only bool fields can be added.");
+    });
+  });
+  it("still says when nothing has the searched name", () => {
+    fireEvent.change(search(), { target: { value: "zzz" } });
+    expect(screen.getByText("No matching fields")).toBeTruthy();
+  });
+  it("counts the fields a search leaves out and says why", () => {
+    fireEvent.change(search(), { target: { value: "alpha" } });
+    fireEvent.keyDown(search(), { key: "Enter" });
+    fireEvent.change(search(), { target: { value: "" } });
+    expect(screen.getByText(/^2 more fields not shown\./).textContent).toBe(
+      "2 more fields not shown. Only numeric fields can be added.",
+    );
+  });
   it("ignores keys when nothing matches", () => {
     fireEvent.change(search(), { target: { value: "zzz" } });
     fireEvent.keyDown(search(), { key: "ArrowDown" });

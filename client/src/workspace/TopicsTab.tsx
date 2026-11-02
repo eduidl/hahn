@@ -1,5 +1,6 @@
 import { type Dispatch, type DragEvent, type SetStateAction } from "react";
 import { Highlight } from "../Highlight";
+import { matchesTerms, searchTerms } from "../search";
 import { typeLabel } from "./fieldIndex";
 import { keyOf, topicKey, type Field, type Info, type Topic, type TopicDrag } from "../types";
 
@@ -76,7 +77,18 @@ export function TopicsTab({
   showErrorTopics: boolean;
   setShowErrorTopics: (show: boolean) => void;
 }) {
-  const visibleTopics = topics.filter((t) => showErrorTopics || !t.error);
+  const terms = searchTerms(search);
+  const visibleTopics = topics
+    .filter((t) => showErrorTopics || !t.error)
+    .flatMap((t) => {
+      const name = t.topicName ?? t.topic;
+      const topicMatch = matchesTerms(name, terms);
+      // The same text the field pickers search, so a word can come from either part.
+      const fields = t.fields.filter(
+        (f) => topicMatch || matchesTerms(`${name} · ${f.path.join(".")}`, terms),
+      );
+      return topicMatch || fields.length ? [{ topic: t, fields }] : [];
+    });
   return (
     <div
       id="sidebar-topics"
@@ -118,20 +130,14 @@ export function TopicsTab({
       </div>
       <div className="topics">
         {loadingInfo && <p className="muted">Loading group information…</p>}
-        {visibleTopics.map((t, i) => {
+        {visibleTopics.map(({ topic: t, fields }, i) => {
           const id = topicKey(t.source, t.topic);
           // Several recordings: head each one's topics with its name.
-          const heading = multiSource && visibleTopics[i - 1]?.source !== t.source && (
+          const heading = multiSource && visibleTopics[i - 1]?.topic.source !== t.source && (
             <div className="source-heading" key={`source-${t.source}`}>
               {sourceNames.get(t.source)}
             </div>
           );
-          const query = search.toLowerCase();
-          const topicMatch = (t.topicName ?? t.topic).toLowerCase().includes(query);
-          const fields = t.fields.filter(
-            (f) => topicMatch || f.path.join(".").toLowerCase().includes(query),
-          );
-          if (!fields.length && !topicMatch) return heading || null;
           return [
             heading,
             <details
@@ -192,7 +198,9 @@ export function TopicsTab({
           ];
         })}
         {!loadingInfo && info && !visibleTopics.length && (
-          <p className="muted">No topics to display</p>
+          <p className="muted">
+            {terms.length ? "No matching topics or fields" : "No topics to display"}
+          </p>
         )}
       </div>
     </div>
