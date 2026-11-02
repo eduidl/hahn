@@ -95,10 +95,15 @@ export function ImageView({
   widget,
   info,
   index,
+  resetCount = 0,
+  onCanReset,
 }: {
   widget: Widget;
   info: Info | null;
   index: FieldIndex;
+  /** Returns to the full image whenever this changes. */
+  resetCount?: number;
+  onCanReset?: (canReset: boolean) => void;
 }) {
   const kind = (series: Selected) =>
     index.topics
@@ -167,6 +172,9 @@ export function ImageView({
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number }>(undefined);
   useEffect(() => setView(fullImage), [identity]);
+  useEffect(() => {
+    if (resetCount) setView(fullImage);
+  }, [resetCount]);
   useEffect(() => {
     const node = root.current!;
     // Non-passive to stop the scroll, which React's onWheel cannot do.
@@ -262,6 +270,7 @@ export function ImageView({
       ? "Image and calibration dimensions differ"
       : "");
   const zoomed = view.zoom > 1;
+  useEffect(() => onCanReset?.(zoomed), [zoomed, onCanReset]);
   return (
     <div
       className={zoomed ? "view-image zoomed" : "view-image"}
@@ -314,15 +323,6 @@ export function ImageView({
             <Projection key={cloud.series.key} cloud={cloud} calibration={calibration} />
           ))}
       </div>
-      {zoomed && (
-        <button
-          className="view-image-reset"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => setView(fullImage)}
-        >
-          Reset
-        </button>
-      )}
       {/* A problem with the projection as a whole applies to each topic to project. */}
       {clouds.map((cloud) => (
         <ReportSeriesProblem key={cloud.key} series={cloud} problem={projectionProblem ?? ""} />

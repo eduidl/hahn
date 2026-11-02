@@ -54,7 +54,12 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   plot: {
     label: "Plot",
-    controls: ["Wheel: zoom", "Shift + wheel: zoom values"],
+    controls: [
+      "Wheel: zoom",
+      "Shift + wheel: zoom values",
+      "Click: move playback position",
+      "Click legend item: show or hide series",
+    ],
     description: "Overlay numeric, bool, or enum time series",
     emptyHint: "Drop a numeric, bool, or enum field",
     accepts: new Set(["numeric", "bool", "enum"]),
@@ -64,7 +69,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   },
   state: {
     label: "State timeline",
-    controls: ["Wheel: zoom", "Drag: pan while zoomed"],
+    controls: ["Wheel: zoom", "Drag: pan while zoomed", "Click: move playback position"],
     description: "Show how bool, enum, or string values stay and change along a time axis",
     emptyHint: "Drop a bool, enum, or string field",
     accepts: new Set(["bool", "enum", "string"]),

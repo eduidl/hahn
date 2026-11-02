@@ -609,6 +609,12 @@ export function Plot({
               return (
                 <div key={s.key} className="tooltip-row">
                   <i className="series-dot" style={{ background: s.color }} />
+                  <SeriesName
+                    inline
+                    source={s.source}
+                    topic={s.topicName ?? s.topic}
+                    path={s.path}
+                  />
                   <strong title={p?.ns}>{p ? tooltipValue(p.raw, s.dataType) : "—"}</strong>
                 </div>
               );

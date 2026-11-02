@@ -20,7 +20,7 @@ export function WidgetControls({
   info,
   canReset,
   onResetView,
-  onResetScene,
+  onResetContent,
   onOpenSettings,
 }: {
   widget: Widget;
@@ -29,7 +29,7 @@ export function WidgetControls({
   info: Info | null;
   canReset: boolean;
   onResetView: () => void;
-  onResetScene: () => void;
+  onResetContent: () => void;
   onOpenSettings: () => void;
 }) {
   const owner = ownerOf(state, widget.id);
@@ -60,7 +60,7 @@ export function WidgetControls({
         duplicate: true,
       });
   };
-  const hasViewControls = widget.type === "plot" || widget.type === "state";
+  const hasReset = ["plot", "state", "scene", "tf-tree", "image"].includes(widget.type);
   return (
     <>
       {widget.type === "plot" && (
@@ -109,7 +109,7 @@ export function WidgetControls({
           </button>
         </div>
       )}
-      {(hasViewControls || widget.type === "scene") && (
+      {hasReset && (
         <>
           <button
             className="widget-icon"
@@ -119,7 +119,9 @@ export function WidgetControls({
               widget.type !== "scene" &&
               (!info || !(widget.type === "state" ? !isDefaultView(widget.view.x) : canReset))
             }
-            onClick={() => (widget.type === "scene" ? onResetScene() : onResetView())}
+            onClick={() =>
+              widget.type === "plot" || widget.type === "state" ? onResetView() : onResetContent()
+            }
           >
             <svg
               width="15"

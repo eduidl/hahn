@@ -173,7 +173,7 @@ describe("fitViewport", () => {
   });
 });
 
-it("zooms from the fitted view and returns to it with Fit", async () => {
+it("zooms from the fitted view and returns to it on reset", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => Response.json({ frames: [{ id: "world", parent: null }] })),
@@ -181,18 +181,28 @@ it("zooms from the fitted view and returns to it with Fit", async () => {
   const rect = vi
     .spyOn(Element.prototype, "getBoundingClientRect")
     .mockReturnValue({ width: 1000, height: 500 } as DOMRect);
-  const { container } = render(
-    <PlaybackContext.Provider value={createPlaybackStore()}>
-      <TfTree runId="run" info={null} />
-    </PlaybackContext.Provider>,
+  const onCanReset = vi.fn();
+  const tree = (resetCount: number) => (
+    <PlaybackContext.Provider value={store}>
+      <TfTree runId="run" info={null} resetCount={resetCount} onCanReset={onCanReset} />
+    </PlaybackContext.Provider>
   );
+  const store = createPlaybackStore();
+  const { container, rerender } = render(tree(0));
   await screen.findByRole("button", { name: "world" });
+  expect(onCanReset).toHaveBeenLastCalledWith(false);
   const box = () => container.querySelector("svg")!.getAttribute("viewBox");
   await waitFor(() => expect(box()).toBe("-390 -210 1000 500"));
-  fireEvent.click(screen.getByRole("button", { name: "Zoom in TF tree" }));
-  expect(box()).toBe("-290 -160 800 400");
-  fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+  act(() => {
+    container
+      .querySelector("svg")!
+      .dispatchEvent(new WheelEvent("wheel", { deltaY: -1, clientX: 500, clientY: 250 }));
+  });
+  expect(box()).not.toBe("-390 -210 1000 500");
+  expect(onCanReset).toHaveBeenLastCalledWith(true);
+  rerender(tree(1));
   expect(box()).toBe("-390 -210 1000 500");
+  expect(onCanReset).toHaveBeenLastCalledWith(false);
   rect.mockRestore();
 });
 
