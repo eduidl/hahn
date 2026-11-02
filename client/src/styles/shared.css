@@ -83,11 +83,6 @@
   font-size: 12px;
   border-left: 2px solid var(--error);
 }
-@media (max-width: 640px) {
-  .field-heading {
-    padding-top: 14px;
-  }
-}
 .field[draggable="true"]:active {
   cursor: grabbing;
 }

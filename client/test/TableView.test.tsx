@@ -142,13 +142,7 @@ describe("table playback", () => {
       const widget = state.widgets["widget-2"];
       return (
         <PlaybackContext.Provider value={store}>
-          <WidgetSettings
-            widget={widget}
-            dispatch={dispatch}
-            index={index}
-            records={[]}
-            pointCount={0}
-          />
+          <WidgetSettings widget={widget} dispatch={dispatch} index={index} records={[]} />
           <TableView
             widget={widget}
             dispatch={dispatch}

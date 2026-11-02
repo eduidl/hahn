@@ -32,7 +32,6 @@ function Harness() {
       widget={state.widgets["widget-1"]}
       dispatch={dispatch}
       records={[]}
-      pointCount={0}
       index={buildFieldIndex([topic])}
     />
   );
@@ -53,12 +52,6 @@ describe("field picker", () => {
   });
   afterEach(cleanup);
 
-  it("shows the help until a series is added", () => {
-    const help = /Add numeric, bool, or enum fields/;
-    expect(screen.getByText(help)).toBeTruthy();
-    fireEvent.keyDown(search(), { key: "Enter" });
-    expect(screen.queryByText(help)).toBeNull();
-  });
   it("selects the first match, which Enter adds", () => {
     expect(selected()).toHaveLength(1);
     expect(selected()[0]).toContain("alpha");

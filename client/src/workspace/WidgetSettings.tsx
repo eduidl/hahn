@@ -13,7 +13,6 @@ import {
   legendPositions,
   osmTiles,
   selectedViewKind,
-  widgetSpecs,
   type LegendPosition,
   type Widget,
   type WorkspaceAction,
@@ -28,15 +27,16 @@ export type WidgetSettingsProps = {
 };
 
 function SettingsHeader({ widget }: WidgetSettingsProps) {
+  return <h2 className="settings-title">{widget.title}</h2>;
+}
+
+function NoSettings(props: WidgetSettingsProps) {
   return (
     <>
-      <div className="field-heading">
-        <span className="eyebrow">{widget.title}</span>
-        {widget.type !== "image" && widgetSpecs[widget.type].maxSeries !== 1 && (
-          <span>{widget.series.length} series</span>
-        )}
+      <SettingsHeader {...props} />
+      <div className="settings-section">
+        <p className="muted">No settings</p>
       </div>
-      {!widget.series.length && <p className="help">{widgetSpecs[widget.type].help}</p>}
     </>
   );
 }
@@ -413,13 +413,14 @@ function MapSettings(props: WidgetSettingsProps) {
 }
 
 const settingsByType: Record<Widget["type"], (props: WidgetSettingsProps) => ReactNode> = {
-  "tf-tree": () => <p className="help">{widgetSpecs["tf-tree"].help}</p>,
-  "source-info": () => (
-    <p className="help">Shows the open groups. There is nothing to configure.</p>
-  ),
+  "tf-tree": NoSettings,
+  "source-info": NoSettings,
   tabs: (props) =>
     props.widget.type === "tabs" ? (
-      <TabSettings widget={props.widget} dispatch={props.dispatch} />
+      <>
+        <SettingsHeader {...props} />
+        <TabSettings widget={props.widget} dispatch={props.dispatch} />
+      </>
     ) : null,
   plot: PlotSettings,
   state: StateSettings,

@@ -82,7 +82,6 @@ function RemoveTabButton({
 export function TabSettings({ widget, dispatch }: Props) {
   return (
     <div className="tab-settings">
-      <p className="help">Place multiple widgets in each tab. You can rename and reorder tabs.</p>
       {widget.tabs.map((tab, i) => (
         <div className="tab-settings-row" key={tab.id}>
           <button

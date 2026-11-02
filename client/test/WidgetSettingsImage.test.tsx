@@ -45,7 +45,6 @@ it("separates the image from additional topics and removes them together", () =>
         widget={current.widgets["widget-1"]}
         dispatch={dispatch}
         records={[]}
-        pointCount={0}
         index={index}
       />
     );
@@ -93,7 +92,6 @@ it("sets an independent image distance in the 3D panel", () => {
           widget={current.widgets["widget-1"]}
           dispatch={dispatch}
           records={[]}
-          pointCount={0}
           index={index}
         />
         <output data-testid="distance">
@@ -141,7 +139,6 @@ it("sets and clears a pose topic's trail duration", () => {
           widget={current.widgets["widget-1"]}
           dispatch={dispatch}
           records={[]}
-          pointCount={0}
           index={index}
         />
         <output data-testid="duration">

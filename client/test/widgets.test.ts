@@ -222,7 +222,7 @@ describe("widget workspace", () => {
     expect(state.widgets["widget-1"]).toMatchObject({
       id: "widget-1",
       type: "state",
-      title: "State transition",
+      title: "State timeline",
       series: [],
       view: defaultPlotView(),
     });

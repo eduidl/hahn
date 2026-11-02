@@ -267,7 +267,3 @@ summary .unreadable {
     font-size: 12px;
   }
 }
-/* Widgets without settings show only this text, so it needs its own top gap. */
-.widget-settings > .help:first-child {
-  margin-top: 25px;
-}
