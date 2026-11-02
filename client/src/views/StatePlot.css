@@ -25,11 +25,14 @@
 .state-track {
   position: relative;
   cursor: pointer;
+  user-select: none;
   height: 24px;
   background: var(--bg-control);
   border-radius: 3px;
   overflow: hidden;
 }
+.state-track-pannable { cursor: grab; }
+.state-track-pannable:active { cursor: grabbing; }
 .state-segment {
   position: absolute;
   top: 0;
