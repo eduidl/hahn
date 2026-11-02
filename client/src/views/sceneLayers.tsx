@@ -25,6 +25,7 @@ export type Stage = {
   scene: THREE.Scene;
   invalidate: () => void;
   fit: (object: THREE.Object3D) => void;
+  /** Carries the view over into a new fixed frame. */
   reframe: (transform: Transform) => void;
   resetView: () => void;
 };
