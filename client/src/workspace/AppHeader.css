@@ -1,33 +1,34 @@
 header {
   position: relative;
-  height: 73px;
+  height: var(--header-height);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 29px;
+  padding: 0 18px;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 8px;
   color: var(--text);
-  font-size: 27px;
-  letter-spacing: -1px;
+  font-size: 19px;
+  letter-spacing: -0.5px;
   font-weight: 650;
   text-decoration: none;
 }
 .brand-mark {
   display: block;
-  width: 29px;
-  height: 29px;
+  width: 22px;
+  height: 22px;
   flex: none;
 }
 .sidebar-toggle {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
   padding: 0;
   color: var(--text-muted);
   background: transparent;
@@ -45,6 +46,20 @@ header {
   gap: 6px;
   min-width: 0;
   max-width: 320px;
+}
+.runs-trigger {
+  padding: 5px 10px;
+}
+header .add-widget {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
 }
 .runs-trigger-name {
   overflow: hidden;
@@ -117,8 +132,7 @@ header .add-widget {
 }
 @media (max-width: 640px) {
   header {
-    height: 60px;
-    padding: 0 18px;
+    padding: 0 12px;
   }
 }
 @media (max-width: 640px) {
@@ -127,9 +141,6 @@ header .add-widget {
   }
 }
 /* The central work surface is tiled; plotting gestures stay inside each pane. */
-header .add-widget {
-  margin-left: auto;
-}
 .widget-catalog {
   position-anchor: --add-widget;
   width: min(280px, calc(100vw - 32px));
