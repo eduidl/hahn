@@ -108,26 +108,26 @@ describe("widgets showing views", () => {
     const off = workspaceReducer(state, { type: "tile-url", id: "widget-1", value: "" });
     expect(off.widgets["widget-1"].tileUrl).toBe("");
   });
-  it("keep their settings when split, and reset the fixed frame with the run", () => {
+  it("keep their settings when split, and reset the followed frame with the run", () => {
     let state = workspaceReducer(widgetOf("scene"), {
-      type: "fixed-frame",
+      type: "follow-frame",
       id: "widget-1",
       value: "base",
     });
     state = workspaceReducer(state, { type: "tile-url", id: "widget-1", value: "https://t/{z}" });
     const split = workspaceReducer(state, { type: "add", target: "widget-1", duplicate: true });
     expect(split.widgets[split.activeId!]).toMatchObject({
-      fixedFrame: "base",
+      followFrame: "base",
       tileUrl: "https://t/{z}",
     });
     const reopened = workspaceReducer(state, { type: "sources", open: new Set() });
-    expect(reopened.widgets["widget-1"].fixedFrame).toBeNull();
+    expect(reopened.widgets["widget-1"].followFrame).toBeNull();
   });
 });
 
 describe("the frame of a 3D widget", () => {
   const withFrame = () =>
-    workspaceReducer(widgetOf("scene"), { type: "fixed-frame", id: "widget-1", value: "base" });
+    workspaceReducer(widgetOf("scene"), { type: "follow-frame", id: "widget-1", value: "base" });
   it("is forgotten once its last topic is gone", () => {
     const series = {
       key: "k",
@@ -143,13 +143,13 @@ describe("the frame of a 3D widget", () => {
       id: "widget-1",
       update: () => [series],
     });
-    expect(state.widgets["widget-1"].fixedFrame).toBe("base");
+    expect(state.widgets["widget-1"].followFrame).toBe("base");
     state = workspaceReducer(state, { type: "series", id: "widget-1", update: () => [] });
-    expect(state.widgets["widget-1"].fixedFrame).toBeNull();
+    expect(state.widgets["widget-1"].followFrame).toBeNull();
   });
   it("is forgotten when the widget is cleared", () => {
     const state = workspaceReducer(withFrame(), { type: "clear", id: "widget-1" });
-    expect(state.widgets["widget-1"].fixedFrame).toBeNull();
+    expect(state.widgets["widget-1"].followFrame).toBeNull();
   });
 });
 

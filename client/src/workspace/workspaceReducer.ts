@@ -156,7 +156,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
           hiddenColumns: [...original.hiddenColumns],
           columnWidths: { ...original.columnWidths },
           mode: original.mode,
-          fixedFrame: original.fixedFrame,
+          followFrame: original.followFrame,
           tileUrl: original.tileUrl,
           frameAxes: { ...original.frameAxes, hidden: [...original.frameAxes.hidden] },
           series: original.series.map((series) => ({ ...series, path: [...series.path] })),
@@ -404,7 +404,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                 ? uniqueSeries(w.series.map((item) => ({ ...item, source: rebind(item.source) })))
                 : w.series,
               view: action.keepViews ? w.view : defaultPlotView(),
-              fixedFrame: action.keepViews ? w.fixedFrame : null,
+              followFrame: action.keepViews ? w.followFrame : null,
             },
           ]),
         ),
@@ -473,7 +473,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
           ? // With nothing left, the next topic added decides the frame again.
             {
               ...withSeries(current, action.update(current.series)),
-              ...(action.update(current.series).length ? {} : { fixedFrame: null }),
+              ...(action.update(current.series).length ? {} : { followFrame: null }),
             }
           : action.type === "view"
             ? { ...current, view: action.update(current.view) }
@@ -484,12 +484,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                   hiddenColumns: [],
                   columnWidths: {},
                   view: defaultPlotView(),
-                  fixedFrame: null,
+                  followFrame: null,
                 }
               : action.type === "legend"
                 ? { ...current, legend: { ...current.legend, ...action.value } }
-                : action.type === "fixed-frame"
-                  ? { ...current, fixedFrame: action.value }
+                : action.type === "follow-frame"
+                  ? { ...current, followFrame: action.value }
                   : action.type === "tile-url"
                     ? { ...current, tileUrl: action.value }
                     : action.type === "frame-axes"

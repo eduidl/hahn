@@ -25,8 +25,11 @@ export type WidgetBase = {
   hiddenColumns: string[];
   columnWidths: Record<string, number>;
   view: PlotView;
-  /** The frame a 3D widget renders in; null follows the graph's root. */
-  fixedFrame: string | null;
+  /**
+   * The frame whose position a 3D widget's camera follows; null is the frame of the first
+   * topic. The scene itself is always in the graph's root, whose z axis is up.
+   */
+  followFrame: string | null;
   /** Map tile URL template. Empty shows no background and requests no tiles. */
   tileUrl: string;
   /** How a 3D widget draws the axes of coordinate frames. */
@@ -121,7 +124,7 @@ export type WorkspaceAction =
   | { type: "view"; id: string; update: (view: PlotView) => PlotView }
   | { type: "mode"; id: string; mode: DragMode }
   | { type: "legend"; id: string; value: Partial<LegendSettings> }
-  | { type: "fixed-frame"; id: string; value: string | null }
+  | { type: "follow-frame"; id: string; value: string | null }
   | { type: "tile-url"; id: string; value: string }
   | { type: "frame-axes"; id: string; value: Partial<FrameAxesSettings> }
   | { type: "table-column"; id: string; path: string[]; visible: boolean }

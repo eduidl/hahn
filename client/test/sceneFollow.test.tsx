@@ -29,6 +29,31 @@ const turned = (yaw: number) => [0, 0, Math.sin(yaw / 2), Math.cos(yaw / 2)];
 const close = (vector: THREE.Vector3, expected: number[]) =>
   vector.toArray().forEach((value, i) => expect(value).toBeCloseTo(expected[i]));
 
+it("chooses the followed frame from the settings, the root until one is known", () => {
+  mocks.frames = [
+    { id: "map", parent: null },
+    { id: "lidar", parent: "map" },
+  ];
+  const dispatch = vi.fn();
+  render(
+    <WidgetSettings
+      widget={widget(1, "scene")}
+      dispatch={dispatch}
+      records={[]}
+      index={buildFieldIndex([])}
+    />,
+  );
+  const frame = screen.getByLabelText("Frame") as HTMLSelectElement;
+  expect(frame.value).toBe("map");
+  expect(screen.queryByLabelText("Fixed frame")).toBeNull();
+  fireEvent.change(frame, { target: { value: "lidar" } });
+  expect(dispatch).toHaveBeenLastCalledWith({
+    type: "follow-frame",
+    id: "widget-1",
+    value: "lidar",
+  });
+});
+
 it("forgets a saved fixed frame and a broken followed frame", () => {
   const saved = JSON.parse(JSON.stringify(initialWorkspace()));
   saved.widgets["widget-1"].fixedFrame = "lidar";
