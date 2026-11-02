@@ -34,12 +34,15 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
 
-/** Fills fields added since the widget was saved, keeping what was saved. */
+/**
+ * Fills fields added since the widget was saved, keeping what was saved. The
+ * title is not editable, so it follows the current name of the widget type.
+ */
 function reviveWidget(id: string, saved: unknown): Widget | null {
   if (!isRecord(saved) || saved.id !== id) return null;
   const type = saved.type as Widget["type"];
   if (typeof type !== "string" || !Object.hasOwn(widgetSpecs, type)) return null;
-  const revived = { ...widget(0, type), ...saved } as Widget;
+  const revived = { ...widget(0, type), ...saved, title: widgetSpecs[type].label } as Widget;
   if (!Array.isArray(revived.series)) return null;
   if (revived.type === "tabs") {
     const { tabs, activeTabId } = revived;

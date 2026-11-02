@@ -31,6 +31,18 @@ describe("session persistence", () => {
     saveSession(localStorage, saved as Session);
     expect(loadSession(localStorage)).toMatchObject({ sidebarWidth: null, sidebarOpen: true });
   });
+  it("shows the current widget name for a widget saved under an older one", () => {
+    const saved = copy(session());
+    saved.workspace.widgets["widget-1"].title = "Older name";
+    saveSession(localStorage, saved);
+    expect(loadSession(localStorage)?.workspace.widgets["widget-1"].title).toBe("Plot");
+  });
+  it("keeps a named time zone, and ignores one that does not exist", () => {
+    saveSession(localStorage, { ...session(), zoneSource: "Europe/Paris" });
+    expect(loadSession(localStorage)?.zoneSource).toBe("Europe/Paris");
+    saveSession(localStorage, { ...session(), zoneSource: "Mars/Olympus" });
+    expect(loadSession(localStorage)?.zoneSource).toBe("browser");
+  });
   it("round-trips a session", () => {
     const saved = session();
     saveSession(localStorage, saved);

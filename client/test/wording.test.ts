@@ -28,6 +28,21 @@ describe("UI wording", () => {
   it("titles every widget with its one name", () => {
     for (const type of widgetTypes) expect(widget(1, type).title).toBe(widgetSpecs[type].label);
   });
+  it("lists widgets alphabetically by name", () => {
+    expect(widgetTypes.map((type) => widgetSpecs[type].label)).toEqual([
+      "3D",
+      "Data source info",
+      "Image",
+      "Map",
+      "Plot",
+      "Raw message",
+      "State table",
+      "State timeline",
+      "Table",
+      "Tabs",
+      "TF tree",
+    ]);
+  });
   it("does not use the retired word for a widget", () => {
     // ARIA's tabpanel role, and elements with that role, are the only exception.
     const others = sources.flatMap(({ path, text }) =>
