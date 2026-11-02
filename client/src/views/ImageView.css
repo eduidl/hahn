@@ -7,11 +7,6 @@
   inset: 0;
   transform-origin: 0 0;
 }
-.view-image-reset {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
 .view-image img {
   display: block;
   width: 100%;

@@ -93,10 +93,25 @@ export function zoomViewport(
   };
 }
 
-export function TfTree({ runId, info }: { runId: string | null; info: Info | null }) {
+export function TfTree({
+  runId,
+  info,
+  resetCount = 0,
+  onCanReset,
+}: {
+  runId: string | null;
+  info: Info | null;
+  /** Fits the view whenever this changes. */
+  resetCount?: number;
+  onCanReset?: (canReset: boolean) => void;
+}) {
   const [loaded, setLoaded] = useState<{ run: string; frames: FrameInfo[]; error: string }>();
   const [selected, setSelected] = useState<{ run: string; id: string }>();
   const [view, setView] = useState<Viewport>();
+  useEffect(() => {
+    if (resetCount) setView(undefined);
+  }, [resetCount]);
+  useEffect(() => onCanReset?.(view !== undefined), [view, onCanReset]);
   const [svg, setSvg] = useState<SVGSVGElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   // Measured before paint, so that the tree does not first appear at the wrong scale.
@@ -151,12 +166,10 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
   };
   const fitted = fitViewport(bounds, size);
   const viewport = view ?? fitted;
-  /** Zooms around `pointer`, or the center without one. */
-  const zoom = (factor: number, pointer?: { x: number; y: number }) => {
+  const zoom = (factor: number, pointer: { x: number; y: number }) => {
     const element = { width: size.width || 1, height: size.height || 1 };
-    const center = { x: element.width / 2, y: element.height / 2 };
     setView((current) =>
-      zoomViewport(current ?? fitted, factor, pointer ?? center, element, [100, fitted.width * 8]),
+      zoomViewport(current ?? fitted, factor, pointer, element, [100, fitted.width * 8]),
     );
   };
   const latestZoom = useRef(zoom);
@@ -195,15 +208,6 @@ export function TfTree({ runId, info }: { runId: string | null; info: Info | nul
   if (!nodes.length) return <p className="widget-status">No frames</p>;
   return (
     <div className="tf-tree">
-      <div className="tf-tree-controls">
-        <button onClick={() => zoom(0.8)} aria-label="Zoom in TF tree">
-          +
-        </button>
-        <button onClick={() => zoom(1.25)} aria-label="Zoom out TF tree">
-          −
-        </button>
-        <button onClick={() => setView(undefined)}>Fit</button>
-      </div>
       <svg
         ref={setSvg}
         aria-label="Transform tree"

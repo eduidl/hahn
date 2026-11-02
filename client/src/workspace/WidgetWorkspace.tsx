@@ -119,7 +119,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     (!!props.widgetDrag && canPlaceWidget(props.widgetDrag, owner)) ||
     (!!moving.id && canMove(state, moving.id, owner, widget.id));
   const [canReset, setCanReset] = useState(false);
-  const [sceneResetCount, setSceneResetCount] = useState(0);
+  const [contentResetCount, setContentResetCount] = useState(0);
   const verdict = widget.type === "tabs" ? null : dragVerdict(widget);
   const onViewChange = useCallback(
     (update: (view: PlotView) => PlotView) => dispatch({ type: "view", id: widget.id, update }),
@@ -154,7 +154,14 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
   const singleTarget = widgetSpecs[widget.type].maxSeries === 1;
   // Each widget type draws its own content; the frame, drop target and empty state are shared.
   const views: Record<Widget["type"], () => ReactNode> = {
-    "tf-tree": () => <TfTree runId={props.runId ?? null} info={info} />,
+    "tf-tree": () => (
+      <TfTree
+        runId={props.runId ?? null}
+        info={info}
+        resetCount={contentResetCount}
+        onCanReset={setCanReset}
+      />
+    ),
     "source-info": () => <SourceInfo info={info} sources={props.sources} />,
     tabs: () =>
       widget.type === "tabs" ? (
@@ -213,7 +220,15 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
       />
     ),
     raw: () => <RawMessage widget={widget} info={info} index={props.fieldIndex} />,
-    image: () => <ImageView widget={widget} info={info} index={props.fieldIndex} />,
+    image: () => (
+      <ImageView
+        widget={widget}
+        info={info}
+        index={props.fieldIndex}
+        resetCount={contentResetCount}
+        onCanReset={setCanReset}
+      />
+    ),
     scene: () => (
       <Suspense fallback={null}>
         <Scene3D
@@ -221,7 +236,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
           info={info}
           index={props.fieldIndex}
           onFixedFrame={(value) => dispatch({ type: "fixed-frame", id: widget.id, value })}
-          resetCount={sceneResetCount}
+          resetCount={contentResetCount}
         />
       </Suspense>
     ),
@@ -323,7 +338,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
             info={info}
             canReset={canReset}
             onResetView={() => onViewChange(() => defaultPlotView())}
-            onResetScene={() => setSceneResetCount((count) => count + 1)}
+            onResetContent={() => setContentResetCount((count) => count + 1)}
             onOpenSettings={openSettings}
           />
         }
