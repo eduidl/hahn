@@ -26,7 +26,7 @@
 }
 .widget-tab-bar button:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .widget-tab-bar input { width: 120px; }
-.tab-settings { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.tab-settings { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
 .tab-settings-row { display: flex; align-items: center; gap: 4px; }
 .tab-settings-row input { min-width: 0; width: 100%; flex: 1; }
 .tab-settings-row button[aria-pressed="true"] { border-color: var(--accent); color: var(--text); }

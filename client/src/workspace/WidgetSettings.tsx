@@ -1,6 +1,13 @@
 import "./WidgetSettings.css";
 import { FieldPicker } from "./FieldPicker";
-import { statusLabel, name, SeriesList, SeriesRow, SeriesStyle } from "./SeriesList";
+import {
+  statusLabel,
+  name,
+  SeriesList,
+  SeriesRow,
+  SeriesStyle,
+  SettingsSection,
+} from "./SeriesList";
 import { TabSettings } from "./TabControls";
 import { useMemo, type Dispatch, type ReactNode } from "react";
 import { SeriesName } from "../SeriesName";
@@ -75,8 +82,9 @@ function PlotSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <LegendSetting {...props} />
-      <FieldPicker {...props} />
+      <SettingsSection title="Display">
+        <LegendSetting {...props} />
+      </SettingsSection>
       <SeriesList
         {...props}
         row={(s) => (
@@ -99,7 +107,6 @@ function StateSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <FieldPicker {...props} />
       <SeriesList {...props} row={(s) => <SeriesRow key={s.key} {...props} series={s} />} />
     </>
   );
@@ -110,7 +117,6 @@ function ValueChangesSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <FieldPicker {...props} />
       <SeriesList
         {...props}
         row={(s) => (
@@ -139,8 +145,7 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <section className="target-setting" aria-label="Target">
-        <div className="legend-heading">Target</div>
+      <SettingsSection title="Target">
         {target ? (
           <div className="target-summary">
             <SeriesName
@@ -158,10 +163,9 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
           <p className="muted">Not selected</p>
         )}
         <FieldPicker {...props} />
-      </section>
+      </SettingsSection>
       {props.widget.type === "table" && target && (
-        <section className="target-setting" aria-label="Column visibility">
-          <div className="legend-heading">Columns</div>
+        <SettingsSection title="Columns">
           <div className="table-column-actions" role="group" aria-label="Bulk column controls">
             <button
               className="small-button"
@@ -214,7 +218,7 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
               );
             })}
           </div>
-        </section>
+        </SettingsSection>
       )}
     </>
   );
@@ -306,8 +310,7 @@ function ImageSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <section className="target-setting" aria-label="Image topic">
-        <div className="legend-heading">Image topic</div>
+      <SettingsSection title="Image topic">
         {image ? (
           <div className="target-summary removable">
             <SeriesName
@@ -328,9 +331,8 @@ function ImageSettings(props: WidgetSettingsProps) {
           <p className="muted">Not selected</p>
         )}
         <FieldPicker {...props} kind="image" />
-      </section>
-      <section className="legend" aria-label="Additional topics">
-        <div className="legend-heading">Additional topics</div>
+      </SettingsSection>
+      <SettingsSection title="Additional topics">
         {!image && <p className="muted">Select an image topic first.</p>}
         {additional.map((series) => (
           <SeriesRow
@@ -342,7 +344,7 @@ function ImageSettings(props: WidgetSettingsProps) {
           />
         ))}
         <FieldPicker {...props} kind="pointcloud" />
-      </section>
+      </SettingsSection>
     </>
   );
 }
@@ -354,25 +356,26 @@ function SceneSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <label className="time-display-setting">
-        Fixed frame
-        <select
-          aria-label="Fixed frame"
-          value={fixed ?? ""}
-          disabled={!frames.length}
-          onChange={(event) =>
-            dispatch({ type: "fixed-frame", id: widget.id, value: event.target.value })
-          }
-        >
-          {!frames.length && <option value="">{error || "No coordinate frames"}</option>}
-          {frames.map((frame) => (
-            <option key={frame.id} value={frame.id}>
-              {frame.id}
-            </option>
-          ))}
-        </select>
-      </label>
-      <FieldPicker {...props} />
+      <SettingsSection title="Display">
+        <label className="time-display-setting">
+          Fixed frame
+          <select
+            aria-label="Fixed frame"
+            value={fixed ?? ""}
+            disabled={!frames.length}
+            onChange={(event) =>
+              dispatch({ type: "fixed-frame", id: widget.id, value: event.target.value })
+            }
+          >
+            {!frames.length && <option value="">{error || "No coordinate frames"}</option>}
+            {frames.map((frame) => (
+              <option key={frame.id} value={frame.id}>
+                {frame.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      </SettingsSection>
       <ViewSeriesList {...props} />
     </>
   );
@@ -384,8 +387,8 @@ function MapSettings(props: WidgetSettingsProps) {
   return (
     <>
       <SettingsHeader {...props} />
-      <section className="target-setting" aria-label="Map tiles">
-        <div className="legend-heading">Map tiles</div>
+      <SettingsSection title="Display">
+        <div className="settings-label">Map tiles</div>
         <input
           className="text-input search"
           type="url"
@@ -405,8 +408,7 @@ function MapSettings(props: WidgetSettingsProps) {
             None
           </button>
         </div>
-      </section>
-      <FieldPicker {...props} />
+      </SettingsSection>
       <ViewSeriesList {...props} />
     </>
   );

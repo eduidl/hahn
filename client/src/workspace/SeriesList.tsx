@@ -1,4 +1,5 @@
 // The list of a widget's series and the controls of each.
+import { FieldPicker } from "./FieldPicker";
 import { type WidgetSettingsProps } from "./WidgetSettings";
 import { type ReactNode } from "react";
 import { SeriesName } from "../SeriesName";
@@ -15,27 +16,38 @@ export function statusLabel(record: Pick<CachedSeries, "status" | "received"> | 
 
 export const name = (s: Selected) => `${s.topicName ?? s.topic} ${s.path.join(".")}`;
 
-/** Series list shared by all settings; each widget type supplies the per-series row. */
-export function SeriesList({
-  widget,
-  pointCount,
-  row,
-  showPoints = true,
-}: WidgetSettingsProps & { row: (series: Selected) => ReactNode; showPoints?: boolean }) {
+/** One titled area of the settings, set apart from its neighbours by a line. */
+export function SettingsSection({
+  title,
+  aside,
+  children,
+}: {
+  title: string;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <section className="legend" aria-label="Selected series">
-      <div className="legend-heading">
-        <span className="eyebrow">Series</span>
-        <span>
-          {widget.series.length} series
-          {showPoints && ` · ${pointCount.toLocaleString()} points`}
-        </span>
+    <section className="settings-section" aria-label={title}>
+      <div className="settings-section-heading">
+        <h3>{title}</h3>
+        {aside && <span>{aside}</span>}
       </div>
-      {widget.series.map(row)}
-      {!widget.series.length && (
-        <p className="legend-empty">Selected series and loading status appear here.</p>
-      )}
+      {children}
     </section>
+  );
+}
+
+/** Series section shared by all settings; each widget type supplies the per-series row. */
+export function SeriesList({
+  row,
+  ...props
+}: WidgetSettingsProps & { row: (series: Selected) => ReactNode }) {
+  const { series } = props.widget;
+  return (
+    <SettingsSection title="Series" aside={`${series.length} series`}>
+      <FieldPicker {...props} />
+      {series.length > 0 && <div>{series.map(row)}</div>}
+    </SettingsSection>
   );
 }
 

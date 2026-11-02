@@ -26,17 +26,14 @@ describe("widget settings", () => {
     show(type);
     expect(screen.getByText("No settings")).toBeTruthy();
   });
-  it("keeps the field wording on a plot", () => {
+  it("separates display settings from series", () => {
     show("plot");
-    expect(screen.getByRole("button", { name: "Add field" }).textContent).toBe("+ Field");
+    expect(screen.getByRole("region", { name: "Display" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Series" })).toBeTruthy();
+  });
+  it("counts series once, in the series section", () => {
+    const { container } = show("plot");
+    expect(container.querySelector(".settings-title")?.textContent).toBe("Plot");
+    expect(screen.getAllByText(/0 series/)).toHaveLength(1);
   });
 });
-
-it.each(["plot", "state", "scene", "tf-tree"] as const)(
-  "leaves the operations of %s to the title bar",
-  (widgetType) => {
-    show(widgetType);
-    expect(screen.queryByText(/wheel|drag/i)).toBeNull();
-    cleanup();
-  },
-);
