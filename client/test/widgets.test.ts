@@ -187,11 +187,11 @@ describe("widget workspace", () => {
       id: "widget-1",
       update: (view) => ({ ...view, ...zoomed }),
     });
-    state = reduce(state, { type: "fixed-frame", id: "widget-1", value: "map" });
+    state = reduce(state, { type: "follow-frame", id: "widget-1", value: "map" });
     state = reduce(state, { type: "sources", open: new Set(["r/1"]), keepViews: true });
     expect(state.widgets["widget-1"].series).toEqual([series, other]);
     expect(state.widgets["widget-1"].view.x).toEqual(zoomed.x);
-    expect(state.widgets["widget-1"].fixedFrame).toBe("map");
+    expect(state.widgets["widget-1"].followFrame).toBe("map");
   });
   it("temporarily expands without changing layout or widget state", () => {
     let state = reduce(initialWorkspace(), { type: "add" });

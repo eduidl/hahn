@@ -29,7 +29,24 @@ export type WidgetBase = {
   fixedFrame: string | null;
   /** Map tile URL template. Empty shows no background and requests no tiles. */
   tileUrl: string;
+  /** How a 3D widget draws the axes of coordinate frames. */
+  frameAxes: FrameAxesSettings;
 };
+
+export type FrameAxesSettings = {
+  /** Frames whose axes are not drawn. Frames seen later are drawn until hidden. */
+  hidden: string[];
+  /** Axis length in meters. */
+  length: number;
+  /** Line width in screen pixels, whatever the distance. */
+  width: number;
+};
+
+export const defaultFrameAxes = (): FrameAxesSettings => ({
+  hidden: [],
+  length: 1,
+  width: 2,
+});
 
 export const osmTiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
@@ -106,6 +123,7 @@ export type WorkspaceAction =
   | { type: "legend"; id: string; value: Partial<LegendSettings> }
   | { type: "fixed-frame"; id: string; value: string | null }
   | { type: "tile-url"; id: string; value: string }
+  | { type: "frame-axes"; id: string; value: Partial<FrameAxesSettings> }
   | { type: "table-column"; id: string; path: string[]; visible: boolean }
   | { type: "table-columns"; id: string; paths: string[][]; visible: boolean }
   | { type: "table-column-width"; id: string; path: string[] | null; width: number }

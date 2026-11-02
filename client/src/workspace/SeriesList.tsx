@@ -18,23 +18,40 @@ export function statusLabel(record: Pick<CachedSeries, "status" | "received"> | 
 
 export const name = (s: Selected) => `${s.topicName ?? s.topic} ${s.path.join(".")}`;
 
-/** One titled area of the settings, set apart from its neighbours by a line. */
+/**
+ * One titled area of the settings, set apart from its neighbours by a line. A
+ * collapsible one starts closed and folds away under its title.
+ */
 export function SettingsSection({
   title,
   aside,
+  collapsible = false,
   children,
 }: {
   title: string;
   aside?: ReactNode;
+  collapsible?: boolean;
   children: ReactNode;
 }) {
+  const heading = (
+    <>
+      <h3>{title}</h3>
+      {aside && <span>{aside}</span>}
+    </>
+  );
   return (
     <section className="settings-section" aria-label={title}>
-      <div className="settings-section-heading">
-        <h3>{title}</h3>
-        {aside && <span>{aside}</span>}
-      </div>
-      {children}
+      {collapsible ? (
+        <details className="settings-collapse">
+          <summary className="settings-section-heading">{heading}</summary>
+          <div className="settings-collapse-body">{children}</div>
+        </details>
+      ) : (
+        <>
+          <div className="settings-section-heading">{heading}</div>
+          {children}
+        </>
+      )}
     </section>
   );
 }

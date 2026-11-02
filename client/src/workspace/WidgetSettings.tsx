@@ -20,6 +20,7 @@ import {
   legendPositions,
   osmTiles,
   selectedViewKind,
+  type FrameAxesSettings,
   type LegendPosition,
   type Widget,
   type WorkspaceAction,
@@ -356,7 +357,7 @@ function SceneSettings(props: WidgetSettingsProps) {
       <SettingsHeader {...props} />
       <SettingsSection title="Display">
         <label className="time-display-setting">
-          Fixed frame
+          Frame
           <select
             aria-label="Fixed frame"
             value={fixed ?? ""}
@@ -374,8 +375,111 @@ function SceneSettings(props: WidgetSettingsProps) {
           </select>
         </label>
       </SettingsSection>
+      <FrameAxesSection {...props} frames={frames.map((frame) => frame.id)} />
       <ViewSeriesList {...props} />
     </>
+  );
+}
+
+/** A number input that applies only positive values and shows the applied one on blur. */
+function PositiveNumber({
+  label,
+  value,
+  step,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  step: string;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="series-style">
+      {label}
+      <input
+        className="text-input"
+        type="number"
+        min="0"
+        step={step}
+        disabled={disabled}
+        defaultValue={value}
+        onChange={(event) => {
+          const number = event.currentTarget.valueAsNumber;
+          if (Number.isFinite(number) && number > 0) onChange(number);
+        }}
+        onBlur={(event) => {
+          event.currentTarget.value = String(value);
+        }}
+      />
+    </label>
+  );
+}
+
+function FrameAxesSection({
+  widget,
+  dispatch,
+  frames,
+}: WidgetSettingsProps & { frames: string[] }) {
+  const settings = widget.frameAxes;
+  const set = (value: Partial<FrameAxesSettings>) =>
+    dispatch({ type: "frame-axes", id: widget.id, value });
+  const hidden = new Set(settings.hidden);
+  return (
+    <SettingsSection title="Frame axes" collapsible>
+      <PositiveNumber
+        label="Length (m)"
+        value={settings.length}
+        step="any"
+        onChange={(length) => set({ length })}
+      />
+      <PositiveNumber
+        label="Width (px)"
+        value={settings.width}
+        step="0.5"
+        onChange={(width) => set({ width })}
+      />
+      {frames.length > 0 && (
+        <>
+          <div className="table-column-actions" role="group" aria-label="Frame axes controls">
+            <button
+              className="small-button"
+              disabled={frames.every((id) => !hidden.has(id))}
+              onClick={() => set({ hidden: [] })}
+            >
+              Show all
+            </button>
+            <button
+              className="small-button"
+              disabled={frames.every((id) => hidden.has(id))}
+              onClick={() => set({ hidden: [...new Set([...settings.hidden, ...frames])] })}
+            >
+              Hide all
+            </button>
+          </div>
+          <div className="table-column-options">
+            {frames.map((id) => (
+              <label className="table-column-option" key={id}>
+                <input
+                  type="checkbox"
+                  aria-label={`Axes of ${id}`}
+                  checked={!hidden.has(id)}
+                  onChange={(event) =>
+                    set({
+                      hidden: event.target.checked
+                        ? settings.hidden.filter((item) => item !== id)
+                        : [...settings.hidden, id],
+                    })
+                  }
+                />
+                <span>{id}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </SettingsSection>
   );
 }
 

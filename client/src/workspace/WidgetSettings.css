@@ -32,6 +32,35 @@
   font-weight: 600;
   color: var(--text);
 }
+.settings-collapse {
+  margin: 0;
+}
+.settings-collapse > summary.settings-section-heading {
+  justify-content: flex-start;
+  padding: 0;
+  font: inherit;
+  list-style: none;
+}
+.settings-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+.settings-collapse > summary::before {
+  content: "›";
+  color: var(--text-faint);
+}
+.settings-collapse[open] > summary::before {
+  transform: rotate(90deg);
+}
+.settings-collapse > summary > span {
+  float: none;
+  margin-left: auto;
+}
+.settings-collapse-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
 .settings-label {
   font-size: 12px;
   color: var(--text-muted);

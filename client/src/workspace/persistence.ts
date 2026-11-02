@@ -1,6 +1,13 @@
 import { usableTimeZone, type TimeDisplay, type TimeZoneSource } from "../timeDisplay";
 import { maxSidebarWidth, minSidebarWidth } from "./SidebarResizer";
-import { leaves, widget, widgetSpecs, type Widget, type WorkspaceState } from "./widgets";
+import {
+  leaves,
+  widget,
+  widgetSpecs,
+  type FrameAxesSettings,
+  type Widget,
+  type WorkspaceState,
+} from "./widgets";
 
 /** What survives a reload. Fetched data and playback position are not kept. */
 export type Session = {
@@ -34,6 +41,18 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
 
+const isPositive = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+function reviveFrameAxes(saved: unknown, defaults: FrameAxesSettings): FrameAxesSettings {
+  if (!isRecord(saved)) return defaults;
+  return {
+    hidden: isStringArray(saved.hidden) ? saved.hidden : defaults.hidden,
+    length: isPositive(saved.length) ? saved.length : defaults.length,
+    width: isPositive(saved.width) ? saved.width : defaults.width,
+  };
+}
+
 /**
  * Fills fields added since the widget was saved, keeping what was saved. The
  * title is not editable, so it follows the current name of the widget type.
@@ -42,8 +61,14 @@ function reviveWidget(id: string, saved: unknown): Widget | null {
   if (!isRecord(saved) || saved.id !== id) return null;
   const type = saved.type as Widget["type"];
   if (typeof type !== "string" || !Object.hasOwn(widgetSpecs, type)) return null;
-  const revived = { ...widget(0, type), ...saved, title: widgetSpecs[type].label } as Widget;
+  const fresh = widget(0, type);
+  const revived = { ...fresh, ...saved, title: widgetSpecs[type].label } as Widget;
   if (!Array.isArray(revived.series)) return null;
+  // Display settings are not worth rejecting the workspace over: bad ones go back to defaults.
+  revived.frameAxes = reviveFrameAxes(saved.frameAxes, fresh.frameAxes);
+  if (typeof revived.followFrame !== "string") revived.followFrame = null;
+  // Replaced by followFrame: the scene is now always in the graph's root.
+  delete (revived as { fixedFrame?: unknown }).fixedFrame;
   if (revived.type === "tabs") {
     const { tabs, activeTabId } = revived;
     if (!Array.isArray(tabs) || !tabs.some((tab) => tab?.id === activeTabId)) return null;
