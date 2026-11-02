@@ -2,7 +2,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import * as THREE from "three";
 import { expect, it, vi } from "vitest";
-import { PoseLayer, PoseTrail } from "../src/views/Scene3D";
+import { PoseLayer, PoseTrail } from "../src/views/sceneLayers";
 
 const mocks = vi.hoisted(() => ({
   frame: undefined as any,

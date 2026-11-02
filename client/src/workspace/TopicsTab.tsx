@@ -1,0 +1,201 @@
+import { type Dispatch, type DragEvent, type SetStateAction } from "react";
+import { Highlight } from "../Highlight";
+import { typeLabel } from "./fieldIndex";
+import { keyOf, topicKey, type Field, type Info, type Topic, type TopicDrag } from "../types";
+
+type DragHandlers = {
+  onAdd: (payload: TopicDrag) => void;
+  onDragStart: (event: DragEvent, payload: TopicDrag) => void;
+  onDragEnd: () => void;
+};
+
+function TopicField({
+  topic,
+  field,
+  search,
+  onAdd,
+  onDragStart,
+  onDragEnd,
+}: DragHandlers & { topic: Topic; field: Field; search: string }) {
+  return (
+    <div
+      className="field topic-field"
+      // Not a <button>: Firefox does not drag those.
+      role="button"
+      tabIndex={0}
+      draggable
+      onDoubleClick={() => onAdd({ source: topic.source, topic: topic.topic, path: field.path })}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onAdd({ source: topic.source, topic: topic.topic, path: field.path });
+      }}
+      onDragStart={(e) =>
+        onDragStart(e, {
+          source: topic.source,
+          topic: topic.topic,
+          path: field.path,
+        })
+      }
+      onDragEnd={onDragEnd}
+    >
+      <span title={field.path.join(".")}>
+        <Highlight text={field.path.join(".")} query={search} />
+      </span>
+      {/* The concrete type suffices: nesting already tells structs apart. */}
+      <small title={field.type_name ?? field.data_type}>{typeLabel(topic, field)}</small>
+    </div>
+  );
+}
+
+export function TopicsTab({
+  topics,
+  sourceNames,
+  multiSource,
+  loadingInfo,
+  info,
+  search,
+  setSearch,
+  expandedTopics,
+  setExpandedTopics,
+  showErrorTopics,
+  setShowErrorTopics,
+  onAdd,
+  onDragStart,
+  onDragEnd,
+}: DragHandlers & {
+  topics: Topic[];
+  sourceNames: Map<string, string>;
+  multiSource: boolean;
+  loadingInfo: boolean;
+  info: Info | null;
+  search: string;
+  setSearch: (search: string) => void;
+  expandedTopics: Set<string>;
+  setExpandedTopics: Dispatch<SetStateAction<Set<string>>>;
+  showErrorTopics: boolean;
+  setShowErrorTopics: (show: boolean) => void;
+}) {
+  const visibleTopics = topics.filter((t) => showErrorTopics || !t.error);
+  return (
+    <div
+      id="sidebar-topics"
+      className="sidebar-content"
+      role="tabpanel"
+      aria-labelledby="tab-topics"
+    >
+      <div className="field-heading">
+        <span className="eyebrow">Topics</span>
+        <button
+          className="collapse-topics"
+          onClick={() => setExpandedTopics(new Set())}
+          disabled={expandedTopics.size === 0}
+        >
+          Collapse all
+        </button>
+        <span>
+          {visibleTopics.length} / {topics.length}
+        </span>
+      </div>
+      <input
+        className="text-input search"
+        aria-label="Search fields"
+        placeholder="Search topics and fields…"
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setExpandedTopics(
+            new Set(e.target.value ? topics.map((t) => topicKey(t.source, t.topic)) : []),
+          );
+        }}
+      />
+      <label className="show-error-topics">
+        <input
+          type="checkbox"
+          checked={showErrorTopics}
+          onChange={(e) => setShowErrorTopics(e.target.checked)}
+        />
+        Show topics with errors
+      </label>
+      <div className="topics">
+        {loadingInfo && <p className="muted">Loading group information…</p>}
+        {visibleTopics.map((t, i) => {
+          const id = topicKey(t.source, t.topic);
+          // Several recordings: head each one's topics with its name.
+          const heading = multiSource && visibleTopics[i - 1]?.source !== t.source && (
+            <div className="source-heading" key={`source-${t.source}`}>
+              {sourceNames.get(t.source)}
+            </div>
+          );
+          const query = search.toLowerCase();
+          const topicMatch = (t.topicName ?? t.topic).toLowerCase().includes(query);
+          const fields = t.fields.filter(
+            (f) => topicMatch || f.path.join(".").toLowerCase().includes(query),
+          );
+          if (!fields.length && !topicMatch) return heading || null;
+          return [
+            heading,
+            <details
+              key={id}
+              open={expandedTopics.has(id)}
+              className={`topic-group ${t.message_count === 0 ? "no-messages" : ""}`}
+            >
+              <summary
+                onClick={(e) => {
+                  e.preventDefault();
+                  setExpandedTopics((current) => {
+                    const next = new Set(current);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  });
+                }}
+                draggable
+                onDragStart={(e) => onDragStart(e, { source: t.source, topic: t.topic })}
+                onDragEnd={onDragEnd}
+              >
+                <span className="topic-label">
+                  <span className="topic-name">
+                    <Highlight text={t.topicName ?? t.topic} query={search} />
+                  </span>
+                  <span className="topic-type">
+                    {[
+                      t.schema_name,
+                      t.message_count === null
+                        ? null
+                        : `${t.message_count.toLocaleString()} messages`,
+                      ...t.views.map((view) => view.name),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+                {t.error && <span className="unreadable">Unreadable</span>}
+              </summary>
+              {t.error ? (
+                <p className="topic-error">{t.error}</p>
+              ) : fields.length ? (
+                fields.map((f) => (
+                  <TopicField
+                    key={keyOf(t.source, t.topic, f.path)}
+                    topic={t}
+                    field={f}
+                    search={search}
+                    onAdd={onAdd}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                  />
+                ))
+              ) : (
+                <p className="muted">No fields</p>
+              )}
+            </details>,
+          ];
+        })}
+        {!loadingInfo && info && !visibleTopics.length && (
+          <p className="muted">No topics to display</p>
+        )}
+      </div>
+    </div>
+  );
+}

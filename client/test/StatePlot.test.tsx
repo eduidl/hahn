@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultPlotView, type PlotView, type Series } from "../src/views/Plot";
-import { StatePlot } from "../src/workspace/WidgetWorkspace";
+import { StatePlot } from "../src/views/StatePlot";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
 import { initialWorkspace } from "../src/workspace/widgets";
 

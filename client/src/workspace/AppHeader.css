@@ -1,0 +1,178 @@
+header {
+  position: relative;
+  height: 73px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 29px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--text);
+  font-size: 27px;
+  letter-spacing: -1px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.brand-mark {
+  display: block;
+  width: 29px;
+  height: 29px;
+  flex: none;
+}
+.sidebar-toggle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+}
+.header-start {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-width: 0;
+}
+.runs-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 320px;
+}
+.runs-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-trigger {
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+}
+/* Header popovers hang off their buttons and flip when they would overflow. */
+.group-trigger {
+  anchor-name: --group-trigger;
+}
+header .add-widget {
+  anchor-name: --add-widget;
+}
+.group-menu,
+.widget-catalog {
+  margin: 8px 0;
+  position-area: bottom span-right;
+}
+.group-menu {
+  position-anchor: --group-trigger;
+  width: min(320px, calc(100vw - 32px));
+  padding: 20px;
+}
+.group-menu h2 {
+  margin-top: 0;
+}
+.group-list {
+  max-height: min(360px, 50vh);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.group-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.group-option + .group-option {
+  border-top: 1px solid var(--line);
+}
+.group-option:hover {
+  background: var(--bg-raised);
+}
+.group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-option small {
+  grid-column: 2;
+  font: 12px var(--font-ui);
+  color: var(--text-faint);
+}
+.file-detail {
+  font: 12px var(--font-ui);
+  color: var(--text-faint);
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  header {
+    height: 60px;
+    padding: 0 18px;
+  }
+}
+@media (max-width: 640px) {
+  .sidebar-toggle {
+    display: none;
+  }
+}
+/* The central work surface is tiled; plotting gestures stay inside each pane. */
+header .add-widget {
+  margin-left: auto;
+}
+.widget-catalog {
+  position-anchor: --add-widget;
+  width: min(280px, calc(100vw - 32px));
+  padding: 8px;
+}
+.widget-catalog .help {
+  margin: 4px 6px 8px;
+}
+.widget-catalog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.widget-catalog-item + .widget-catalog-item {
+  margin-top: 6px;
+}
+.widget-catalog-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.widget-catalog-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-accent);
+}
+.widget-catalog-item strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.widget-catalog-item span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .header-start {
+    gap: 12px;
+  }
+  header .add-widget {
+    font-size: 12px;
+    padding: 7px;
+  }
+}

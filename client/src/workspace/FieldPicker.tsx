@@ -1,0 +1,181 @@
+// The search popover that adds fields to a widget.
+import { type WidgetSettingsProps } from "./WidgetSettings";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { addableFields } from "./drop";
+import { SeriesName } from "../SeriesName";
+import { type IndexedField } from "./fieldIndex";
+import { addFieldAction, viewFor, widgetSpecs } from "./widgets";
+
+/** Rows rendered at once; the search narrows the rest. */
+export const pickerLimit = 100;
+
+/** A button opening a searchable list of the fields this widget can take now; picking one closes it. */
+export function FieldPicker({
+  widget,
+  dispatch,
+  index,
+  kind,
+}: WidgetSettingsProps & { kind?: "image" | "pointcloud" }) {
+  const singleTarget = widgetSpecs[widget.type].maxSeries === 1 || kind === "image";
+  // Widgets fed by converted views take whole topics, never individual fields.
+  const takesTopics = Boolean(widgetSpecs[widget.type].viewKinds);
+  const label =
+    kind === "image"
+      ? "Select image topic"
+      : takesTopics
+        ? "Add topic"
+        : singleTarget
+          ? "Select target"
+          : "Add field";
+  const pickerId = useId();
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  const results = useRef<HTMLDivElement>(null);
+  const popover = useRef<HTMLDivElement>(null);
+  const candidates = useMemo(
+    () =>
+      addableFields(index, widget).filter(
+        (entry) => !kind || viewFor(widgetSpecs[widget.type], entry.topic)?.kind === kind,
+      ),
+    [index, widget, kind],
+  );
+  const one = candidates.length === 1;
+  const candidateNoun = takesTopics
+    ? one
+      ? "topic"
+      : "topics"
+    : singleTarget
+      ? one
+        ? "topic or field"
+        : "topics and fields"
+      : one
+        ? "field"
+        : "fields";
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? candidates.filter((entry) => entry.label.toLowerCase().includes(needle))
+    : candidates;
+  const shown = matches.slice(0, pickerLimit);
+  // Candidates can shrink while the list is open, so never point past the end.
+  const activeIndex = Math.min(active, shown.length - 1);
+  useEffect(() => {
+    results.current?.children[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex]);
+  useEffect(() => {
+    // The popover focuses its `autofocus` descendant when shown; React's
+    // autoFocus prop only focuses on mount and emits no attribute.
+    input.current?.setAttribute("autofocus", "");
+    // React's onToggle does not cover popovers, so listen to the native event.
+    const node = popover.current;
+    const onToggle = (event: Event) => {
+      if ((event as ToggleEvent).newState !== "closed") return;
+      setQuery("");
+      setActive(0);
+    };
+    node?.addEventListener("toggle", onToggle);
+    return () => node?.removeEventListener("toggle", onToggle);
+  }, []);
+  const pick = (entry: IndexedField) => {
+    dispatch(addFieldAction(widget, entry.topic, entry.field, index));
+    popover.current?.hidePopover();
+  };
+  return (
+    <>
+      <button
+        className="add-field"
+        aria-label={label}
+        popoverTarget={pickerId}
+        disabled={!candidates.length}
+      >
+        {singleTarget ? label : takesTopics ? "+ Topic" : "+ Field"}
+      </button>
+      <div
+        id={pickerId}
+        ref={popover}
+        className="popover-surface field-picker"
+        popover="auto"
+        role="dialog"
+        aria-label={label}
+      >
+        <input
+          ref={input}
+          className="text-input search"
+          type="search"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls={`${pickerId}-results`}
+          aria-activedescendant={shown.length ? `${pickerId}-${activeIndex}` : undefined}
+          aria-label={
+            kind === "image"
+              ? "Search for a topic to select"
+              : takesTopics
+                ? "Search for a topic to add"
+                : singleTarget
+                  ? "Search for a topic or field to select"
+                  : "Search for a field to add"
+          }
+          placeholder={`Search ${candidates.length.toLocaleString()} ${candidateNoun}…`}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActive(0);
+          }}
+          onKeyDown={(event) => {
+            if ((event.key === "ArrowDown" || event.key === "ArrowUp") && shown.length) {
+              event.preventDefault();
+              const step = event.key === "ArrowDown" ? 1 : -1;
+              setActive((activeIndex + step + shown.length) % shown.length);
+              return;
+            }
+            // A search input's native Escape only clears the text; close instead.
+            if (event.key === "Escape") {
+              event.preventDefault();
+              popover.current?.hidePopover();
+              return;
+            }
+            if (event.key !== "Enter" || !shown.length) return;
+            // Closing returns focus to the opener; without this the same
+            // Enter would press it and reopen the list.
+            event.preventDefault();
+            pick(shown[activeIndex]);
+          }}
+        />
+        <div
+          ref={results}
+          id={`${pickerId}-results`}
+          className="field-picker-results"
+          role="listbox"
+          aria-label={label}
+        >
+          {shown.map((entry, i) => (
+            <button
+              key={entry.key}
+              id={`${pickerId}-${i}`}
+              className="field-option"
+              role="option"
+              aria-selected={i === activeIndex}
+              // Focus stays in the search box; the arrow keys move the selection.
+              tabIndex={-1}
+              onMouseMove={() => setActive(i)}
+              onClick={() => pick(entry)}
+            >
+              <SeriesName
+                source={entry.topic.source}
+                topic={entry.topic.topicName ?? entry.topic.topic}
+                path={entry.field.path}
+                type={entry.typeLabel}
+              />
+            </button>
+          ))}
+          {matches.length > pickerLimit && (
+            <p className="muted">
+              {(matches.length - pickerLimit).toLocaleString()} more. Refine your search.
+            </p>
+          )}
+          {!matches.length && <p className="muted">No matching fields</p>}
+        </div>
+      </div>
+    </>
+  );
+}
