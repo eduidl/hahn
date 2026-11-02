@@ -1,7 +1,7 @@
 // The search popover that adds fields to a widget.
 import { type WidgetSettingsProps } from "./WidgetSettings";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { addableFields } from "./drop";
+import { pickableFields } from "./drop";
 import { SeriesName } from "../SeriesName";
 import { matchesTerms, searchTerms } from "../search";
 import { type IndexedField } from "./fieldIndex";
@@ -9,6 +9,14 @@ import { addFieldAction, viewFor, widgetSpecs } from "./widgets";
 
 /** Rows rendered at once; the search narrows the rest. */
 export const pickerLimit = 100;
+
+const alreadyAdded = "Already added";
+/** Why these cannot be added. Being added already is the least useful thing to say. */
+function explain(items: { reason: string }[]) {
+  const reasons = new Set(items.map((item) => item.reason));
+  if (reasons.size > 1) reasons.delete(alreadyAdded);
+  return [...reasons].join(" ");
+}
 
 /** A button opening a searchable list of the fields this widget can take now; picking one closes it. */
 export function FieldPicker({
@@ -59,6 +67,9 @@ export function FieldPicker({
   const terms = searchTerms(query);
   const matches = candidates.filter((entry) => matchesTerms(entry.label, terms));
   const shown = matches.slice(0, pickerLimit);
+  const unavailableMatches = unavailable.filter((item) => matchesTerms(item.entry.label, terms));
+  // Fields that are already in the widget explain themselves in its series list.
+  const hiddenMatches = unavailableMatches.filter((item) => item.reason !== alreadyAdded);
   // Candidates can shrink while the list is open, so never point past the end.
   const activeIndex = Math.min(active, shown.length - 1);
   useEffect(() => {
@@ -89,6 +100,11 @@ export function FieldPicker({
         aria-label={label}
         popoverTarget={pickerId}
         disabled={!candidates.length}
+        title={
+          candidates.length
+            ? undefined
+            : explain(unavailable) || `No ${nounFor(0)} are available in the open groups.`
+        }
       >
         {singleTarget ? label : takesTopics ? "+ Topic" : "+ Field"}
       </button>
@@ -175,8 +191,16 @@ export function FieldPicker({
               {(matches.length - pickerLimit).toLocaleString()} more. Refine your search.
             </p>
           )}
-          {!matches.length && <p className="muted">No matching fields</p>}
+          {candidates.length > 0 && !matches.length && (
+            <p className="muted">{explain(unavailableMatches) || "No matching fields"}</p>
+          )}
         </div>
+        {matches.length > 0 && hiddenMatches.length > 0 && (
+          <p className="muted field-picker-note">
+            {hiddenMatches.length.toLocaleString()} more {nounFor(hiddenMatches.length)} not shown.{" "}
+            {explain(hiddenMatches)}
+          </p>
+        )}
       </div>
     </>
   );

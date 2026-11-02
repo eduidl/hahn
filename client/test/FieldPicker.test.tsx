@@ -12,6 +12,11 @@ const field = (name: string) => ({
   data_type: "float64" as const,
   type_name: "float64",
 });
+const bool = (name: string) => ({
+  path: [name],
+  data_type: "bool" as const,
+  type_name: "bool",
+});
 const topic: Topic = {
   source: "r/0",
   topic: "/t",
@@ -20,7 +25,7 @@ const topic: Topic = {
   views: [],
   message_count: 1,
   error: null,
-  fields: [field("alpha"), field("beta"), field("gamma")],
+  fields: [field("alpha"), field("beta"), field("gamma"), bool("flag"), bool("ready")],
 };
 
 let latest: WorkspaceState;
@@ -60,7 +65,7 @@ describe("field picker", () => {
   });
   it("moves with the arrow keys, wrapping at the ends, and adds the selection", () => {
     fireEvent.keyDown(search(), { key: "ArrowUp" });
-    expect(selected()[0]).toContain("gamma");
+    expect(selected()[0]).toContain("ready");
     fireEvent.keyDown(search(), { key: "ArrowDown" });
     expect(selected()[0]).toContain("alpha");
     fireEvent.keyDown(search(), { key: "ArrowDown" });
