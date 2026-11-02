@@ -2,7 +2,11 @@
 import { ReportSeriesProblem } from "./seriesViewProblem";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { errorMessage, type Info, type Selected } from "../types";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { errorMessage, type Info, type Schemas, type Selected } from "../types";
+import { type FrameAxesSettings } from "../workspace/widgetModel";
 import { decodeImage } from "../data/imagePixels";
 import { type FieldIndex } from "../workspace/fieldIndex";
 import { usePlaybackNs, useTransforms, useViewFrame } from "../data/useViewData";
@@ -480,44 +484,63 @@ export function CameraLayer({
   return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
-/** Axes of every frame at the playback position. */
+/** Unit axes, x red, y green and z blue, as segments from the origin. */
+function unitAxes() {
+  const geometry = new LineSegmentsGeometry();
+  geometry.setPositions([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+  geometry.setColors([1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1]);
+  return geometry;
+}
+
+/** Axes of the shown frames at the playback position. */
 export function FrameAxes({
-  source,
-  target,
-  info,
+  transforms,
   stage,
+  settings,
 }: {
   source: string | undefined;
   target: string | null;
   info: Info | null;
   stage: Stage;
+  settings: FrameAxesSettings;
 }) {
-  const ns = usePlaybackNs(info);
-  const { transforms } = useTransforms(source, target, ns === null ? null : String(ns), true);
-  const group = useMemo(() => new THREE.Group(), []);
+  // Every frame draws the same geometry and material, so changing a setting touches one object.
+  const { group, geometry, material } = useMemo(
+    () => ({
+      group: new THREE.Group(),
+      geometry: unitAxes(),
+      material: new LineMaterial({ vertexColors: true }),
+    }),
+    [],
+  );
   useEffect(() => {
     stage.scene.add(group);
     return () => {
       stage.scene.remove(group);
+      geometry.dispose();
+      material.dispose();
       stage.invalidate();
     };
-  }, [stage, group]);
+  }, [stage, group, geometry, material]);
   useEffect(() => {
-    const frames = Object.values(transforms?.frames ?? {});
-    while (group.children.length > frames.length) {
-      const axes = group.children.pop() as THREE.AxesHelper;
-      axes.dispose();
-    }
+    material.linewidth = settings.width;
+    stage.invalidate();
+  }, [material, settings.width, stage]);
+  useEffect(() => {
+    const hidden = new Set(settings.hidden);
+    const frames = Object.entries(transforms?.frames ?? {}).filter(([id]) => !hidden.has(id));
+    group.children.length = Math.min(group.children.length, frames.length);
     while (group.children.length < frames.length) {
-      const axes = new THREE.AxesHelper(1);
+      const axes = new LineSegments2(geometry, material);
       axes.matrixAutoUpdate = false;
       group.add(axes);
     }
-    frames.forEach((frame, i) => {
-      group.children[i].matrix.copy(matrixOf(frame));
+    const scale = new THREE.Matrix4().makeScale(settings.length, settings.length, settings.length);
+    frames.forEach(([, frame], i) => {
+      group.children[i].matrix.copy(matrixOf(frame)).multiply(scale);
       group.children[i].matrixWorldNeedsUpdate = true;
     });
     stage.invalidate();
-  }, [transforms, group, stage]);
+  }, [transforms, settings.hidden, settings.length, group, geometry, material, stage]);
   return null;
 }

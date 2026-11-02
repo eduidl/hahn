@@ -158,6 +158,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
           mode: original.mode,
           fixedFrame: original.fixedFrame,
           tileUrl: original.tileUrl,
+          frameAxes: { ...original.frameAxes, hidden: [...original.frameAxes.hidden] },
           series: original.series.map((series) => ({ ...series, path: [...series.path] })),
         });
         if (copy.type === "tabs" && original.type === "tabs") {
@@ -491,7 +492,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                   ? { ...current, fixedFrame: action.value }
                   : action.type === "tile-url"
                     ? { ...current, tileUrl: action.value }
-                    : { ...current, mode: action.mode };
+                    : action.type === "frame-axes"
+                      ? { ...current, frameAxes: { ...current.frameAxes, ...action.value } }
+                      : { ...current, mode: action.mode };
       return { ...state, widgets: { ...state.widgets, [action.id]: updated } };
     }
   }
