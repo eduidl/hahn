@@ -1,6 +1,6 @@
 //! A group's coordinate frame graph, merged from all of its transform topics.
 
-use super::convert::{Message, has, is_string, is_struct, quaternion, vector};
+use super::convert::{Message, has, is_foxglove, is_string, is_struct, quaternion, vector};
 use crate::{
     ApiError, AppState, blocking,
     message::parse_time,
@@ -126,37 +126,88 @@ fn transform_fields(defs: &FieldDefs) -> bool {
         && has(defs, "rotation", is_struct)
 }
 
-fn transform_list(data_type: &DataTypeDef) -> bool {
+fn list_of(data_type: &DataTypeDef, check: fn(&FieldDefs) -> bool) -> bool {
     let element = match data_type {
         DataTypeDef::List(element)
         | DataTypeDef::BoundedList(element, _)
         | DataTypeDef::Array(element, _) => element,
         _ => return false,
     };
-    matches!(&element.data_type, DataTypeDef::Struct(defs) if transform_fields(&defs.fields))
+    matches!(&element.data_type, DataTypeDef::Struct(defs) if check(&defs.fields))
 }
 
-fn accepts(schema_name: &str, defs: &FieldDefs) -> bool {
-    match schema_name {
-        "foxglove.FrameTransform" => transform_fields(defs),
-        "foxglove.FrameTransforms" => has(defs, "transforms", transform_list),
-        _ => false,
+fn transform_list(data_type: &DataTypeDef) -> bool {
+    list_of(data_type, transform_fields)
+}
+
+/// The fields of `geometry_msgs/msg/TransformStamped`.
+fn stamped_fields(defs: &FieldDefs) -> bool {
+    has(defs, "header", is_struct)
+        && has(defs, "child_frame_id", is_string)
+        && has(defs, "transform", is_struct)
+}
+
+fn stamped_list(data_type: &DataTypeDef) -> bool {
+    list_of(data_type, stamped_fields)
+}
+
+/// How a message type holds its transforms.
+#[derive(Clone, Copy)]
+enum Layout {
+    Single,
+    Batch,
+    RosBatch,
+}
+
+fn layout(schema_name: &str, defs: &FieldDefs) -> Option<Layout> {
+    if is_foxglove(schema_name, "FrameTransform") && transform_fields(defs) {
+        Some(Layout::Single)
+    } else if is_foxglove(schema_name, "FrameTransforms") && has(defs, "transforms", transform_list)
+    {
+        Some(Layout::Batch)
+    } else if schema_name == "tf2_msgs/msg/TFMessage" && has(defs, "transforms", stamped_list) {
+        Some(Layout::RosBatch)
+    } else {
+        None
     }
 }
 
-/// The parent, child and transform of a message, if it holds a usable one.
-fn sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str, Transform)> {
-    let (parent, child) = (
-        message.string("parent_frame_id")?,
-        message.string("child_frame_id")?,
-    );
+fn named_frames<'a>(parent: &'a str, child: &'a str) -> anyhow::Result<(&'a str, &'a str)> {
     ensure!(
         !parent.is_empty() && !child.is_empty(),
         "A transform must name both of its frames"
     );
+    Ok((parent, child))
+}
+
+/// The parent, child and transform of a message, if it holds a usable one.
+fn sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str, Transform)> {
+    let (parent, child) = named_frames(
+        message.string("parent_frame_id")?,
+        message.string("child_frame_id")?,
+    )?;
     let transform = Transform {
         translation: vector(message.child("translation")?)?,
         rotation: quaternion(message.child("rotation")?)?,
+    };
+    Ok((parent, child, transform))
+}
+
+/// The same from a `geometry_msgs/msg/TransformStamped`.
+fn stamped_sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str, Transform)> {
+    let header = message.child("header")?;
+    let parent = header.map_or(Ok(""), |header| header.string("frame_id"))?;
+    let (parent, child) = named_frames(parent, message.string("child_frame_id")?)?;
+    let transform = message.child("transform")?;
+    let part = |name| {
+        transform
+            .map(|t| t.child(name))
+            .transpose()
+            .map(Option::flatten)
+    };
+    let transform = Transform {
+        translation: vector(part("translation")?)?,
+        rotation: quaternion(part("rotation")?)?,
     };
     Ok((parent, child, transform))
 }
@@ -227,20 +278,25 @@ impl TfIndex {
                 let (Ok(defs), Some(schema_name)) = (&meta.fields, &meta.schema_name) else {
                     continue;
                 };
-                if !accepts(schema_name, defs) {
+                let Some(layout) = layout(schema_name, defs) else {
                     continue;
-                }
+                };
                 let from_static_topic = is_static_topic(&meta.topic);
                 source.read(&meta.id, TimeRange::default(), &mut |times, value| {
                     // One bad sample must not take every frame of the run with it.
                     if let Ok(message) = Message::new(defs, &value) {
-                        let messages = if schema_name == "foxglove.FrameTransforms" {
-                            message.children("transforms").unwrap_or_default()
-                        } else {
-                            vec![message]
+                        let messages = match layout {
+                            Layout::Single => vec![message],
+                            Layout::Batch | Layout::RosBatch => {
+                                message.children("transforms").unwrap_or_default()
+                            }
                         };
                         for message in messages {
-                            if let Ok((parent, child, transform)) = sample(message) {
+                            let sample = match layout {
+                                Layout::RosBatch => stamped_sample(message),
+                                Layout::Single | Layout::Batch => sample(message),
+                            };
+                            if let Ok((parent, child, transform)) = sample {
                                 index.add(
                                     child,
                                     parent,
