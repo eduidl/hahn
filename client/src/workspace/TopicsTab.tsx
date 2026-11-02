@@ -84,19 +84,6 @@ export function TopicsTab({
       role="tabpanel"
       aria-labelledby="tab-topics"
     >
-      <div className="field-heading">
-        <span className="eyebrow">Topics</span>
-        <button
-          className="collapse-topics"
-          onClick={() => setExpandedTopics(new Set())}
-          disabled={expandedTopics.size === 0}
-        >
-          Collapse all
-        </button>
-        <span>
-          {visibleTopics.length} / {topics.length}
-        </span>
-      </div>
       <input
         className="text-input search"
         aria-label="Search fields"
@@ -117,6 +104,18 @@ export function TopicsTab({
         />
         Show topics with errors
       </label>
+      <div className="topics-toolbar">
+        <span>
+          {visibleTopics.length} / {topics.length} topics
+        </span>
+        <button
+          className="collapse-topics"
+          onClick={() => setExpandedTopics(new Set())}
+          disabled={expandedTopics.size === 0}
+        >
+          Collapse all
+        </button>
+      </div>
       <div className="topics">
         {loadingInfo && <p className="muted">Loading group information…</p>}
         {visibleTopics.map((t, i) => {

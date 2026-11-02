@@ -17,13 +17,20 @@ aside {
   color: var(--text-muted);
 }
 .collapse-topics {
-  padding: 4px 6px;
+  padding: 2px 6px;
   font-size: 12px;
+}
+#sidebar-topics > .search {
+  margin: 14px 16px 16px;
+}
+.errors-panel > .muted {
+  padding: 14px 16px 0;
+  margin: 0;
 }
 .topics {
   flex: 1;
   overflow: auto;
-  max-height: calc(100vh - 395px - var(--playback-height));
+  max-height: calc(100vh - 322px - var(--header-height) - var(--playback-height));
   padding: 0 8px 20px;
 }
 .topic-field {
@@ -92,7 +99,7 @@ aside {
   }
 }
 aside {
-  height: calc(100dvh - 73px - var(--playback-height));
+  height: calc(100dvh - var(--header-height) - var(--playback-height));
   position: sticky;
   top: 0;
 }
@@ -228,7 +235,7 @@ summary .unreadable {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 20px 16px;
+  margin: 0 16px 12px;
   font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
