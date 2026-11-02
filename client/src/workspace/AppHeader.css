@@ -34,10 +34,21 @@ header {
   background: transparent;
   border: 0;
 }
+.sidebar-toggle:hover:not(:disabled),
+header .add-widget:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+/* On while the sidebar is open, like the drag mode buttons of a widget. */
+.sidebar-toggle[aria-expanded="true"],
+.sidebar-toggle[aria-expanded="true"]:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
 .header-start {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 16px;
   min-width: 0;
 }
 .runs-trigger {
@@ -147,6 +158,8 @@ header .add-widget {
   position-area: bottom span-left;
   position-try-fallbacks: none;
   width: min(280px, calc(100vw - 32px));
+  max-height: calc(100% - 16px);
+  overflow: auto;
   padding: 8px;
 }
 .widget-catalog .help {
@@ -185,8 +198,8 @@ header .add-widget {
   .header-start {
     gap: 12px;
   }
+  /* The sidebar toggle that pushes the right side over is hidden here. */
   header .add-widget {
-    font-size: 12px;
-    padding: 7px;
+    margin-left: auto;
   }
 }
