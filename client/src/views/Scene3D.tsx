@@ -115,7 +115,16 @@ function createStage(host: HTMLDivElement) {
   const resetView = () => {
     camera.position.copy(homePosition);
     grid.scale.setScalar(1);
-    replaceControls(new THREE.Vector3());
+    placeGrid();
+    controls.target.set(0, 0, 0);
+    controls.update();
+    invalidate();
+  };
+  const setOrigin = (position: number[] | null) => {
+    origin.set(...((position ?? [0, 0, 0]) as [number, number, number]));
+    content.position.copy(origin).negate();
+    placeGrid();
+    invalidate();
   };
   invalidate();
   return {
@@ -188,13 +197,13 @@ export default function Scene3D({
   widget,
   info,
   index,
-  onFixedFrame,
+  onFollowFrame,
   resetCount,
 }: {
   widget: Widget;
   info: Info | null;
   index: FieldIndex;
-  onFixedFrame: (frame: string) => void;
+  onFollowFrame: (frame: string) => void;
   /** Each change returns the camera to its starting place in the current frame. */
   resetCount: number;
 }) {
@@ -215,7 +224,7 @@ export default function Scene3D({
   }, [resetCount]);
   const sources = widget.series.map((s) => s.source);
   const { frames, error } = useFrames(sources);
-  // Unless one was chosen, the scene follows the frame of the first topic added.
+  // Unless one was chosen, the camera follows the frame of the first topic added.
   const { frame: firstFrame } = useViewFrame(
     widget.fixedFrame === null ? widget.series[0] : undefined,
     info,
@@ -224,7 +233,7 @@ export default function Scene3D({
     firstFrame?.value && "frame_id" in firstFrame.value ? firstFrame.value.frame_id : null;
   useEffect(() => {
     if (firstFrameId && frames.some((frame) => frame.id === firstFrameId))
-      onFixedFrame(firstFrameId);
+      onFollowFrame(firstFrameId);
   }, [firstFrameId, frames]);
   const world = fixedFrameOf(null, frames);
   const { target, error: frameError } = useSceneFrame(stage, sources[0], world, info);
