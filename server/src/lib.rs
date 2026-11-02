@@ -280,6 +280,16 @@ fn schema_fields(defs: &FieldDefs) -> Vec<FieldInfo> {
         .collect()
 }
 
+/// A JSON text topic's fields: its one string field is declared as a JSON document.
+fn json_text_fields(defs: &FieldDefs) -> Vec<FieldInfo> {
+    let mut fields = schema_fields(defs);
+    for field in &mut fields {
+        field.field_type.data_type = "json".into();
+        field.field_type.type_name = "json".into();
+    }
+    fields
+}
+
 fn field_type(data_type: &DataTypeDef) -> FieldType {
     FieldType {
         data_type: data_type.type_name().into(),
@@ -345,19 +355,26 @@ async fn topics(
             })
             .collect();
         let topics = source.topics()?;
-        Ok(topics
+        topics
             .into_iter()
             .map(|meta| {
+                // Only this encoding can be JSON text; the check reads the channel list.
+                let json_text = meta.schema_encoding.as_deref() == Some("jsonschema")
+                    && source.is_json_text(&meta.id)?;
                 let (fields, meta_fields, views, error) = match meta.fields {
                     Ok(defs) => (
-                        schema_fields(&defs),
+                        if json_text {
+                            json_text_fields(&defs)
+                        } else {
+                            schema_fields(&defs)
+                        },
                         meta_fields.clone(),
                         view::declared(meta.schema_name.as_deref(), &defs, &state.converters),
                         None,
                     ),
                     Err(e) => (Vec::new(), Vec::new(), Vec::new(), Some(e)),
                 };
-                Topic {
+                Ok(Topic {
                     id: meta.id,
                     topic: meta.topic,
                     schema_name: meta.schema_name,
@@ -367,9 +384,9 @@ async fn topics(
                     meta_fields,
                     views,
                     error,
-                }
+                })
             })
-            .collect())
+            .collect::<anyhow::Result<Vec<_>>>()
     })
     .await
     .map(Json)

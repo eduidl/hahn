@@ -155,25 +155,28 @@ it("shows a JSON topic's document directly under the topic", () => {
       lineWidth: 1,
     },
   ];
-  const topic = (schema_encoding: string): Topic => ({
+  const topic = (data_type: "json" | "string"): Topic => ({
     source: "r/0",
     topic: "/status",
     schema_name: "Status",
-    schema_encoding,
+    schema_encoding: null,
     views: [],
     message_count: 1,
     error: null,
-    fields: [{ path: ["json"], data_type: "string" }],
+    fields: [
+      { path: ["json"], data_type },
+      { path: ["$meta", "log_time"], data_type: "uint64" },
+    ],
   });
   const info = { start_ns: "0", end_ns: "1", message_count: 1 };
   current.message = { time_ns: "0", value: { json: { speed: 1.5 } } };
   const keys = (root: HTMLElement) =>
     [...root.querySelectorAll(".raw-key")].map((key) => key.textContent);
   const { container, rerender } = render(
-    <RawMessage widget={widget} info={info} index={buildFieldIndex([topic("jsonschema")])} />,
+    <RawMessage widget={widget} info={info} index={buildFieldIndex([topic("json")])} />,
   );
   expect(keys(container)).toEqual(["/status", "speed"]);
   // Elsewhere, a field that happens to be called json is an ordinary field.
-  rerender(<RawMessage widget={widget} info={info} index={buildFieldIndex([topic("ros2msg")])} />);
+  rerender(<RawMessage widget={widget} info={info} index={buildFieldIndex([topic("string")])} />);
   expect(keys(container)).toEqual(["/status", "json", "speed"]);
 });

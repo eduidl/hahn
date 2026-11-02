@@ -3,7 +3,7 @@ import { memo, useMemo, useRef } from "react";
 import { secondsFrom } from "../data/data";
 import { useCurrentMessage } from "../data/useCurrentMessage";
 import { useTimeFormatter } from "../timeDisplay";
-import { keyOf, topicKey, type Info, type Selected } from "../types";
+import { isMetaPath, keyOf, topicKey, type Info, type Selected } from "../types";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 
@@ -111,14 +111,14 @@ const Node = memo(function MessageNode({
   );
 });
 
-/** A JSON topic's only field holds the whole message, so its name adds nothing. */
+/** A lone JSON field holds the whole message, so its name adds nothing. */
 function shownValue(value: Json, series: Selected, index: FieldIndex): Json {
-  const topic = index.topics.get(topicKey(series.source, series.topic));
-  return topic?.schema_encoding === "jsonschema" &&
-    !series.path.length &&
-    isObject(value) &&
-    Object.hasOwn(value, "json")
-    ? value.json
+  const fields = index.topics
+    .get(topicKey(series.source, series.topic))
+    ?.fields.filter((field) => !isMetaPath(field.path));
+  const name = fields?.length === 1 && fields[0].data_type === "json" ? fields[0].path[0] : null;
+  return name !== null && !series.path.length && isObject(value) && Object.hasOwn(value, name)
+    ? value[name]
     : value;
 }
 

@@ -926,7 +926,8 @@ async fn json_channels_without_a_schema_show_parsed_messages() {
     assert!(topics[0]["error"].is_null());
     assert_eq!(topics[0]["schema_encoding"], "jsonschema");
     assert_eq!(topics[0]["fields"][0]["name"], "json");
-    assert_eq!(topics[0]["fields"][0]["data_type"], "string");
+    assert_eq!(topics[0]["fields"][0]["data_type"], "json");
+    assert_eq!(topics[0]["fields"][0]["type_name"], "json");
     let rows = |events: Vec<serde_json::Value>| -> Vec<serde_json::Value> {
         events
             .iter()

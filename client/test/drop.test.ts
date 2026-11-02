@@ -93,6 +93,21 @@ describe("drop verdict", () => {
     });
   });
 
+  it("shows JSON documents in Table and Raw message only", () => {
+    const json = buildFieldIndex([
+      { ...topic, fields: [{ path: ["json"], data_type: "json", type_name: "json" }] },
+    ]);
+    const accepted = (type: Exclude<Widget["type"], "tabs">, path: string[]) =>
+      dropVerdict(json, { source: "r/0", topic: "/t", path }, widget(type)).ok;
+    for (const path of [["json"], []]) {
+      expect(accepted("table", path)).toBe(true);
+      expect(accepted("raw", path)).toBe(true);
+      expect(accepted("plot", path)).toBe(false);
+      expect(accepted("state", path)).toBe(false);
+      expect(accepted("value-changes", path)).toBe(false);
+    }
+  });
+
   it("explains that widgets without topic input take no topics", () => {
     expect(verdict(undefined, widget("source-info"))).toEqual({
       ok: false,
