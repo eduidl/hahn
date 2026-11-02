@@ -45,7 +45,7 @@ export type ValueKind =
   | { type: "bool" }
   | { type: "string" }
   | { type: "enum"; values: EnumValue[] }
-  /** Structs, arrays, bytes and maps: only generic viewers show these. */
+  /** Structs, arrays, bytes, maps and JSON documents: only generic viewers show these. */
   | { type: "other" };
 export function valueKind(
   dataType: string | undefined,
