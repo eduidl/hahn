@@ -123,8 +123,48 @@ export function AppHeader({
         </div>
       </div>
 
-      <button className="add-widget" aria-label="Add widget" popoverTarget="widget-catalog">
-        + Widget
+      <button
+        className="sidebar-toggle"
+        aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+        title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+        aria-expanded={sidebarOpen}
+        onClick={onToggleSidebar}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <rect x="3" y="4" width="18" height="20" rx="2" />
+          <path d="M9 4v16" />
+        </svg>
+      </button>
+      <button
+        className="add-widget"
+        aria-label="Add widget"
+        title="Add widget"
+        popoverTarget="widget-catalog"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <path d="M17.5 14v7M14 17.5h7" />
+        </svg>
       </button>
       <div
         id="widget-catalog"
@@ -168,7 +208,6 @@ export function AppHeader({
       </div>
       <TimeDisplaySelect value={timeDisplay} onChange={onTimeDisplay} />
       <TimeZoneSelect
-        disabled={timeDisplay === "offset"}
         source={zoneSource}
         serverZone={serverZone}
         atMs={info ? Number(BigInt(info.start_ns) / 1_000_000n) : undefined}
