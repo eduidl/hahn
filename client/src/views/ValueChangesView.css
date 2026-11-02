@@ -1,4 +1,4 @@
-/* Value changes: in time order, one fixed-height row each. */
+/* State table: in time order, one fixed-height row each. */
 .value-changes-view {
   display: flex;
   flex-direction: column;

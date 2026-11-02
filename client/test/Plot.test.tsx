@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Plot, tooltipValue } from "../src/views/Plot";
-import { drawnPoints } from "../src/views/Plot";
+import { drawnPoints, markedPoints } from "../src/views/Plot";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
 import { initialWorkspace } from "../src/workspace/widgets";
 
@@ -240,6 +240,20 @@ describe("Plot playback position", () => {
     fireEvent(canvas, pointer("pointermove", 500));
     fireEvent(canvas, pointer("pointerup", 500));
     expect(store.getState().time).toBe(0);
+  });
+});
+
+describe("markedPoints", () => {
+  const small = [1, 2, 3];
+  const large = Array.from({ length: 501 }, (_, i) => i);
+  const drawn = [0, 500];
+  it("marks a small series by default and a large one only when asked", () => {
+    expect(markedPoints(small, small, undefined)).toBe(small);
+    expect(markedPoints(large, drawn, undefined)).toEqual([]);
+    expect(markedPoints(large, drawn, "show")).toBe(drawn);
+  });
+  it("marks nothing when hidden", () => {
+    expect(markedPoints(small, small, "hide")).toEqual([]);
   });
 });
 
