@@ -9,7 +9,6 @@ import { saveSession } from "../src/workspace/persistence";
 
 // The workspace itself has its own tests; here only its restored state matters.
 vi.mock("../src/workspace/WidgetWorkspace", () => ({
-  widgetSeries: () => [],
   WidgetWorkspace: ({ state }: { state: WorkspaceState }) => (
     <pre data-testid="state">{JSON.stringify(state)}</pre>
   ),
@@ -144,7 +143,7 @@ describe("App session restore", () => {
     render(<App />);
     const list = document.getElementById("widget-catalog")!;
     list.hidePopover = vi.fn();
-    activate(screen.getByRole("button", { name: /^Value changes/, hidden: true }));
+    activate(screen.getByRole("button", { name: /^State table/, hidden: true }));
     expect(Object.values(shown().widgets).map((w) => w.type)).toEqual(["plot", "value-changes"]);
     expect(list.hidePopover).toHaveBeenCalledTimes(1);
   });

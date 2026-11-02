@@ -39,7 +39,6 @@ export function Sidebar({
   activeWidget: Widget | undefined;
   dispatch: Dispatch<WorkspaceAction>;
   records: (CachedSeries | MessageRecord)[];
-  pointCount: number;
   index: FieldIndex;
   topics: Topic[];
   sourceNames: Map<string, string>;
@@ -130,7 +129,6 @@ export function Sidebar({
               widget={activeWidget}
               dispatch={dispatch}
               records={records}
-              pointCount={pointCount}
               index={index}
             />
           ) : (
