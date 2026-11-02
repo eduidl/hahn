@@ -16,7 +16,7 @@ function createStage(host: HTMLDivElement) {
   renderer.setPixelRatio(window.devicePixelRatio);
   host.append(renderer.domElement);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#101317");
+  scene.background = new THREE.Color("#171a1e");
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1e6);
   // Recorded coordinates have z up.
   camera.up.set(0, 0, 1);

@@ -4,7 +4,7 @@ import { type WidgetSettingsProps } from "./WidgetSettings";
 import { type ReactNode } from "react";
 import { SeriesName } from "../SeriesName";
 import { type CachedSeries } from "../data/useSeries";
-import { type Selected } from "../types";
+import { type PointMarkers, type Selected } from "../types";
 
 export function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefined) {
   if (!record) return "Waiting";
@@ -135,6 +135,23 @@ export function SeriesStyle({
           }}
         />
         <span>px</span>
+      </label>
+      <label>
+        Points
+        <select
+          aria-label={`${name(s)} points`}
+          value={s.pointMarkers ?? "auto"}
+          onChange={(e) =>
+            restyle({
+              pointMarkers:
+                e.target.value === "auto" ? undefined : (e.target.value as PointMarkers),
+            })
+          }
+        >
+          <option value="auto">Auto</option>
+          <option value="show">Show</option>
+          <option value="hide">Hide</option>
+        </select>
       </label>
     </div>
   );

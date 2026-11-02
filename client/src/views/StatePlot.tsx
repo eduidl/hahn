@@ -148,7 +148,7 @@ export function StatePlot({
     [visible, fullEnd],
   );
   return (
-    <div className="state-plot" ref={plot} aria-label="State transitions">
+    <div className="state-plot" ref={plot} aria-label="State timeline">
       {visible.map((s) => (
         <div className="state-row" key={s.key}>
           <div className="state-label">

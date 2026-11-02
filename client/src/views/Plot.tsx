@@ -18,9 +18,19 @@ import { SeriesName } from "../SeriesName";
 import { linearTicks, timeTicks } from "./ticks";
 import type { LegendSettings } from "../workspace/widgets";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
-import { isDiscreteKind, valueKind, type EnumValue } from "../types";
+import { isDiscreteKind, valueKind, type EnumValue, type PointMarkers } from "../types";
 
 export type DragMode = "pan" | "zoom";
+
+/** Above this many samples, automatic markers would only thicken the line. */
+const autoMarkerLimit = 500;
+
+/** The samples to mark. Small series mark all, so duplicate timestamps stay visible. */
+export function markedPoints<T>(all: T[], drawn: T[], markers: PointMarkers | undefined): T[] {
+  if (markers === "hide") return [];
+  if (all.length <= autoMarkerLimit) return all;
+  return markers === "show" ? drawn : [];
+}
 
 export type Series = {
   key: string;
@@ -30,6 +40,7 @@ export type Series = {
   path: string[];
   color: string;
   lineWidth: number;
+  pointMarkers?: PointMarkers;
   hidden: boolean;
   points: Point[];
   dataType?: string;
@@ -394,7 +405,8 @@ export function Plot({
       let connected = false;
       let previousY = 0;
       const start = Math.max(0, lowerBound(s.points, domain[0]) - 1);
-      for (const p of drawnPoints(s.points, start, domain[1], px)) {
+      const drawn = drawnPoints(s.points, start, domain[1], px);
+      for (const p of drawn) {
         if (p.y === null) {
           connected = false;
           continue;
@@ -413,16 +425,13 @@ export function Plot({
         previousY = y;
       }
       ctx.stroke();
-      // Single samples and duplicate timestamps should still be visible.
-      if (s.points.length <= 500) {
-        ctx.fillStyle = s.color;
-        for (const p of s.points)
-          if (p.y !== null) {
-            ctx.beginPath();
-            ctx.arc(px(p.x), yOf(p.y), 2.2, 0, Math.PI * 2);
-            ctx.fill();
-          }
-      }
+      ctx.fillStyle = s.color;
+      for (const p of markedPoints(s.points, drawn, s.pointMarkers))
+        if (p.y !== null) {
+          ctx.beginPath();
+          ctx.arc(px(p.x), yOf(p.y), 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
     }
     if (cursor !== null && visible.length && !drag?.moved) {
       ctx.strokeStyle = "#c7c7c7";

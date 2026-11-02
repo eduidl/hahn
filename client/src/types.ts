@@ -75,6 +75,7 @@ export type Topic = Omit<Schemas["Topic"], "fields" | "meta_fields" | "id"> & {
   /** The open group the topic belongs to (see `sourceOf`); added by the client. */
   source: string;
 };
+export type PointMarkers = "show" | "hide";
 export type Selected = {
   key: string;
   source: string;
@@ -83,6 +84,8 @@ export type Selected = {
   path: string[];
   color: string;
   lineWidth: number;
+  /** Whether a plot marks each sample; absent means automatic. */
+  pointMarkers?: PointMarkers;
   hidden: boolean;
   dataType?: string;
   enumValues?: EnumValue[];
