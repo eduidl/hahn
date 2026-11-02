@@ -33,9 +33,15 @@ export function WidgetHelp({ title, controls }: { title: string; controls: reado
         role="tooltip"
         style={{ positionAnchor: anchor }}
       >
-        {controls.map((control) => (
-          <div key={control}>{control}</div>
-        ))}
+        {controls.map((control) => {
+          const [input, action] = control.split(": ");
+          return (
+            <div key={control} className="widget-help-row">
+              <kbd>{input}</kbd>
+              <span>{action}</span>
+            </div>
+          );
+        })}
       </div>
     </>
   );

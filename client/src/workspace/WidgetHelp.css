@@ -4,8 +4,33 @@
 .widget-help-list {
   margin: 4px 0;
   position-area: bottom span-left;
-  padding: 6px 10px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 8px 10px;
   width: max-content;
   font-size: 12px;
-  line-height: 1.7;
+}
+/* Hidden until open: `popover` hides it with `display`, which the grid above would override. */
+.widget-help-list:not(:popover-open) {
+  display: none;
+}
+.widget-help-row {
+  display: contents;
+}
+.widget-help-row kbd {
+  justify-self: start;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--bg-control);
+  color: var(--text);
+  font: inherit;
+}
+.widget-help-row span {
+  color: var(--text-muted);
+}
+.widget-help-row span::first-letter {
+  text-transform: uppercase;
 }
