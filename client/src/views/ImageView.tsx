@@ -329,12 +329,6 @@ export function ImageView({
       {projectionProblem && <p className="view-error projection-error">{projectionProblem}</p>}
       {problem ? (
         <p className="view-status view-error">{problem}</p>
-      ) : !series ? (
-        <p className="view-status">Select an image topic</p>
-      ) : frame === undefined || (frame && !shown) ? (
-        <p className="view-status">Loading…</p>
-      ) : frame === null ? (
-        <p className="view-status">No messages</p>
       ) : (
         shown && (
           <p className="view-time">
