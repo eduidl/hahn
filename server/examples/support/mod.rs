@@ -1,3 +1,5 @@
+pub mod ros2;
+
 use prost::Message;
 use prost_types::{
     DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,

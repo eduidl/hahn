@@ -39,6 +39,13 @@ cargo run --manifest-path server/Cargo.toml --locked --example generate_visual -
 
 この2つの録画を配信するサーバに対して、`client/` で `BASE_URL=http://host:port npm run conformance` を実行します。実データの比較は任意のローカル確認です。必要な場合だけ `MCAP_TEST_DATA_DIR=/path/to/recordings cargo test --manifest-path server/Cargo.toml --locked --test real_data -- --ignored` を実行し、録画や出力を共有するテストへ持ち込みません。
 
+ROS 2（CDR）の型を確認する録画は、次のコマンドで生成できます。`generate_ros2` は合成データです。`foxglove_to_ros2` はFoxgloveの録画を実際の画像や点群のままROS 2へ変換するので表示の確認に使えますが、実機のドライバが書くメッセージとは限りません。変換前の録画のライセンスは変換後にも適用されます。
+
+```bash
+cargo run --manifest-path server/Cargo.toml --locked --example generate_ros2 -- data/samples/ros2.mcap
+cargo run --manifest-path server/Cargo.toml --locked --release --example foxglove_to_ros2 -- input.mcap data/samples/converted.mcap 20
+```
+
 ## Running the client in development
 
 Start the server, then run `npm --prefix client run dev`. Vite forwards `/api` to port 3000.

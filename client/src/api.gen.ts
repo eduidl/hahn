@@ -559,7 +559,7 @@ export interface components {
             }[];
         };
         /**
-         * @description GeoJSON features on a map, held by one message. Each message replaces the previous features. The current converter turns foxglove.LocationFix into a Point feature; the map client connects the history into a trail.
+         * @description GeoJSON features on a map, held by one message. Each message replaces the previous features. The current converters turn foxglove.LocationFix and sensor_msgs/msg/NavSatFix into a Point feature; the map client connects the history into a trail.
          * @example {
          *       "kind": "geo",
          *       "features": [
