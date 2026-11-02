@@ -33,9 +33,6 @@
   object-fit: contain;
   pointer-events: none;
 }
-.view-image .projection-error {
-  top: 38px;
-}
 /* Covers the image, so it shows on demand; without hover it has to stay. */
 @media (hover: hover) {
   .view-image .view-time {

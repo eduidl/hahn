@@ -3,6 +3,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import * as THREE from "three";
 import { expect, it, vi } from "vitest";
 import { PoseLayer, PoseTrail } from "../src/views/sceneLayers";
+import { useSeriesViewProblems } from "../src/views/seriesViewProblem";
+
+function ReportedProblems() {
+  return <output>{useSeriesViewProblems().map((item) => item.problem)}</output>;
+}
 
 const mocks = vi.hoisted(() => ({
   frame: undefined as any,
@@ -66,6 +71,7 @@ it("places the latest pose in the fixed frame and hides it if the transform is m
   mocks.transforms = { time_ns: "1", frames: {} };
   view.rerender(<PoseLayer world="map" series={series} info={null} target="fixed" stage={stage} />);
   expect(arrow.visible).toBe(false);
+  render(<ReportedProblems />);
   expect(screen.getByText(/No transform from map to fixed/)).toBeTruthy();
   view.unmount();
   expect(stage.scene.children).toHaveLength(0);

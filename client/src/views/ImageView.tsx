@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { secondsFrom } from "../data/data";
 import { get, runUrl } from "../data/sources";
+import { ReportSeriesProblem } from "./seriesViewProblem";
 import { decodeImage } from "../data/imagePixels";
 import { useLatestOnly, useViewFrame } from "../data/useViewData";
 import { fetchLatestFrame, pointBuffers, type ViewFrame } from "../data/viewFrames";
@@ -84,11 +85,7 @@ function Projection({ cloud, calibration }: { cloud: Cloud; calibration: Calibra
       {value && !problem && !series.hidden && (
         <canvas ref={canvas} width={calibration.width} height={calibration.height} />
       )}
-      {problem && (
-        <p className="view-error projection-error">
-          {series.topicName ?? series.topic}: {problem}
-        </p>
-      )}
+      <ReportSeriesProblem series={series} problem={problem} />
     </>
   );
 }
@@ -326,7 +323,10 @@ export function ImageView({
           Reset
         </button>
       )}
-      {projectionProblem && <p className="view-error projection-error">{projectionProblem}</p>}
+      {/* A problem with the projection as a whole applies to each topic to project. */}
+      {clouds.map((cloud) => (
+        <ReportSeriesProblem key={cloud.key} series={cloud} problem={projectionProblem ?? ""} />
+      ))}
       {problem ? (
         <p className="view-status view-error">{problem}</p>
       ) : (

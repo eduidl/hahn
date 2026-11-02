@@ -103,7 +103,7 @@ describe("widget workspace", () => {
     expect(state.widgets["widget-3"].type).toBe("state");
     expect(state.widgets["widget-1"].type).toBe("plot");
   });
-  it("preserves views during layout and selection changes and clears series on recording change", () => {
+  it("preserves views during layout and selection changes and keeps series on recording change", () => {
     let state = reduce(initialWorkspace(), {
       type: "series",
       id: "widget-1",
@@ -140,7 +140,23 @@ describe("widget workspace", () => {
     state = reduce(state, { type: "sources", open: new Set() });
     expect(state.layout).toBe(layout);
     expect(state.widgets["widget-1"].view).toEqual(defaultPlotView());
-    expect(requestedSeries(state.widgets)).toEqual([]);
+    expect(state.widgets["widget-1"].series).toEqual([series]);
+  });
+  it("moves series to the group that takes over, merging ones that land together", () => {
+    const other: Selected = { ...series, key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
+    let state = reduce(initialWorkspace(), {
+      type: "series",
+      id: "widget-1",
+      update: () => [series, other],
+    });
+    state = reduce(state, {
+      type: "sources",
+      open: new Set(["n/0"]),
+      rebind: () => "n/0",
+    });
+    expect(state.widgets["widget-1"].series).toEqual([
+      { ...series, source: "n/0", key: keyOf("n/0", series.topic, series.path) },
+    ]);
   });
   it("keeps series of recordings that stay open and resets views", () => {
     const other: Selected = { ...series, key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
@@ -155,10 +171,10 @@ describe("widget workspace", () => {
       update: (view) => ({ ...view, x: { center: 0.2, zoom: 4 } }),
     });
     state = reduce(state, { type: "sources", open: new Set(["r/1", "r/2"]) });
-    expect(state.widgets["widget-1"].series).toEqual([other]);
+    expect(state.widgets["widget-1"].series).toEqual([series, other]);
     expect(state.widgets["widget-1"].view).toEqual(defaultPlotView());
   });
-  it("keeps views and frames but still drops closed series when restoring", () => {
+  it("keeps views, frames and closed series when restoring", () => {
     const other: Selected = { ...series, key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
     const zoomed = { x: { center: 0.2, zoom: 4 } };
     let state = reduce(initialWorkspace(), {
@@ -173,7 +189,7 @@ describe("widget workspace", () => {
     });
     state = reduce(state, { type: "fixed-frame", id: "widget-1", value: "map" });
     state = reduce(state, { type: "sources", open: new Set(["r/1"]), keepViews: true });
-    expect(state.widgets["widget-1"].series).toEqual([other]);
+    expect(state.widgets["widget-1"].series).toEqual([series, other]);
     expect(state.widgets["widget-1"].view.x).toEqual(zoomed.x);
     expect(state.widgets["widget-1"].fixedFrame).toBe("map");
   });

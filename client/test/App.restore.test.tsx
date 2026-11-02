@@ -19,10 +19,12 @@ const series: Selected = {
   key: keyOf("run/b", "/pose", ["x"]),
   source: "run/b",
   topic: "/pose",
+  topicName: "/pose",
   path: ["x"],
   color: "#ff0000",
   lineWidth: 0.1,
   hidden: false,
+  dataType: "float64",
 };
 function savedWorkspace() {
   let workspace = reduce(initialWorkspace(), {
@@ -71,7 +73,24 @@ function server(runResponse: () => Promise<Response>) {
   fetchMock.mockImplementation((url: string) => {
     if (url === "/api/runs/run") return runResponse();
     if (url.startsWith("/api/runs?")) return json({ items: [], truncated: false });
-    if (url.endsWith("/topics")) return json([]);
+    if (url.endsWith("/topics"))
+      return json(
+        url.includes("/groups/b/")
+          ? [
+              {
+                id: "/pose",
+                topic: "/pose",
+                schema_name: "T",
+                schema_encoding: null,
+                views: [],
+                message_count: 1,
+                error: null,
+                fields: [{ name: "x", data_type: "float64", type_name: "float64" }],
+                meta_fields: [],
+              },
+            ]
+          : [],
+      );
     return json(info);
   });
 }
@@ -106,9 +125,8 @@ describe("App session restore", () => {
     );
     expect(showModal).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalledWith("/api/runs/run/groups/a", expect.anything());
-    const widget = shown().widgets["widget-1"];
-    expect(widget.series).toEqual([series]);
-    expect(widget.view.x).toEqual({ center: 0.2, zoom: 4 });
+    await waitFor(() => expect(shown().widgets["widget-1"].series).toEqual([series]));
+    expect(shown().widgets["widget-1"].view.x).toEqual({ center: 0.2, zoom: 4 });
   });
   it("shows the open run in the header and asks when none is open", async () => {
     server(() => json(run));
@@ -235,17 +253,17 @@ describe("App session restore", () => {
     expect(stored().sources).toEqual(["run/b"]);
     expect(stored().workspace.widgets["widget-1"].series).toEqual([series]);
   });
-  it("asks again and drops series when the run is gone, keeping the layout", async () => {
+  it("asks again when the run is gone, keeping the series and layout", async () => {
     save();
     server(() => json({ error: "not found" }, 404));
     render(<App />);
     await waitFor(() => expect(showModal).toHaveBeenCalled());
-    await waitFor(() => expect(shown().widgets["widget-1"].series).toEqual([]));
     expect(shown().widgets["widget-1"].view.x).toEqual({
       center: 0.2,
       zoom: 4,
     });
     await waitFor(() => expect(stored().runId).toBeNull());
+    expect(stored().workspace.widgets["widget-1"].series).toEqual([series]);
   });
   it("keeps the session when the server cannot be reached", async () => {
     save();
@@ -253,7 +271,6 @@ describe("App session restore", () => {
     server(() => Promise.reject(new TypeError("Failed to fetch")));
     render(<App />);
     await waitFor(() => expect(showModal).toHaveBeenCalled());
-    expect(shown().widgets["widget-1"].series).toEqual([series]);
     window.dispatchEvent(new Event("pagehide"));
     expect(localStorage.getItem(key)).toBe(before);
   });
