@@ -6,6 +6,7 @@ import {
   useContext,
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type Dispatch,
   type DragEvent,
@@ -27,6 +28,7 @@ import { TfTree } from "../views/TfTree";
 import { SourceInfo } from "../views/SourceInfo";
 import type { OpenSource } from "../data/sources";
 import { ImageView } from "../views/ImageView";
+import { ViewWidget } from "../views/seriesViewProblem";
 import { hideOverflowForDragImage } from "./widgetDragImage";
 import { flattenMapsForDragImage } from "../views/mapDragImage";
 import { SourceNames } from "../data/sources";
@@ -101,6 +103,10 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     moving.liftedId === widget.id &&
     leaves(containerLayout(state, ownerOf(state, widget.id))).length > 1;
   const sourceNames = useContext(SourceNames);
+  const viewWidget = useMemo(
+    () => ({ id: widget.id, title: widget.title }),
+    [widget.id, widget.title],
+  );
   const selection = widget.series
     .map((series) => {
       const group = sourceNames.size > 1 ? sourceNames.get(series.source) : undefined;
@@ -346,7 +352,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 onDrop={(event) => drop(event, widget.id)}
                 aria-label={`Drop target for ${widget.title}`}
               >
-                {views[widget.type]()}
+                <ViewWidget.Provider value={viewWidget}>{views[widget.type]()}</ViewWidget.Provider>
                 {verdict && (
                   <div className={`drop-overlay ${verdict.ok ? "" : "rejected"}`}>
                     {verdict.ok

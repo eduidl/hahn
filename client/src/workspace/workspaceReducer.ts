@@ -8,7 +8,7 @@ import {
 } from "./widgetModel";
 import { canPlaceWidget } from "./widgetSpecs";
 import { widget } from "./workspaceActions";
-import { kindsMatch, seriesKind, type Selected } from "../types";
+import { keyOf, kindsMatch, seriesKind, type Selected } from "../types";
 import {
   leaves,
   hasTabs,
@@ -126,6 +126,16 @@ export function validLayoutChange(
   const before = leaves(containerLayout(state, container)).sort();
   const after = leaves(layout).sort();
   return before.length === after.length && before.every((id, i) => id === after[i]);
+}
+
+/** Two groups may end up in one, so the same field can come up twice. */
+function uniqueSeries(series: Selected[]) {
+  const unique = new Map<string, Selected>();
+  for (const item of series) {
+    const key = keyOf(item.source, item.topic, item.path);
+    if (!unique.has(key)) unique.set(key, { ...item, key });
+  }
+  return [...unique.values()];
 }
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
@@ -359,7 +369,29 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         : validLayoutChange(state, action.container, action.layout)
           ? setContainerLayout(state, action.container, action.layout)
           : state;
-    case "sources":
+    case "topic-ids": {
+      const ids = new Map(
+        action.topics.map((topic) => [
+          JSON.stringify([topic.source, topic.topicName]),
+          topic.topic,
+        ]),
+      );
+      const idOf = (item: Selected) =>
+        ids.get(JSON.stringify([item.source, item.topicName])) ?? item.topic;
+      const widgets = { ...state.widgets };
+      let changed = false;
+      for (const w of Object.values(state.widgets)) {
+        if (w.series.every((item) => idOf(item) === item.topic)) continue;
+        changed = true;
+        widgets[w.id] = {
+          ...w,
+          series: uniqueSeries(w.series.map((item) => ({ ...item, topic: idOf(item) }))),
+        };
+      }
+      return changed ? { ...state, widgets } : state;
+    }
+    case "sources": {
+      const { rebind } = action;
       return {
         ...state,
         widgets: Object.fromEntries(
@@ -367,17 +399,16 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
             w.id,
             {
               ...w,
-              series: w.series.filter((s) => action.open.has(s.source)),
-              hiddenColumns:
-                w.series[0] && !action.open.has(w.series[0].source) ? [] : w.hiddenColumns,
-              columnWidths:
-                w.series[0] && !action.open.has(w.series[0].source) ? {} : w.columnWidths,
+              series: rebind
+                ? uniqueSeries(w.series.map((item) => ({ ...item, source: rebind(item.source) })))
+                : w.series,
               view: action.keepViews ? w.view : defaultPlotView(),
               fixedFrame: action.keepViews ? w.fixedFrame : null,
             },
           ]),
         ),
       };
+    }
     default: {
       const current = state.widgets[action.id];
       if (!current) return state;

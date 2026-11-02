@@ -88,6 +88,8 @@ For CSV and Parquet:
 
 Your workspace is saved in the browser and restored on reload, except for the playback position.
 
+Selecting another run keeps your series. Each moves to the group with the same name, or otherwise the first open one, and finds its topic and field by name. A series that cannot be shown stays in its widget with a warning in the settings, and comes back when a run or group that has it is open.
+
 ## Privacy
 
 The Map widget gets its tiles from OpenStreetMap by default, which sends the area you view to that service. You can change the tile URL or turn tiles off in the widget's settings.

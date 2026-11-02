@@ -7,6 +7,7 @@ import { SidebarResizer } from "./SidebarResizer";
 import { TopicsTab } from "./TopicsTab";
 import type { useTopicDrag } from "./useTopicDrag";
 import { WidgetSettings } from "./WidgetSettings";
+import { useSeriesViewProblems } from "../views/seriesViewProblem";
 import type { Widget, WorkspaceAction } from "./widgets";
 import type { CachedSeries } from "../data/useSeries";
 import type { MessageRecord } from "../data/useMessages";
@@ -62,8 +63,13 @@ export function Sidebar({
     ).values(),
   ];
   const unreadable = topics.filter((t) => t.error);
+  const viewProblems = useSeriesViewProblems();
   const errorCount =
-    unreadable.length + runtimeErrors.length + sourceErrors.length + (error ? 1 : 0);
+    unreadable.length +
+    runtimeErrors.length +
+    viewProblems.length +
+    sourceErrors.length +
+    (error ? 1 : 0);
   return (
     <aside>
       <SidebarResizer onResize={onResize} />
@@ -142,6 +148,7 @@ export function Sidebar({
           error={error}
           sourceErrors={sourceErrors}
           runtimeErrors={runtimeErrors}
+          viewProblems={viewProblems}
           unreadable={unreadable}
           multiSource={multiSource}
           sourceNames={sourceNames}

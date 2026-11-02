@@ -28,6 +28,7 @@ export function useRunSources(
   const pendingRestore = useRef(saved?.runId ? saved : null);
   const [restoring, setRestoring] = useState(Boolean(saved?.runId));
   const [run, setRun] = useState<Run | null>(null);
+  const previousRun = useRef<Run | null>(null);
   // Open groups of the run, in the order they were opened.
   const [sources, setSources] = useState<string[]>([]);
   const [loaded, setLoaded] = useState<Record<string, LoadedSource>>({});
@@ -76,7 +77,25 @@ export function useRunSources(
         const kept = restored ? pending.sources.filter((id) => existing.includes(id)) : [];
         const open = kept.length ? kept : initialSources(detail);
         setSources(open);
-        dispatch({ type: "sources", open: new Set(open), keepViews: restored });
+        const groupNames = new Map(
+          previousRun.current?.groups.map((group) => [
+            sourceOf(previousRun.current!.id, group.id),
+            group.name,
+          ]),
+        );
+        dispatch({
+          type: "sources",
+          open: new Set(open),
+          keepViews: restored,
+          rebind:
+            restored || !open.length
+              ? undefined
+              : (source) => {
+                  if (existing.includes(source)) return source;
+                  const same = detail.groups.find((group) => group.name === groupNames.get(source));
+                  return same ? sourceOf(detail.id, same.id) : open[0];
+                },
+        });
         pendingRestore.current = null;
         setRestoring(false);
       })
@@ -132,8 +151,9 @@ export function useRunSources(
     return () => current.forEach((controller) => controller.abort());
   }, []);
 
-  /** Switch runs: the layout and widget settings stay, the previous run's series do not. */
+  /** Switch runs: everything stays, and each series moves to the new run's matching group. */
   const selectRun = (id: string) => {
+    if (run) previousRun.current = run;
     setRun(null);
     setError("");
     setSources([]);
@@ -147,7 +167,7 @@ export function useRunSources(
     setRunId(id);
   };
 
-  /** Open or close a group. Series of closed groups are dropped. */
+  /** Open or close a group. Series of a closed group wait until it is open again. */
   const toggleSource = (id: string, open: boolean) => {
     const next = open ? [...sources.filter((s) => s !== id), id] : sources.filter((s) => s !== id);
     setSources(next);

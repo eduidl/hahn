@@ -1,4 +1,5 @@
 // What a 3D widget draws: point clouds, poses, camera images and frame axes.
+import { ReportSeriesProblem } from "./seriesViewProblem";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { errorMessage, type Info, type Selected } from "../types";
@@ -143,11 +144,7 @@ export function PointsLayer({
     frame?.error ||
     transformError ||
     (unresolved ? `No transform from ${frameId} to ${target} at this time` : "");
-  return problem ? (
-    <p className="view-error">
-      {series.topicName ?? series.topic}: {problem}
-    </p>
-  ) : null;
+  return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
 /** The recorded pose history up to the playback position. */
@@ -248,11 +245,7 @@ export function PoseTrail({
     history?.error ||
     transformError ||
     (trail.gaps ? "Some trajectory samples could not be placed" : "");
-  return problem ? (
-    <p className="view-error">
-      {series.topicName ?? series.topic}: {problem}
-    </p>
-  ) : null;
+  return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
 /** The latest pose, with the arrow pointing along the body's positive x axis. */
@@ -318,11 +311,7 @@ export function PoseLayer({
       {info && (
         <PoseTrail series={series} info={info} target={target} world={world} stage={stage} />
       )}
-      {problem && (
-        <p className="view-error">
-          {series.topicName ?? series.topic}: {problem}
-        </p>
-      )}
+      <ReportSeriesProblem series={series} problem={problem} />
     </>
   );
 }
@@ -488,11 +477,7 @@ export function CameraLayer({
     transformError ||
     (image && !image.frame_id ? "Image has no frame ID" : "") ||
     (unresolved ? `No transform from ${image?.frame_id} to ${target} at this time` : "");
-  return problem ? (
-    <p className="view-error">
-      {series.topicName ?? series.topic}: {problem}
-    </p>
-  ) : null;
+  return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
 /** Axes of every frame at the playback position. */

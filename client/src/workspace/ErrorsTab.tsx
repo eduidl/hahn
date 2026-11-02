@@ -1,11 +1,13 @@
 import { topicKey, type Topic } from "../types";
 import type { CachedSeries } from "../data/useSeries";
+import type { SeriesViewProblem } from "../views/seriesViewProblem";
 
 export function ErrorsTab({
   count,
   error,
   sourceErrors,
   runtimeErrors,
+  viewProblems,
   unreadable,
   multiSource,
   sourceNames,
@@ -14,6 +16,7 @@ export function ErrorsTab({
   error: string;
   sourceErrors: { group: { source: string; name: string }; error: string }[];
   runtimeErrors: Pick<CachedSeries, "key" | "source" | "topic" | "topicName" | "error">[];
+  viewProblems: SeriesViewProblem[];
   unreadable: Topic[];
   multiSource: boolean;
   sourceNames: Map<string, string>;
@@ -47,6 +50,16 @@ export function ErrorsTab({
           </strong>
           <span>Stream error</span>
           <p>{r.error}</p>
+        </div>
+      ))}
+      {viewProblems.map(({ widgetId, widgetTitle, series, problem }) => (
+        <div className="error-item" key={`view-${widgetId}-${series.key}`}>
+          <strong>
+            {multiSource && <small>{sourceNames.get(series.source)} </small>}
+            {series.topicName ?? series.topic}
+          </strong>
+          <span>{widgetTitle}</span>
+          <p>{problem}</p>
         </div>
       ))}
       {unreadable.map((t) => (

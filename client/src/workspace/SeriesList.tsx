@@ -1,8 +1,10 @@
 // The list of a widget's series and the controls of each.
 import { FieldPicker } from "./FieldPicker";
 import { type WidgetSettingsProps } from "./WidgetSettings";
-import { type ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
+import { SeriesEnvironmentContext, seriesStates } from "./seriesState";
 import { SeriesName } from "../SeriesName";
+import { useSeriesViewProblem } from "../views/seriesViewProblem";
 import { type CachedSeries } from "../data/useSeries";
 import { type PointMarkers, type Selected } from "../types";
 
@@ -68,6 +70,10 @@ export function SeriesRow({
 }) {
   const update = (change: (series: Selected[]) => Selected[]) =>
     dispatch({ type: "series", id: widget.id, update: change });
+  const environment = useContext(SeriesEnvironmentContext);
+  const state = environment && seriesStates(widget, environment).get(s.key);
+  const viewProblem = useSeriesViewProblem(widget.id, s.key);
+  const problem = (state && !state.usable ? state.problem : null) ?? viewProblem;
   return (
     <div className="legend-row">
       <button
@@ -82,8 +88,15 @@ export function SeriesRow({
         <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
       </button>
       {children}
-      {showStatus && (
-        <span className="series-status">{statusLabel(records.find((r) => r.key === s.key))}</span>
+      {problem ? (
+        <span className="series-status series-problem">
+          <span aria-hidden="true">⚠ </span>
+          {problem}
+        </span>
+      ) : (
+        showStatus && (
+          <span className="series-status">{statusLabel(records.find((r) => r.key === s.key))}</span>
+        )
       )}
       <button
         className="remove"

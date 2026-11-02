@@ -42,16 +42,14 @@ function widgetReason(entry: IndexedField, widget: Widget, spec: WidgetSpec, ind
     return "Select an image topic first.";
   // A single-series widget replaces its series, so nothing else constrains it.
   if (spec.maxSeries === 1) return null;
-  const current = seriesKind(widget.series);
+  // Series that are not in the open groups are not shown, so they do not constrain anything.
+  const shown = widget.series.filter((s) => index.byKey.has(s.key));
+  const current = seriesKind(shown);
   if (spec.sameKind && current !== null && !kindsMatch(current, entry.kind))
     return mismatchReason(current, entry.kind);
-  if (widget.series.length >= spec.maxSeries)
-    return `A maximum of ${spec.maxSeries} series is allowed.`;
+  if (shown.length >= spec.maxSeries) return `A maximum of ${spec.maxSeries} series is allowed.`;
   const { source, topic } = entry.topic;
-  if (
-    widget.series.filter((s) => s.source === source && s.topic === topic).length >=
-    maxFieldsPerTopic
-  )
+  if (shown.filter((s) => s.source === source && s.topic === topic).length >= maxFieldsPerTopic)
     return `A maximum of ${maxFieldsPerTopic} fields per topic is allowed.`;
   return null;
 }

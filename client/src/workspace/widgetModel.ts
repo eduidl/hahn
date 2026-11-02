@@ -2,7 +2,7 @@
 import { type DropEdge } from "./layoutTree";
 import { type MosaicDirection, type MosaicNode } from "react-mosaic-component";
 import { type DragMode, type PlotView } from "../views/Plot";
-import { type Selected } from "../types";
+import { type Selected, type Topic } from "../types";
 
 export type LegendPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -114,7 +114,18 @@ export type WorkspaceAction =
    * longer open and reset every view to the new full range. `keepViews` skips
    * the reset, for restoring a saved session over the same time axis.
    */
-  | { type: "sources"; open: ReadonlySet<string>; keepViews?: boolean };
+  /** Topic ids differ between runs, so a series that moved finds its topic again by name. */
+  | {
+      type: "topic-ids";
+      topics: readonly (Pick<Topic, "source" | "topic"> & { topicName?: string })[];
+    }
+  | {
+      type: "sources";
+      open: ReadonlySet<string>;
+      keepViews?: boolean;
+      /** The group of the newly opened run that takes over the series of a group. */
+      rebind?: (source: string) => string;
+    };
 
 export const widgetMoveMime = "application/x-hahn-widget-move";
 

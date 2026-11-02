@@ -155,6 +155,7 @@
 .series-toggle.dim {
   opacity: 0.35;
 }
+.series-problem { color: var(--error) !important; }
 .series-status {
   grid-column: 1 / -1;
   font: 12px var(--font-ui);
