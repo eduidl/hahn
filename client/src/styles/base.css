@@ -7,6 +7,7 @@
   font-display: swap;
 }
 :root {
+  --header-height: 48px;
   --playback-height: 52px;
   --font-ui: "Inter Variable", system-ui, "Noto Sans JP", sans-serif;
   /* For names and values only: topics, fields, series, frames, message contents. */
