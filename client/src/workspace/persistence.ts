@@ -1,4 +1,4 @@
-import type { TimeDisplay, TimeZoneSource } from "../timeDisplay";
+import { usableTimeZone, type TimeDisplay, type TimeZoneSource } from "../timeDisplay";
 import { maxSidebarWidth, minSidebarWidth } from "./SidebarResizer";
 import { leaves, widget, widgetSpecs, type Widget, type WorkspaceState } from "./widgets";
 
@@ -103,7 +103,11 @@ export function loadSession(storage: Storage | null): Session | null {
       workspace,
       runId: typeof saved.runId === "string" ? saved.runId : null,
       sources: isStringArray(saved.sources) ? saved.sources : [],
-      zoneSource: saved.zoneSource === "server" ? "server" : "browser",
+      zoneSource:
+        saved.zoneSource === "server" ||
+        (typeof saved.zoneSource === "string" && usableTimeZone(saved.zoneSource))
+          ? (saved.zoneSource as TimeZoneSource)
+          : "browser",
       timeDisplay: saved.timeDisplay === "offset" ? "offset" : "absolute",
       tab: saved.tab === "topics" || saved.tab === "errors" ? saved.tab : "settings",
       sidebarWidth:

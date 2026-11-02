@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeFormatter, usableTimeZone } from "../src/timeDisplay";
+import { chosenTimeZone, timeFormatter, usableTimeZone, zoneOffset } from "../src/timeDisplay";
 const origin = (BigInt(Date.parse("2026-01-04T23:59:59.123Z")) * 1_000_000n + 456_789n).toString();
 describe("time display", () => {
   it("formats readable absolute time, milliseconds, and dates across midnight", () => {
@@ -37,6 +37,26 @@ describe("time display", () => {
     expect(relative.axisTime(0.5, 0.5)).toBe("0.5");
     expect(timeFormatter(null, "absolute").tick(0).time).toBe("—");
     expect(timeFormatter(origin, "absolute").tick(1e308).time).toBe("—");
+  });
+});
+
+describe("zoneOffset", () => {
+  it("follows the date, and writes UTC as a number", () => {
+    expect(zoneOffset("America/New_York", Date.UTC(2025, 0, 15))).toBe("UTC-5");
+    expect(zoneOffset("America/New_York", Date.UTC(2025, 6, 15))).toBe("UTC-4");
+    expect(zoneOffset("Asia/Tokyo", Date.UTC(2025, 0, 15))).toBe("UTC+9");
+    expect(zoneOffset("Pacific/Auckland", Date.UTC(2025, 0, 15))).toBe("UTC+13");
+    expect(zoneOffset("Asia/Kolkata", Date.UTC(2025, 0, 15))).toBe("UTC+5:30");
+    expect(zoneOffset("UTC", Date.UTC(2025, 0, 15))).toBe("UTC");
+  });
+});
+
+describe("chosenTimeZone", () => {
+  it("resolves each kind of choice", () => {
+    expect(chosenTimeZone("browser", "UTC")).toBeUndefined();
+    expect(chosenTimeZone("server", "UTC")).toBe("UTC");
+    expect(chosenTimeZone("server", null)).toBeUndefined();
+    expect(chosenTimeZone("Europe/Paris", null)).toBe("Europe/Paris");
   });
 });
 
