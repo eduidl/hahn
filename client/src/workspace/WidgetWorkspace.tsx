@@ -89,6 +89,9 @@ export function widgetSeries(widget: Widget, data: Series[]): Series[] {
   });
 }
 
+/** Just enough to find the widget again. How small to make one is up to the user. */
+const minimumWidgetPixels = 10;
+
 function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path: MosaicPath }) {
   const { state, dispatch, data, info, fullEnd, revision, dragVerdict, drop, openSettings } = props;
   const moving = useContext(MoveContext);
@@ -379,7 +382,7 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
         value={expanded ?? (moving.liftedId ? withoutLifted(layout, moving.liftedId) : layout)}
         onChange={(layout) => dispatch({ type: "layout", layout, container })}
         className="hahn-mosaic"
-        resize={{ minimumPaneSizePx: { row: 320, column: 260 } }}
+        resize={{ minimumPaneSizePercentage: 0, minimumPaneSizePx: minimumWidgetPixels }}
         zeroStateView={
           <div
             className={`workspace-empty ${canDrop ? "drop-ready" : ""}`}
