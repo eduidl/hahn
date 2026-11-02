@@ -129,6 +129,10 @@
 .field-picker-results .muted {
   margin: 8px 10px;
 }
+.field-picker-note {
+  flex-shrink: 0;
+  margin: 8px 10px 2px;
+}
 .field-option[aria-selected="true"] {
   background: var(--bg-hover);
   outline: 1px solid var(--accent);

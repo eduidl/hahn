@@ -28,7 +28,7 @@ const kindLabel = (kind: ValueKind["type"] | undefined) =>
 function mismatchReason(current: ValueKind | null, added: ValueKind | null) {
   if (current?.type === "enum" && added?.type === "enum")
     return "Enums with different definitions cannot be combined.";
-  return `Cannot combine ${kindLabel(added?.type)} with ${kindLabel(current?.type)} series.`;
+  return `Only ${kindLabel(current?.type)} fields can be added.`;
 }
 
 /** Checks that depend on the widget's current series; null when the field fits. */
@@ -103,8 +103,18 @@ export function dropVerdict(
   };
 }
 
+/** The widget's cached candidates: those it can take right now, and why it cannot take the rest. */
+export function pickableFields(index: FieldIndex, widget: Widget) {
+  const addable: IndexedField[] = [];
+  const unavailable: { entry: IndexedField; reason: string }[] = [];
+  for (const entry of index.candidates[widget.type]) {
+    const reason = widgetReason(entry, widget, widgetSpecs[widget.type], index);
+    if (reason === null) addable.push(entry);
+    else unavailable.push({ entry, reason });
+  }
+  return { addable, unavailable };
+}
+
 /** Fields that can be added to the widget right now, from the cached candidates. */
 export const addableFields = (index: FieldIndex, widget: Widget): IndexedField[] =>
-  index.candidates[widget.type].filter(
-    (entry) => widgetReason(entry, widget, widgetSpecs[widget.type], index) === null,
-  );
+  pickableFields(index, widget).addable;

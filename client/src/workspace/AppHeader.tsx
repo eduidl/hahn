@@ -173,7 +173,7 @@ export function AppHeader({
         role="dialog"
         aria-label="Add widget"
       >
-        <p className="help">Click to add next to the selected widget, or drag to a position.</p>
+        <p className="help">Click to add on the left, or drag to a position.</p>
         {widgetTypes.map((type) => (
           <div
             key={type}

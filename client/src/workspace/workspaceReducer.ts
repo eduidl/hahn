@@ -130,7 +130,9 @@ export function validLayoutChange(
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case "add": {
-      const target = state.widgets[action.target ?? (action.container ? "" : state.activeId) ?? ""];
+      const target = action.leading
+        ? undefined
+        : state.widgets[action.target ?? (action.container ? "" : state.activeId) ?? ""];
       const container = action.container ?? (target ? ownerOf(state, target.id) : undefined);
       const addedType = action.duplicate && target ? target.type : (action.widgetType ?? "plot");
       if (!containerExists(state, container) || !canPlaceWidget(addedType, container)) return state;
