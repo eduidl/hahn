@@ -2,7 +2,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { timeFormatter } from "../src/timeDisplay";
-import { StateAxis } from "../src/workspace/WidgetWorkspace";
+import { StateAxis } from "../src/views/StatePlot";
 
 let resize: (width: number) => void;
 beforeEach(() => {
