@@ -1,9 +1,22 @@
 .legend {
   flex-shrink: 0;
-  border-top: 1px solid var(--line);
-  margin-top: 4px;
-  min-height: 138px;
-  padding: 0 16px 16px;
+  margin: 0;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-section:last-child {
+  border-bottom: 0;
 }
 .legend-heading {
   display: flex;

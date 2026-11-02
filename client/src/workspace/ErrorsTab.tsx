@@ -25,10 +25,6 @@ export function ErrorsTab({
       role="tabpanel"
       aria-labelledby="tab-errors"
     >
-      <div className="field-heading">
-        <span className="eyebrow">Errors</span>
-        <span>{count}</span>
-      </div>
       {!count && <p className="muted">No errors</p>}
       {error && (
         <div className="error-item">

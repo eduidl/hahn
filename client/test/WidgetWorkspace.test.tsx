@@ -98,13 +98,7 @@ function Harness({
       />
       {selected && (
         <aside aria-label="設定">
-          <WidgetSettings
-            widget={selected}
-            dispatch={dispatch}
-            index={index}
-            records={[]}
-            pointCount={0}
-          />
+          <WidgetSettings widget={selected} dispatch={dispatch} index={index} records={[]} />
         </aside>
       )}
     </PlaybackContext.Provider>

@@ -56,7 +56,7 @@ const wheel = (target: Element, deltaY: number, clientX = 25) => {
   return event;
 };
 
-describe("State transition zoom", () => {
+describe("State timeline zoom", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "ResizeObserver",

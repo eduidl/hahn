@@ -7,7 +7,6 @@ import { topicKey, type Selected, type Topic, type ValueKind } from "../types";
 export type WidgetSpec = {
   label: string;
   description: string;
-  help: string;
   /** Shown in an empty widget. */
   emptyHint: string;
   /** Value kinds the widget can display at all. */
@@ -29,7 +28,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     label: "TF tree",
     description: "Show coordinate frame relationships",
     controls: ["Drag: pan", "Wheel: zoom"],
-    help: "Shows coordinate frames. There is nothing to configure.",
     emptyHint: "No frames",
     accepts: new Set(),
     sameKind: false,
@@ -39,7 +37,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   "source-info": {
     label: "Data source info",
     description: "Show the time range and topics of the open groups",
-    help: "Shows the open groups. There is nothing to configure.",
     emptyHint: "No data source",
     accepts: new Set(),
     sameKind: false,
@@ -49,7 +46,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   tabs: {
     label: "Tabs",
     description: "Switch between widget layouts using tabs",
-    help: "Place widgets in each tab. Edit tab names and order.",
     emptyHint: "Drop a widget",
     accepts: new Set(),
     sameKind: false,
@@ -60,7 +56,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     label: "Plot",
     controls: ["Wheel: zoom", "Shift + wheel: zoom values"],
     description: "Overlay numeric, bool, or enum time series",
-    help: "Add numeric, bool, or enum fields. Only fields matching the first series can be combined.",
     emptyHint: "Drop a numeric, bool, or enum field",
     accepts: new Set(["numeric", "bool", "enum"]),
     sameKind: true,
@@ -68,10 +63,9 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: true,
   },
   state: {
-    label: "State transition",
+    label: "State timeline",
     controls: ["Wheel: zoom"],
-    description: "Show bool, enum, or string state transitions in separate rows",
-    help: "Add bool, enum, or string fields. Series may have different types or enum definitions.",
+    description: "Show how bool, enum, or string values stay and change along a time axis",
     emptyHint: "Drop a bool, enum, or string field",
     accepts: new Set(["bool", "enum", "string"]),
     sameKind: false,
@@ -79,9 +73,8 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     loadsSeries: true,
   },
   "value-changes": {
-    label: "Value changes",
-    description: "List string, enum, or bool value changes in time order",
-    help: "Add string, enum, or bool fields. Changes are listed in time order.",
+    label: "State table",
+    description: "Show each bool, enum, or string value change with its time in a table",
     emptyHint: "Drop a string, enum, or bool field",
     accepts: new Set(["string", "enum", "bool"]),
     sameKind: false,
@@ -91,7 +84,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   table: {
     label: "Table",
     description: "Show topic or field history in a table",
-    help: "Select one topic or field. Its contents are expanded into columns.",
     emptyHint: "Drop a topic or field",
     accepts: new Set(["numeric", "bool", "enum", "string", "other"]),
     sameKind: false,
@@ -101,7 +93,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   raw: {
     label: "Raw message",
     description: "Show a topic or field at the playback position",
-    help: "Select one topic or field.",
     emptyHint: "Drop a topic or field",
     accepts: new Set(["numeric", "bool", "enum", "string", "other"]),
     sameKind: false,
@@ -112,7 +103,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     label: "Image",
     description: "Show an image and projected point clouds",
     controls: ["Drag: pan", "Wheel: zoom"],
-    help: "Select an image and point cloud topics.",
     emptyHint: "Drop an image topic",
     accepts: new Set(),
     sameKind: false,
@@ -124,7 +114,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     label: "3D",
     description: "Show point clouds, cameras, poses and coordinate frames in 3D",
     controls: ["Drag: rotate", "Right-drag: pan", "Wheel: zoom"],
-    help: "Add point cloud, image or pose topics.",
     emptyHint: "Drop a point cloud, image or pose topic",
     accepts: new Set(),
     sameKind: false,
@@ -136,7 +125,6 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     label: "Map",
     description: "Show location history and playback position on a map",
     controls: ["Drag: pan", "Wheel: zoom"],
-    help: "Add location topics. Change map tiles in settings.",
     emptyHint: "Drop a location topic",
     accepts: new Set(),
     sameKind: false,
