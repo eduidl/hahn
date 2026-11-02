@@ -249,6 +249,7 @@
   border-left: 1.5px solid var(--accent);
   transform: translateX(-0.75px);
   pointer-events: none;
+  z-index: 2;
 }
 /* A Tab contains the same layout surface as the root workspace. */
 .tab-widget-content {

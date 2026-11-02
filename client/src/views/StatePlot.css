@@ -37,13 +37,26 @@
   min-width: 1px;
   display: flex;
   align-items: center;
-  padding: 0 5px;
   overflow: hidden;
   border-right: 1px solid var(--bg-base);
   color: var(--text);
   font-size: 12px;
   font-weight: 600;
   text-shadow: 0 1px 2px #000;
+}
+.state-segment-labeled { padding: 0 5px; }
+/* Stays visible over the next band, which starts less than a pixel later. */
+.state-segment-thin {
+  z-index: 1;
+  border-right: 0;
+}
+/* Neutral, so it does not read as a state, and lighter than the empty track behind it. */
+.state-segment-mixed { background: color-mix(in srgb, var(--text-faint) 45%, var(--bg-control)); }
+.state-segment-mixed span {
+  color: var(--text);
+  font-weight: 400;
+  font-style: normal;
+  text-shadow: none;
 }
 .state-segment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .state-segment .state-empty {

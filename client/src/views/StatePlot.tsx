@@ -27,9 +27,28 @@ function stateColor(value: string) {
   const hash = [...value].reduce((result, char) => (result * 31 + char.charCodeAt(0)) | 0, 0);
   return stateColors[Math.abs(hash) % stateColors.length];
 }
+type StateSegment = { start: number; end: number; value: string; color: string; ns: string };
+/** What one element shows: a single state, or several too short to tell apart (`segment` null). */
+export type StateBand = {
+  start: number;
+  end: number;
+  first: StateSegment;
+  segment: StateSegment | null;
+  count: number;
+};
+/** States narrower than this are merged with their neighbors, which would otherwise alias. */
+const minBandPixels = 2;
+/** The separator would cover a narrower band completely. */
+const minSeparatedPixels = 4;
+/** Below these widths a label is not readable, so it is not rendered. */
+const minLabelPixels = 24;
+const minMixedLabelPixels = 96;
+/** A press that moves less than this is a click. */
+const dragPixels = 4;
+
 function stateSegments(series: Series, fullEnd: number) {
-  const segments: { start: number; end: number; value: string; color: string; ns: string }[] = [];
-  let current: (typeof segments)[number] | null = null;
+  const segments: StateSegment[] = [];
+  let current: StateSegment | null = null;
   for (const point of series.points) {
     if (point.raw === null) {
       if (current) segments.push({ ...current, end: point.x });
@@ -43,6 +62,47 @@ function stateSegments(series: Series, fullEnd: number) {
   }
   if (current) segments.push(current);
   return segments;
+}
+/**
+ * The bands to draw for a visible time range. There are at most about `width`
+ * of them per row, however many states the recording has.
+ */
+export function stateBands(segments: StateSegment[], domain: AxisRange, width: number) {
+  const bands: StateBand[] = [];
+  const span = domain[1] - domain[0];
+  if (width <= 0 || span <= 0) return bands;
+  const pixels = width / span;
+  // Segments are in time order, so the visible ones can be found without a scan.
+  let low = 0;
+  let high = segments.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (segments[middle].end < domain[0]) low = middle + 1;
+    else high = middle;
+  }
+  let run: Omit<StateBand, "segment"> | undefined;
+  const flush = () => {
+    if (run) bands.push({ ...run, segment: run.count === 1 ? run.first : null });
+    run = undefined;
+  };
+  for (let i = low; i < segments.length && segments[i].start <= domain[1]; i++) {
+    const segment = segments[i];
+    const start = Math.max(segment.start, domain[0]);
+    const end = Math.min(segment.end, domain[1]);
+    if ((end - start) * pixels >= minBandPixels) {
+      flush();
+      bands.push({ start, end, first: segment, segment, count: 1 });
+      continue;
+    }
+    // A visible gap of missing values stays a gap.
+    if (run && (start - run.end) * pixels >= 1) flush();
+    if (run) {
+      run.end = end;
+      run.count++;
+    } else run = { start, end, first: segment, count: 1 };
+  }
+  flush();
+  return bands;
 }
 function StatePlayhead({ domain }: { domain: AxisRange }) {
   const time = usePlayback((s) => s.time);
@@ -95,6 +155,14 @@ export function StateAxis({
   );
 }
 
+type SegmentCache = {
+  points: Series["points"];
+  length: number;
+  enumValues: Series["enumValues"];
+  fullEnd: number;
+  segments: StateSegment[];
+};
+
 export function StatePlot({
   widget,
   series,
@@ -143,10 +211,35 @@ export function StatePlot({
     return domain[0] + ((event.clientX - rect.left) / rect.width) * (domain[1] - domain[0]);
   };
   const visible = series.filter((s) => !s.hidden);
-  const segments = useMemo(
-    () => new Map(visible.map((item) => [item.key, stateSegments(item, fullEnd)])),
-    [visible, fullEnd],
-  );
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(plot.current!);
+    return () => observer.disconnect();
+  }, []);
+  // Series objects are rebuilt on every render; their points change only while loading.
+  const cache = useRef(new Map<string, SegmentCache>());
+  const segmentsOf = (item: Series) => {
+    const cached = cache.current.get(item.key);
+    if (
+      cached?.points === item.points &&
+      cached.length === item.points.length &&
+      cached.enumValues === item.enumValues &&
+      cached.fullEnd === fullEnd
+    )
+      return cached.segments;
+    const segments = stateSegments(item, fullEnd);
+    cache.current.set(item.key, {
+      points: item.points,
+      length: item.points.length,
+      enumValues: item.enumValues,
+      fullEnd,
+      segments,
+    });
+    return segments;
+  };
+  const span = domain[1] - domain[0];
+  const percent = (time: number) => ((time - domain[0]) / span) * 100;
   return (
     <div className="state-plot" ref={plot} aria-label="State timeline">
       {visible.map((s) => (
@@ -160,27 +253,39 @@ export function StatePlot({
             onPointerMove={(event) => playback.setPreview(timeAt(event))}
             onPointerLeave={() => playback.setPreview(null)}
           >
-            {(segments.get(s.key) ?? []).map((segment, i) => {
-              if (segment.end < domain[0] || segment.start > domain[1]) return null;
-              const span = domain[1] - domain[0];
-              const left = Math.max(0, Math.min(100, ((segment.start - domain[0]) / span) * 100));
-              const right = Math.max(left, Math.min(100, ((segment.end - domain[0]) / span) * 100));
+            {stateBands(segmentsOf(s), domain, width).map((band, i) => {
+              const pixels = ((band.end - band.start) / span) * width;
+              const { segment } = band;
+              const labeled = pixels >= (segment ? minLabelPixels : minMixedLabelPixels);
+              const className = [
+                "state-segment",
+                segment ? "" : "state-segment-mixed",
+                pixels < minSeparatedPixels ? "state-segment-thin" : "",
+                labeled ? "state-segment-labeled" : "",
+              ].join(" ");
               return (
                 <div
-                  key={`${segment.ns}-${i}`}
-                  className="state-segment"
+                  key={`${band.first.ns}-${i}`}
+                  className={className}
                   style={{
-                    left: `${left}%`,
-                    width: `${right - left}%`,
-                    backgroundColor: segment.color,
+                    left: `${percent(band.start)}%`,
+                    width: `${percent(band.end) - percent(band.start)}%`,
+                    backgroundColor: segment?.color,
                   }}
-                  title={`${formatter.tooltip(segment.start)} · ${segment.value === "" ? "Empty string" : segment.value}`}
+                  title={
+                    segment
+                      ? `${formatter.tooltip(segment.start)} · ${segment.value === "" ? "Empty string" : segment.value}`
+                      : `${formatter.tooltip(band.start)} to ${formatter.tooltip(band.end)} · ${band.count.toLocaleString()} states. Zoom in to see them.`
+                  }
                 >
-                  {segment.value === "" ? (
-                    <span className="state-empty">(empty string)</span>
-                  ) : (
-                    <span>{segment.value}</span>
-                  )}
+                  {labeled &&
+                    (!segment ? (
+                      <span>Many changes</span>
+                    ) : segment.value === "" ? (
+                      <span className="state-empty">(empty string)</span>
+                    ) : (
+                      <span>{segment.value}</span>
+                    ))}
                 </div>
               );
             })}
