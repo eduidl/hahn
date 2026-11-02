@@ -26,15 +26,51 @@ function createStage(host: HTMLDivElement) {
   // Stays at the origin: the scene is in the fixed frame, so this is that frame's ground plane.
   grid.rotation.x = Math.PI / 2;
   scene.add(grid);
-  let controls = new OrbitControls(camera, renderer.domElement);
+  // Layers draw here in the root, shifted to keep coordinates near the camera small.
+  const content = new THREE.Group();
+  scene.add(content);
+  const origin = new THREE.Vector3();
+  const placeGrid = () => grid.position.copy(gridOffset(origin, grid.scale.x));
+  // Marks the point the view turns around while it is being moved.
+  const pivot = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 8),
+    new THREE.MeshBasicMaterial({ color: "#ffffff", depthTest: false, transparent: true }),
+  );
+  pivot.renderOrder = 1;
+  pivot.visible = false;
+  scene.add(pivot);
   let pending = 0;
   const invalidate = () => {
     pending ||= requestAnimationFrame(() => {
       pending = 0;
+      pivot.position.copy(controls.target);
+      // The same size on screen at any distance.
+      pivot.scale.setScalar(camera.position.distanceTo(controls.target) * 0.006);
       renderer.render(scene, camera);
     });
   };
-  controls.addEventListener("change", invalidate);
+  const createControls = (target: THREE.Vector3) => {
+    const created = new OrbitControls(camera, renderer.domElement);
+    // Panning slides along the ground, so the view keeps turning around a point on it
+    // rather than one lifted into the air by dragging up or down the screen.
+    created.screenSpacePanning = false;
+    // Zooming moves toward what is under the cursor, carrying the point turned around
+    // along the ground, so a distant object can be reached without panning first.
+    created.zoomToCursor = true;
+    created.target.copy(target);
+    created.addEventListener("change", invalidate);
+    created.addEventListener("start", () => {
+      pivot.visible = true;
+      invalidate();
+    });
+    created.addEventListener("end", () => {
+      pivot.visible = false;
+      invalidate();
+    });
+    created.update();
+    return created;
+  };
+  let controls = createControls(new THREE.Vector3());
   const resize = new ResizeObserver(() => {
     const { clientWidth: width, clientHeight: height } = host;
     if (!width || !height) return;
@@ -60,10 +96,7 @@ function createStage(host: HTMLDivElement) {
   // Controls take the camera's up direction when created, so changing it needs new ones.
   const replaceControls = (target: THREE.Vector3) => {
     controls.dispose();
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.copy(target);
-    controls.addEventListener("change", invalidate);
-    controls.update();
+    controls = createControls(target);
     invalidate();
   };
   const reframe = (transform: Transform) => {
@@ -84,6 +117,8 @@ function createStage(host: HTMLDivElement) {
       cancelAnimationFrame(pending);
       resize.disconnect();
       controls.dispose();
+      pivot.geometry.dispose();
+      pivot.material.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },
