@@ -351,7 +351,7 @@ function ImageSettings(props: WidgetSettingsProps) {
 function SceneSettings(props: WidgetSettingsProps) {
   const { widget, dispatch } = props;
   const { frames, error } = useFrames(widget.series.map((s) => s.source));
-  const fixed = fixedFrameOf(widget.fixedFrame, frames);
+  const followed = fixedFrameOf(widget.followFrame, frames);
   return (
     <>
       <SettingsHeader {...props} />
@@ -359,11 +359,12 @@ function SceneSettings(props: WidgetSettingsProps) {
         <label className="time-display-setting">
           Frame
           <select
-            aria-label="Fixed frame"
-            value={fixed ?? ""}
+            aria-label="Frame"
+            title="The camera follows this frame's position. The root keeps it still."
+            value={followed ?? ""}
             disabled={!frames.length}
             onChange={(event) =>
-              dispatch({ type: "fixed-frame", id: widget.id, value: event.target.value })
+              dispatch({ type: "follow-frame", id: widget.id, value: event.target.value })
             }
           >
             {!frames.length && <option value="">{error || "No coordinate frames"}</option>}

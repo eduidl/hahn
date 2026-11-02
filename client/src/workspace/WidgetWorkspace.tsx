@@ -235,7 +235,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
           widget={widget}
           info={info}
           index={props.fieldIndex}
-          onFixedFrame={(value) => dispatch({ type: "fixed-frame", id: widget.id, value })}
+          onFollowFrame={(value) => dispatch({ type: "follow-frame", id: widget.id, value })}
           resetCount={contentResetCount}
         />
       </Suspense>

@@ -226,7 +226,7 @@ export default function Scene3D({
   const { frames, error } = useFrames(sources);
   // Unless one was chosen, the camera follows the frame of the first topic added.
   const { frame: firstFrame } = useViewFrame(
-    widget.fixedFrame === null ? widget.series[0] : undefined,
+    widget.followFrame === null ? widget.series[0] : undefined,
     info,
   );
   const firstFrameId =

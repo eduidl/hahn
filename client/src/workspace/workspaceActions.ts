@@ -106,7 +106,7 @@ export const widget = (number: number, type: Widget["type"] = "plot"): Widget =>
   hiddenColumns: [],
   columnWidths: {},
   view: defaultPlotView(),
-  fixedFrame: null,
+  followFrame: null,
   tileUrl: osmTiles,
   frameAxes: defaultFrameAxes(),
 });
