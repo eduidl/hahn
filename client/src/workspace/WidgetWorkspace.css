@@ -117,11 +117,6 @@
   border-bottom: 1px solid var(--line);
   font-size: 12px;
 }
-/* Direct children only: a selected Tabs widget must not light up the widgets inside it. */
-.hahn-mosaic .widget-active > .mosaic-window-toolbar {
-  background: var(--bg-accent);
-  color: var(--text);
-}
 .hahn-mosaic .mosaic-window-title {
   padding-left: 10px;
   font-weight: 500;
