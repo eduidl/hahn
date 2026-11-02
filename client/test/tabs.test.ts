@@ -1,3 +1,4 @@
+import { insertLeadingColumn } from "../src/workspace/layoutTree";
 import { describe, expect, it } from "vitest";
 import {
   addSelectedAction,
@@ -46,10 +47,44 @@ describe("adding from the widget list", () => {
   const add = (state: WorkspaceState, type: Parameters<typeof addSelectedAction>[1]) =>
     reduce(state, addSelectedAction(state, type));
 
-  it("adds beside the selected widget", () => {
-    const state = add(initialWorkspace(), "value-changes");
-    expect(leaves(state.layout)).toEqual(["widget-1", "widget-2"]);
-    expect(state.activeId).toBe("widget-2");
+  it("adds at the left, wherever the selection is", () => {
+    let state = add(initialWorkspace(), "table");
+    state = reduce(state, { type: "select", id: "widget-1" });
+    state = add(state, "raw");
+    expect(leaves(state.layout)).toEqual(["widget-3", "widget-2", "widget-1"]);
+    expect(state.activeId).toBe("widget-3");
+  });
+  it("keeps every column usable when adding repeatedly", () => {
+    let state = initialWorkspace();
+    for (let i = 0; i < 7; i++) state = add(state, "plot");
+    const { splitPercentages } = state.layout as { splitPercentages: number[] };
+    expect(splitPercentages).toHaveLength(8);
+    for (const percentage of splitPercentages) expect(percentage).toBeCloseTo(12.5);
+  });
+  it("keeps the proportions of the existing columns", () => {
+    const layout = {
+      type: "split" as const,
+      direction: "row" as const,
+      children: ["a", "b"],
+      splitPercentages: [75, 25],
+    };
+    const { splitPercentages } = insertLeadingColumn(layout, "c") as typeof layout;
+    expect(splitPercentages[0]).toBeCloseTo(100 / 3);
+    expect(splitPercentages[1] / splitPercentages[2]).toBeCloseTo(3);
+  });
+  it("wraps a layout that is not a row of columns", () => {
+    const layout = {
+      type: "split" as const,
+      direction: "column" as const,
+      children: ["a", "b"],
+      splitPercentages: [50, 50],
+    };
+    expect(insertLeadingColumn(layout, "c")).toEqual({
+      type: "split",
+      direction: "row",
+      children: ["c", layout],
+      splitPercentages: [50, 50],
+    });
   });
   it("adds to the empty root when nothing is selected", () => {
     const empty = reduce(initialWorkspace(), { type: "remove", id: "widget-1" });

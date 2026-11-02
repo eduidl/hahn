@@ -109,6 +109,33 @@ export function insertLeaf(
     : split(layout);
 }
 
+/**
+ * Adds a column at the left with an equal share of the width. The other columns
+ * keep their proportions, so that repeated adding does not halve any of them.
+ */
+export function insertLeadingColumn(
+  layout: MosaicNode<string> | null,
+  id: string,
+): MosaicNode<string> {
+  if (layout === null) return id;
+  const columns =
+    typeof layout !== "string" && layout.type === "split" && layout.direction === "row"
+      ? layout
+      : null;
+  if (!columns)
+    return { type: "split", direction: "row", children: [id, layout], splitPercentages: [50, 50] };
+  const count = columns.children.length;
+  const percentages = columns.splitPercentages ?? columns.children.map(() => 100 / count);
+  return {
+    ...columns,
+    children: [id, ...columns.children],
+    splitPercentages: [
+      100 / (count + 1),
+      ...percentages.map((percentage) => (percentage * count) / (count + 1)),
+    ],
+  };
+}
+
 export function containerLayout(
   state: WorkspaceState,
   container?: Container,
