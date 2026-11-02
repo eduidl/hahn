@@ -268,7 +268,10 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 const { left, top } = frame.getBoundingClientRect();
                 event.dataTransfer.setDragImage(frame, event.clientX - left, event.clientY - top);
                 // The browser takes the image once this handler has returned.
-                setTimeout(flattenMapsForDragImage(frame));
+                setTimeout(() => {
+                  restoreMaps();
+                  cleanup();
+                });
                 moving.setId(widget.id);
                 dispatch({ type: "select", id: widget.id });
               }}

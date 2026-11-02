@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultPlotView, type PlotView, type Series } from "../src/views/Plot";
-import { StatePlot } from "../src/views/StatePlot";
+import { StatePlot, stateBands } from "../src/views/StatePlot";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
 import { initialWorkspace } from "../src/workspace/widgets";
 
@@ -56,12 +56,62 @@ const wheel = (target: Element, deltaY: number, clientX = 25) => {
   return event;
 };
 
+const state = (start: number, end: number, value = "A") => ({
+  start,
+  end,
+  value,
+  color: "red",
+  ns: String(start),
+});
+
+describe("State timeline bands", () => {
+  it("merges states too short to draw, instead of widening each one", () => {
+    const flips = Array.from({ length: 2000 }, (_, i) =>
+      state(i / 100, (i + 1) / 100, i % 2 ? "A" : "B"),
+    );
+    const bands = stateBands(flips, [0, 20], 1000);
+    expect(bands).toHaveLength(1);
+    expect(bands[0]).toMatchObject({ start: 0, end: 20, segment: null, count: 2000 });
+  });
+  it("shows each state again once zoomed in far enough", () => {
+    const flips = Array.from({ length: 2000 }, (_, i) =>
+      state(i / 100, (i + 1) / 100, i % 2 ? "A" : "B"),
+    );
+    const bands = stateBands(flips, [0, 1], 1000);
+    expect(bands.every((band) => band.segment)).toBe(true);
+    expect(bands.length).toBeGreaterThanOrEqual(100);
+  });
+  it("keeps one short state as itself between long ones", () => {
+    const bands = stateBands(
+      [state(0, 5), state(5, 5.001, "SPIKE"), state(5.001, 10)],
+      [0, 10],
+      100,
+    );
+    expect(bands.map((band) => band.segment?.value)).toEqual(["A", "SPIKE", "A"]);
+  });
+  it("does not merge across a visible gap", () => {
+    const bands = stateBands([state(0, 0.01), state(5, 5.01)], [0, 10], 100);
+    expect(bands).toHaveLength(2);
+  });
+  it("clips to the visible range and skips the rest", () => {
+    const bands = stateBands([state(0, 2), state(2, 6, "B"), state(6, 10)], [3, 5], 100);
+    expect(bands).toHaveLength(1);
+    expect(bands[0]).toMatchObject({ start: 3, end: 5, count: 1 });
+  });
+  it("draws nothing until the width is known", () => {
+    expect(stateBands([state(0, 1)], [0, 1], 0)).toEqual([]);
+  });
+});
+
 describe("State timeline zoom", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "ResizeObserver",
       class {
-        observe() {}
+        constructor(private notify: (entries: unknown[]) => void) {}
+        observe() {
+          this.notify([{ contentRect: { width: 100 } }]);
+        }
         disconnect() {}
       },
     );
@@ -136,6 +186,54 @@ describe("State timeline zoom", () => {
     expect(document.querySelectorAll(".state-segment")).toHaveLength(1);
     expect(store.getState().time).toBe(0);
     expect(document.querySelector(".playhead")).toBeNull();
+  });
+  it("labels only bands wide enough to read", () => {
+    setup();
+    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.getByText("B")).toBeTruthy();
+    expect(document.querySelectorAll(".state-segment-labeled")).toHaveLength(2);
+  });
+  describe("drag", () => {
+    const pointer = (type: string, target: Element, clientX: number) => {
+      const event = new MouseEvent(type, { clientX, bubbles: true, cancelable: true });
+      Object.defineProperty(event, "pointerId", { value: 1 });
+      fireEvent(target, event);
+    };
+    const press = (track: Element) => {
+      (track as HTMLElement).setPointerCapture = () => {};
+      pointer("pointerdown", track, 50);
+    };
+    it("pans the time range while zoomed, without moving the playback position", () => {
+      const { store, track } = setup({ ...defaultPlotView(), x: { center: 0.5, zoom: 2 } });
+      press(track);
+      pointer("pointermove", track, 30);
+      pointer("pointerup", track, 30);
+      fireEvent.click(track, { clientX: 30 });
+      // 20% of the track at 2x zoom is 10% of the recording.
+      expect(view.x.center).toBeCloseTo(0.6);
+      expect(store.getState().time).toBe(0);
+    });
+    it("stops at the ends of the recording", () => {
+      const { track } = setup({ ...defaultPlotView(), x: { center: 0.5, zoom: 2 } });
+      press(track);
+      pointer("pointermove", track, -500);
+      expect(view.x.center).toBeCloseTo(0.75);
+    });
+    it("treats a small movement as a click", () => {
+      const { store, track } = setup({ ...defaultPlotView(), x: { center: 0.5, zoom: 2 } });
+      press(track);
+      pointer("pointermove", track, 48);
+      pointer("pointerup", track, 48);
+      fireEvent.click(track, { clientX: 50 });
+      expect(view.x.center).toBeCloseTo(0.5);
+      expect(store.getState().time).toBeCloseTo(5);
+    });
+    it("keeps the full range when not zoomed", () => {
+      const { track } = setup();
+      press(track);
+      pointer("pointermove", track, 10);
+      expect(view.x).toEqual(defaultPlotView().x);
+    });
   });
   it("keeps the view on double-click", () => {
     const zoomed = { center: 0.5, zoom: 2 };
