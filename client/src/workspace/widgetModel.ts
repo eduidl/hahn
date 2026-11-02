@@ -74,6 +74,8 @@ export type WorkspaceAction =
       target?: string;
       container?: Container;
       direction?: MosaicDirection;
+      /** A new column at the left of the container, instead of a split of `target`. */
+      leading?: boolean;
       /** Place the new widget left of / above the target instead of after it. */
       before?: boolean;
       duplicate?: boolean;

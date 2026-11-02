@@ -14,6 +14,7 @@ import {
   hasTabs,
   mapLeaves,
   removeLeafNullable,
+  insertLeadingColumn,
   insertLeaf,
   containerLayout,
   containerExists,
@@ -174,7 +175,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       next = setContainerLayout(
         next,
         container,
-        insertLeaf(layout, added.id, target?.id, action.direction, action.before),
+        action.leading
+          ? insertLeadingColumn(layout, added.id)
+          : insertLeaf(layout, added.id, target?.id, action.direction, action.before),
       );
       return revealContainer(next, container);
     }

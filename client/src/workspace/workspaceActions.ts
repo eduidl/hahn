@@ -122,20 +122,23 @@ export function initialWorkspace(): WorkspaceState {
 
 /** A Y range fitted to one value kind is meaningless for another. */
 
-/** Adds beside the selected widget, or into the open tab when a Tabs widget is selected. */
+/**
+ * Adds at a fixed place, the left of the layout holding the selection, which a
+ * drag can override. A selected Tabs widget holds its open tab's layout. A Tabs
+ * widget cannot nest, so it always goes to the workspace.
+ */
 export function addSelectedAction(state: WorkspaceState, type: Widget["type"]): WorkspaceAction {
   const selected = state.activeId ? state.widgets[state.activeId] : undefined;
-  if (!selected) return { type: "add", widgetType: type };
-  if (selected.type === "tabs" && type !== "tabs")
-    return {
-      type: "add",
-      widgetType: type,
-      container: { widgetId: selected.id, tabId: selected.activeTabId },
-    };
-  const owner = ownerOf(state, selected.id);
-  // A Tabs widget cannot nest, so it goes beside the one holding the selection.
-  const target = owner && !canPlaceWidget(type, owner) ? owner.widgetId : selected.id;
-  return { type: "add", widgetType: type, target };
+  const container =
+    selected?.type === "tabs"
+      ? { widgetId: selected.id, tabId: selected.activeTabId }
+      : selected && ownerOf(state, selected.id);
+  return {
+    type: "add",
+    widgetType: type,
+    leading: true,
+    container: container && canPlaceWidget(type, container) ? container : undefined,
+  };
 }
 
 /** One demand per recording field, independently of presentation in each widget. */
