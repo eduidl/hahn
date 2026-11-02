@@ -1,7 +1,14 @@
+/* Latin only, to keep the build small: everything else falls through to the system fonts. */
+@font-face {
+  font-family: "Inter Variable";
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
   --playback-height: 52px;
-  --font-ui:
-    Inter, "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-ui: "Inter Variable", system-ui, "Noto Sans JP", sans-serif;
   /* For names and values only: topics, fields, series, frames, message contents. */
   --font-mono: ui-monospace, monospace;
 
@@ -94,13 +101,6 @@ summary span {
 input[type="checkbox"] {
   accent-color: var(--accent);
   margin: 0;
-}
-h1 {
-  font-size: 21px;
-  letter-spacing: -0.3px;
-  font-weight: 500;
-  margin: 10px 0 0;
-  overflow-wrap: anywhere;
 }
 canvas {
   width: 100%;

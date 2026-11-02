@@ -29,9 +29,6 @@
 .field:hover {
   background: var(--bg-hover);
 }
-.field.checked {
-  background: var(--bg-hover);
-}
 .field span {
   min-width: 0;
   overflow: hidden;
@@ -70,12 +67,6 @@
 .empty p {
   font-size: 12px;
   color: var(--text-muted);
-}
-.empty-wave {
-  font-size: 65px;
-  color: var(--accent);
-  line-height: 1.2;
-  opacity: 0.7;
 }
 .remove {
   border: 0;
