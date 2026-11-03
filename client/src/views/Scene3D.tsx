@@ -22,7 +22,7 @@ import {
 } from "../data/useViewData";
 import { type Transform } from "../data/viewFrames";
 import { type Widget } from "../workspace/widgets";
-import { gridOffset, reframeCamera } from "./sceneCamera";
+import { gridOffset, lookCamera, reframeCamera, walkCamera } from "./sceneCamera";
 
 function createStage(host: HTMLDivElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -43,6 +43,7 @@ function createStage(host: HTMLDivElement) {
   const content = new THREE.Group();
   scene.add(content);
   const origin = new THREE.Vector3();
+  let originSet = false;
   const placeGrid = () => grid.position.copy(gridOffset(origin, grid.scale.x));
   // Marks the point the view turns around while it is being moved.
   const pivot = new THREE.Mesh(
@@ -67,6 +68,8 @@ function createStage(host: HTMLDivElement) {
     // Panning slides along the ground, so the view keeps turning around a point on it
     // rather than one lifted into the air by dragging up or down the screen.
     created.screenSpacePanning = false;
+    // The middle button looks around instead of zooming, which the wheel does.
+    created.mouseButtons.MIDDLE = -1 as unknown as THREE.MOUSE;
     // Zooming moves toward what is under the cursor, carrying the point turned around
     // along the ground, so a distant object can be reached without panning first.
     created.zoomToCursor = true;
