@@ -283,6 +283,10 @@ async fn odometry_provides_a_validated_pose_view() {
     );
 }
 
+/// Converts topic `echo`, whose messages hold a case number, to whatever `make`
+/// returns for that case.
+struct Echo(hahn::Kind, fn(u32) -> hahn::View);
+
 impl hahn::ViewConverter for Echo {
     fn id(&self) -> &'static str {
         "echo"
@@ -299,6 +303,68 @@ impl hahn::ViewConverter for Echo {
     fn convert(&self, message: &hahn::Message<'_>) -> anyhow::Result<hahn::View> {
         Ok((self.1)(message.number("case")? as u32))
     }
+}
+
+/// The frames of every case `make` handles, as the server sends them.
+async fn echoed(
+    kind: hahn::Kind,
+    cases: u32,
+    make: fn(u32) -> hahn::View,
+) -> Vec<(Value, Vec<u8>)> {
+    use crate::memory::Topic;
+    let mut topic = Topic::new("echo", "test/Echo", vec![("case", hahn::DataTypeDef::U32)]);
+    for case in 0..cases {
+        topic = topic.at(case as u64, vec![hahn::Value::U32(case)]);
+    }
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder.view(Echo(kind, make)));
+    let (status, mut events) = frames(&app, &view_url("views", "echo", "echo", "")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(events.pop().unwrap().0["type"], "complete");
+    events
+}
+
+#[tokio::test]
+async fn image_formats_are_normalized_and_checked() {
+    let events = echoed(hahn::Kind::Image, 2, |case| {
+        hahn::ImageView {
+            frame_id: None,
+            format: ["JPG", "bmp"][case as usize].into(),
+            data: [1u8].as_slice().into(),
+        }
+        .into()
+    })
+    .await;
+    assert_eq!(events[0].0["value"]["format"], "jpeg");
+    assert_eq!(events[0].0["value"]["frame_id"], Value::Null);
+    let error = events[1].0["error"].as_str().unwrap();
+    assert!(error.contains("Unsupported image format"), "{error}");
+}
+
+#[tokio::test]
+async fn unset_rotations_are_identity_and_others_are_normalized() {
+    let events = echoed(hahn::Kind::Pose, 3, |case| {
+        hahn::PoseView {
+            frame_id: None,
+            pose: hahn::Pose {
+                position: [0.; 3],
+                orientation: [0., 0., 0., [0., 2., f64::NAN][case as usize]],
+            },
+        }
+        .into()
+    })
+    .await;
+    for (header, _) in &events[..2] {
+        assert_eq!(
+            header["value"]["pose"]["orientation"],
+            json!([0., 0., 0., 1.])
+        );
+    }
+    assert!(
+        events[2].0["error"]
+            .as_str()
+            .unwrap()
+            .contains("Non-finite")
+    );
 }
 
 #[tokio::test]
@@ -356,3 +422,134 @@ async fn a_point_feature_must_be_on_the_earth() {
     );
 }
 
+#[tokio::test]
+async fn blobs_start_on_eight_byte_boundaries_and_frames_end_on_one() {
+    use crate::memory::Topic;
+    let topic = Topic::new("echo", "test/Echo", vec![("case", hahn::DataTypeDef::U32)])
+        .at(0, vec![hahn::Value::U32(0)]);
+    let make = |_| {
+        hahn::PointCloudView {
+            positions: vec![[1., 2., 3.]; 3],
+            fields: vec![hahn::PointField {
+                name: "intensity".into(),
+                numeric_type: hahn::NumericType::U8,
+                data: vec![7; 3],
+            }],
+            ..Default::default()
+        }
+        .into()
+    };
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| {
+        builder.view(Echo(hahn::Kind::PointCloud, make))
+    });
+    let url = resolve(&app, &view_url("views", "echo", "echo", "")).await;
+    let response = app
+        .oneshot(Request::get(&url).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+
+    // A frame with 36 bytes of positions and 3 of intensity, then `complete`.
+    let header_len = u32::from_le_bytes(body[..4].try_into().unwrap()) as usize;
+    let payload_len = u32::from_le_bytes(body[4..8].try_into().unwrap()) as usize;
+    let header: Value = serde_json::from_slice(&body[8..8 + header_len]).unwrap();
+    let start = (8 + header_len).next_multiple_of(8);
+    assert!(body[8 + header_len..start].iter().all(|b| *b == 0));
+    let value = &header["value"];
+    // Each blob is padded to the next boundary, whatever the order.
+    assert_eq!(
+        value["fields"][0]["data"]["$blob"],
+        json!({"offset": 0, "length": 3})
+    );
+    assert_eq!(
+        value["positions"]["$blob"],
+        json!({"offset": 8, "length": 36})
+    );
+    assert_eq!(payload_len, 48);
+    let payload = &body[start..start + payload_len];
+    assert_eq!(payload[..3], [7; 3]);
+    assert_eq!(payload[3..8], [0; 5]);
+    assert_eq!(payload[8..12], 1f32.to_le_bytes());
+    assert_eq!(payload[44..], [0; 4]);
+
+    // A frame without a payload still ends on a boundary.
+    let rest = &body[start + payload_len..];
+    let complete_len = u32::from_le_bytes(rest[..4].try_into().unwrap()) as usize;
+    assert_eq!(u32::from_le_bytes(rest[4..8].try_into().unwrap()), 0);
+    assert_eq!(rest.len(), (8 + complete_len).next_multiple_of(8));
+}
+
+#[tokio::test]
+async fn a_type_of_the_right_name_but_wrong_shape_is_not_offered_a_view() {
+    use crate::memory::Topic;
+    use hahn::DataTypeDef::{Bytes, String};
+    let image = |name, schema_name, data| {
+        Topic::new(
+            name,
+            schema_name,
+            vec![("frame_id", String), ("data", data), ("format", String)],
+        )
+        .at(0, vec![])
+    };
+    let (_dir, app) = crate::memory::app(
+        vec![
+            image("right", "foxglove.CompressedImage", Bytes),
+            image("other_name", "other.CompressedImage", Bytes),
+            image("wrong_shape", "foxglove.CompressedImage", String),
+        ],
+        |builder| builder,
+    );
+    let (_, topics) = get(app, "/g/topics").await;
+    let views = |i: usize| topics[i]["views"].as_array().unwrap().len();
+    assert_eq!(topics[0]["views"][0]["id"], "image");
+    assert_eq!(views(1), 0);
+    assert_eq!(views(2), 0);
+}
+
+#[tokio::test]
+async fn foxglove_calibration_is_read_under_either_spelling() {
+    use crate::memory::{Topic, list};
+    use hahn::{DataTypeDef as D, Value as V};
+    let calibration = |name, schema_name, matrix, distortion| {
+        let k = [400., 0., 320., 0., 400., 240., 0., 0., 1.]
+            .map(V::F64)
+            .to_vec();
+        Topic::new(
+            name,
+            schema_name,
+            vec![
+                ("frame_id", D::String),
+                ("width", D::U32),
+                ("height", D::U32),
+                ("distortion_model", D::String),
+                (matrix, list(D::F64)),
+                (distortion, list(D::F64)),
+            ],
+        )
+        .at(
+            0,
+            vec![
+                V::string("camera"),
+                V::U32(640),
+                V::U32(480),
+                V::string("plumb_bob"),
+                V::List(k),
+                V::List(vec![]),
+            ],
+        )
+    };
+    let (_dir, app) = crate::memory::app(
+        vec![
+            // Protobuf capitalizes the matrices, and `foxglove_msgs` does not.
+            calibration("protobuf", "foxglove.CameraCalibration", "K", "D"),
+            calibration("ros", "foxglove_msgs/msg/CameraCalibration", "k", "d"),
+        ],
+        |builder| builder,
+    );
+    for topic in ["protobuf", "ros"] {
+        let url = view_url("views/latest", topic, "camera_calibration", "&time_ns=0");
+        let (status, events) = frames(&app, &url).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(events[0].0["value"]["intrinsics"][0], 400., "{topic}");
+    }
+}

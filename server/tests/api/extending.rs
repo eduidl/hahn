@@ -346,3 +346,31 @@ fn packed_points_are_unpacked_by_offset() {
     assert!(PointCloudView::from_packed(None, &fields, [&point[..4]]).is_err());
 }
 
+#[test]
+fn messages_read_rotations_as_unit_quaternions() {
+    use crate::memory::{defs, structure};
+    use hahn::{DataTypeDef as D, Message, Value as V};
+    let quaternion = || {
+        structure(vec![
+            ("x", D::F64),
+            ("y", D::F64),
+            ("z", D::F64),
+            ("w", D::F64),
+        ])
+    };
+    let defs = defs(vec![
+        ("zero", quaternion()),
+        ("double", quaternion()),
+        ("unset", quaternion()),
+    ]);
+    let at = |w| V::Struct(vec![V::F64(0.), V::F64(0.), V::F64(0.), V::F64(w)]);
+    let value = V::Struct(vec![at(0.), at(2.), V::Null]);
+    let message = Message::new(&defs, &value).unwrap();
+    for name in ["zero", "double", "unset"] {
+        assert_eq!(
+            message.quaternion(name).unwrap(),
+            [0., 0., 0., 1.],
+            "{name}"
+        );
+    }
+}
