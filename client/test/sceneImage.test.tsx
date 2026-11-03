@@ -46,6 +46,7 @@ it("keeps the displayed texture while the next image is decoding", async () => {
     fit: vi.fn(),
     reframe: vi.fn(),
     resetView: vi.fn(),
+    setOrigin: vi.fn(),
   };
   const series = {
     key: "camera",
@@ -135,6 +136,7 @@ it("uses raw pixels as a 3D camera texture", async () => {
     fit: vi.fn(),
     reframe: vi.fn(),
     resetView: vi.fn(),
+    setOrigin: vi.fn(),
   };
   const series = {
     key: "camera",

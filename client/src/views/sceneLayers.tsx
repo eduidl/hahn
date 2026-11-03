@@ -22,12 +22,18 @@ import { useCameraCalibration } from "./useCameraCalibration";
 import { poseTrail, trailWindow } from "./poseTrail";
 
 export type Stage = {
-  scene: THREE.Scene;
+  /** What layers draw into, in the graph's root, shifted so that the origin is in view. */
+  scene: THREE.Object3D;
   invalidate: () => void;
   fit: (object: THREE.Object3D) => void;
   /** Carries the view over into a new fixed frame. */
   reframe: (transform: Transform) => void;
   resetView: () => void;
+  /**
+   * Draws around `origin`, a position in the root, which then sits at the scene's origin
+   * under the camera. Null is the root's own origin.
+   */
+  setOrigin: (origin: number[] | null) => void;
 };
 
 export const matrixOf = ({ translation, rotation }: Transform) =>

@@ -34,6 +34,7 @@ it("places the latest pose in the fixed frame and hides it if the transform is m
     fit: vi.fn(),
     reframe: vi.fn(),
     resetView: vi.fn(),
+    setOrigin: vi.fn(),
   };
   const series = {
     key: "pose",
@@ -84,6 +85,7 @@ it("shows the trajectory up to playback and updates it when seeking", async () =
     fit: vi.fn(),
     reframe: vi.fn(),
     resetView: vi.fn(),
+    setOrigin: vi.fn(),
   };
   const series = {
     key: "pose",
@@ -147,6 +149,7 @@ it("shows a trail recorded in a stable frame from where the fixed frame is now",
     fit: vi.fn(),
     reframe: vi.fn(),
     resetView: vi.fn(),
+    setOrigin: vi.fn(),
   };
   const series = {
     key: "pose",
@@ -202,6 +205,7 @@ it("keeps a pose rigid to the fixed frame still, using the transform at its own 
     fit: vi.fn(),
     reframe: vi.fn(),
     resetView: vi.fn(),
+    setOrigin: vi.fn(),
   };
   const series = {
     key: "pose",

@@ -29,6 +29,12 @@ const turned = (yaw: number) => [0, 0, Math.sin(yaw / 2), Math.cos(yaw / 2)];
 const close = (vector: THREE.Vector3, expected: number[]) =>
   vector.toArray().forEach((value, i) => expect(value).toBeCloseTo(expected[i]));
 
+it("puts the grid level with the origin, its lines staying put in the root", () => {
+  close(gridOffset(new THREE.Vector3(12.3, -4.5, 0.8), 1), [-0.3, -0.5, 0]);
+  // Moving by whole cells shows the same grid.
+  close(gridOffset(new THREE.Vector3(22.3, 5.5, 0.8), 10), [-2.3, -5.5, 0]);
+});
+
 it("chooses the followed frame from the settings, the root until one is known", () => {
   mocks.frames = [
     { id: "map", parent: null },
