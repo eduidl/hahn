@@ -60,6 +60,8 @@ A run is what you open. It contains one or more groups, which you can open and c
 | --- | --- |
 | MCAP | Must be chunked and indexed. Decodes ROS 2 and Protobuf. JSON channels are not decoded into fields |
 
+To read other formats, see [Showing your own message types](#showing-your-own-message-types).
+
 ## Controls
 
 | Input | Action |

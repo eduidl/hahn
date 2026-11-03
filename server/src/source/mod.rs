@@ -64,11 +64,15 @@ impl From<u64> for MessageTimes {
 pub type Visit<'a> = dyn FnMut(MessageTimes, Value) -> anyhow::Result<()> + 'a;
 
 /// An opened, immutable recording. Calls block, so run them off the async runtime.
+///
+/// Topics are named by [`TopicMeta::id`]. Every message of a topic is a
+/// [`Value::Struct`] of the topic's [`FieldDefs`], in the same order.
 pub trait Source: Send + Sync {
     /// Names of the values in [`MessageTimes`] this format records.
     fn meta_fields(&self) -> &'static [&'static str] {
         &[]
     }
+    /// The time range of all messages. Fails for a recording without messages.
     fn info(&self) -> anyhow::Result<SourceInfo>;
     fn topics(&self) -> anyhow::Result<Vec<TopicMeta>>;
     fn field_defs(&self, topic: &str) -> anyhow::Result<FieldDefs>;
@@ -109,14 +113,22 @@ pub trait Source: Send + Sync {
 }
 
 /// A file format: recognises its files and opens them as a [`Source`].
+///
+/// An application adds its own with [`Builder::format`](crate::Builder::format).
 pub trait Format: Send + Sync {
+    /// Decided from the path alone, such as by its extension: the server asks about
+    /// every file when it starts.
     fn accepts(&self, path: &Path) -> bool;
+    /// Opens a file this format accepted, on first use of its group. An error is
+    /// reported for that group only, each time it is used.
     fn open(&self, path: &Path) -> anyhow::Result<Arc<dyn Source>>;
 }
 
-/// Every supported format, tried in order.
-pub fn formats() -> &'static [&'static dyn Format] {
-    &[&mcap::Mcap]
+/// `extra` followed by the built-in formats, tried in that order.
+pub(crate) fn formats(extra: Vec<Arc<dyn Format>>) -> Vec<Arc<dyn Format>> {
+    let mut formats = extra;
+    formats.push(Arc::new(mcap::Mcap));
+    formats
 }
 
 fn has_extension(path: &Path, extension: &str) -> bool {

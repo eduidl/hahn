@@ -1,3 +1,4 @@
+pub mod acme_log;
 pub mod ros2;
 
 use prost::Message;

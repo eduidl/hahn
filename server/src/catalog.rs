@@ -49,7 +49,7 @@ pub(crate) struct Group {
     #[serde(skip)]
     segments: Vec<PathBuf>,
     #[serde(skip)]
-    opener: &'static dyn Format,
+    opener: Arc<dyn Format>,
     /// Opened on first use; failures are not cached so each request reports them.
     #[serde(skip)]
     source: OnceLock<Arc<dyn Source>>,
@@ -58,7 +58,7 @@ pub(crate) struct Group {
 }
 
 impl Group {
-    fn new(name: String, segments: Vec<PathBuf>, opener: &'static dyn Format) -> Arc<Self> {
+    fn new(name: String, segments: Vec<PathBuf>, opener: Arc<dyn Format>) -> Arc<Self> {
         Arc::new(Self {
             id: encode(&name),
             name,
@@ -77,7 +77,7 @@ impl Group {
         }
         let source = match self.segments.as_slice() {
             [path] => self.opener.open(path)?,
-            paths => source::open_segments(self.opener, paths)?,
+            paths => source::open_segments(&*self.opener, paths)?,
         };
         Ok(self.source.get_or_init(|| source).clone())
     }
@@ -100,8 +100,8 @@ fn encode(name: &str) -> String {
     name.bytes().map(|b| format!("{b:02x}")).collect()
 }
 
-fn format_of(path: &Path) -> Option<&'static dyn Format> {
-    source::formats().iter().find(|f| f.accepts(path)).copied()
+fn format_of(formats: &[Arc<dyn Format>], path: &Path) -> Option<Arc<dyn Format>> {
+    formats.iter().find(|f| f.accepts(path)).cloned()
 }
 
 fn relative(path: &Path, root: &Path) -> anyhow::Result<String> {
