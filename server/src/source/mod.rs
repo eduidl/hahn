@@ -4,14 +4,12 @@
 //! recognises its files and opens them. Schemas and values use the
 //! format-agnostic `mcapdecode_core` IR.
 
-mod csv;
 mod mcap;
-mod parquet;
 mod segmented;
 
 pub use segmented::open_segments;
 
-use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
+use mcapdecode::core::{FieldDefs, Value};
 use std::{path::Path, sync::Arc};
 
 /// First backwards search window of the default [`Source::latest_at`]; it
@@ -118,81 +116,10 @@ pub trait Format: Send + Sync {
 
 /// Every supported format, tried in order.
 pub fn formats() -> &'static [&'static dyn Format] {
-    &[&mcap::Mcap, &csv::Csv, &parquet::Parquet]
-}
-
-/// Names starting with `$` are reserved for markers in message values.
-pub(super) fn check_field_names(defs: &FieldDefs) -> anyhow::Result<()> {
-    fn check_type(data_type: &DataTypeDef) -> anyhow::Result<()> {
-        match data_type {
-            DataTypeDef::Struct(children) => check_field_names(&children.fields),
-            DataTypeDef::List(element)
-            | DataTypeDef::BoundedList(element, _)
-            | DataTypeDef::Array(element, _) => check_type(&element.data_type),
-            DataTypeDef::Map { key, value } => {
-                check_type(&key.data_type)?;
-                check_type(&value.data_type)
-            }
-            _ => Ok(()),
-        }
-    }
-    for field in defs.iter() {
-        anyhow::ensure!(
-            !field.name.starts_with('$'),
-            "Field name {:?} is reserved: names must not start with $",
-            field.name
-        );
-        check_type(&field.element.data_type)?;
-    }
-    Ok(())
+    &[&mcap::Mcap]
 }
 
 fn has_extension(path: &Path, extension: &str) -> bool {
     path.extension()
         .is_some_and(|e| e.eq_ignore_ascii_case(extension))
-}
-
-/// Nanoseconds per unit of the time column, chosen by its name suffix
-/// (`_ns`, `_us`, `_ms`, otherwise seconds).
-pub(super) fn time_scale(header: &str) -> u64 {
-    let header = header.to_ascii_lowercase();
-    if header.ends_with("_ns") {
-        1
-    } else if header.ends_with("_us") {
-        1_000
-    } else if header.ends_with("_ms") {
-        1_000_000
-    } else {
-        1_000_000_000
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mcapdecode::core::{ElementDef, FieldDef};
-
-    fn named(name: &str) -> DataTypeDef {
-        DataTypeDef::Struct(vec![FieldDef::new(name, DataTypeDef::F64, false)].into())
-    }
-
-    fn check(data_type: DataTypeDef) -> anyhow::Result<()> {
-        check_field_names(&FieldDefs::new(vec![FieldDef::new("a", data_type, false)]))
-    }
-
-    #[test]
-    fn reserved_names_are_found_at_any_depth() {
-        assert!(check(named("x")).is_ok());
-        assert!(check(named("$x")).is_err());
-        let element = |name| Box::new(ElementDef::new(named(name), false));
-        assert!(check(DataTypeDef::List(element("$x"))).is_err());
-        assert!(check(DataTypeDef::Array(element("$x"), 2)).is_err());
-        assert!(
-            check(DataTypeDef::Map {
-                key: Box::new(ElementDef::new(DataTypeDef::String, false)),
-                value: element("$x"),
-            })
-            .is_err()
-        );
-    }
 }

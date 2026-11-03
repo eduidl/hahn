@@ -2,9 +2,9 @@ use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf};
 
 #[derive(Parser)]
-#[command(about = "Progressive plot viewer for MCAP, CSV and Parquet recordings")]
+#[command(about = "Progressive plot viewer for MCAP recordings")]
 struct Args {
-    /// Directory containing immutable recordings (MCAP, CSV, Parquet; including subdirectories).
+    /// Directory containing immutable MCAP recordings (including subdirectories).
     #[arg(long, default_value = "data")]
     data_dir: PathBuf,
     #[arg(long, default_value = "127.0.0.1:3000")]
