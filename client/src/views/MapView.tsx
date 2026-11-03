@@ -12,6 +12,7 @@ import {
   type ViewFrame,
 } from "../data/viewFrames";
 import type { Widget } from "../workspace/widgets";
+import { trailWindow } from "./poseTrail";
 
 const osmAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
@@ -45,26 +46,53 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
     return () => controller.abort();
   }, [series.key, series.view, info?.start_ns]);
   const frames = history?.frames;
-  const trail = useMemo(
-    () => frames?.flatMap((frame) => (location(frame) ? [latLng(location(frame)!)] : [])) ?? [],
-    [frames],
-  );
+  const trail = useMemo(() => {
+    const points = frames?.filter((frame) => location(frame)) ?? [];
+    return {
+      starts: points.slice(0, -1),
+      ends: points.slice(1),
+      positions: points
+        .slice(1)
+        .flatMap((frame, i) => [
+          ...latLng(location(points[i])!),
+          0,
+          ...latLng(location(frame)!),
+          0,
+        ]),
+    };
+  }, [frames]);
+  const visible = useMemo(() => {
+    const window = trailWindow(trail, ns, series.trailDuration);
+    if (!window.count) return [];
+    const positions = trail.positions;
+    const first = window.point ?? positions.slice(window.start * 6, window.start * 6 + 3);
+    const points: [number, number][] = [[first[0], first[1]]];
+    for (let i = window.start; i < window.start + window.count; i++)
+      points.push([positions[i * 6 + 3], positions[i * 6 + 4]]);
+    return points;
+  }, [trail, ns, series.trailDuration]);
   const fitted = useRef(false);
+  const fittedTrail = useRef(false);
   useEffect(() => {
-    if (series.hidden || !trail.length) return;
-    const line = L.polyline(trail, { color: series.color, weight: 2, opacity: 0.6 }).addTo(map);
-    if (!fitted.current) {
+    if (series.hidden || !visible.length) return;
+    const line = L.polyline(visible, { color: series.color, weight: 2, opacity: 0.6 }).addTo(map);
+    if (!fittedTrail.current) {
+      fittedTrail.current = true;
       fitted.current = true;
       map.fitBounds(line.getBounds(), { maxZoom: 18, padding: [24, 24] });
     }
     return () => void line.remove();
-  }, [map, trail, series.color, series.hidden]);
+  }, [map, visible, series.color, series.hidden]);
   const index = frames && ns !== null ? frameIndexAt(frames, ns) : -1;
   const currentShapes = index >= 0 ? shapes(frames![index]) : undefined;
   const currentLocation = index >= 0 ? location(frames![index]) : undefined;
   useEffect(() => {
     if (series.hidden || !currentLocation) return;
     const at = latLng(currentLocation);
+    if (!fitted.current) {
+      fitted.current = true;
+      map.fitBounds(L.latLngBounds([at]), { maxZoom: 18, padding: [24, 24] });
+    }
     const layer = L.layerGroup().addTo(map);
     if (currentLocation.accuracy_m)
       L.circle(at, {
