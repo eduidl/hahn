@@ -94,7 +94,7 @@ export type Selected = {
   enumValues?: EnumValue[];
   /** Distance in meters of an image plane in a 3D view. */
   imageDistance?: number;
-  /** How many seconds of pose history to show; absent means all history. */
+  /** How many seconds of pose history to show; absent means all of it, zero none. */
   trailDuration?: number;
   /**
    * For an image: the calibration view of a topic in the same group chosen in place of

@@ -47,6 +47,8 @@ it("limits the past duration and interpolates its first segment", () => {
   expect(trailWindow(trail, 4000000000n, 1.5)).toEqual({ start: 1, count: 2, point: [2.5, 0, 0] });
   expect(trailWindow(trail, 3000000000n, 1)).toEqual({ start: 1, count: 1 });
   expect(trailWindow(trail, 1000000000n, 1)).toEqual({ start: 0, count: 0 });
+  // Zero seconds is no trail: only the latest value shows.
+  expect(trailWindow(trail, 4000000000n, 0)).toEqual({ start: 3, count: 0 });
   expect(trailWindow(trail, null, 1)).toEqual({ start: 0, count: 0 });
 });
 

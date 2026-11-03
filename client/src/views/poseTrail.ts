@@ -94,7 +94,9 @@ export function trailWindow(
 ) {
   if (now === null) return { start: 0, count: 0 };
   const end = frameIndexAt(trail.ends, now) + 1;
-  if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0)
+  // Zero is no trail at all: only the latest value is shown.
+  if (seconds === 0) return { start: end, count: 0 };
+  if (seconds === undefined || !Number.isFinite(seconds) || seconds < 0)
     return { start: 0, count: end };
   const nanos =
     BigInt(Math.trunc(seconds)) * 1_000_000_000n + BigInt(Math.round((seconds % 1) * 1e9));

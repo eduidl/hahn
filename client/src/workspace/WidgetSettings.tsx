@@ -389,7 +389,8 @@ function ViewSeriesList(props: WidgetSettingsProps) {
                   onChange={(event) => {
                     const input = event.currentTarget;
                     const duration = input.value === "" ? undefined : input.valueAsNumber;
-                    if (duration === undefined || (Number.isFinite(duration) && duration > 0))
+                    // Zero shows only the latest value, without a trail.
+                    if (duration === undefined || (Number.isFinite(duration) && duration >= 0))
                       props.dispatch({
                         type: "series",
                         id: props.widget.id,
