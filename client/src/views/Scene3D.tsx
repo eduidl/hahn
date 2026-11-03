@@ -255,11 +255,18 @@ export default function Scene3D({
     followed !== null && followed !== target && transforms?.target === target
       ? (transforms.frames[followed] ?? null)
       : null;
+  // Changing the followed frame changes only what the view moves with: the view stays, as
+  // a frame fixed to the ground such as odom may have its origin far from anything shown.
+  // Without a frame to follow, the scene stays around where it was. Resetting the view
+  // brings it to the followed frame.
+  const lastFollowed = useRef<string | null>(null);
   useEffect(() => {
-    if (!stage) return;
-    if (followed === null || followed === target) stage.setOrigin(null);
-    // Until the frame is placed again, the scene stays around where it was.
-    else if (pose) stage.setOrigin(pose.translation);
+    if (!stage || followed === null) return;
+    const switched = lastFollowed.current !== null && lastFollowed.current !== followed;
+    if (followed === target) lastFollowed.current = followed;
+    if (!pose) return;
+    stage.setOrigin(pose.translation, switched);
+    lastFollowed.current = followed;
   }, [stage, followed, target, pose]);
   const anchor = useMemo(
     () => (pose && followed !== null ? { frame: followed, pose } : null),

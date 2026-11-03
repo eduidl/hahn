@@ -30,10 +30,10 @@ export type Stage = {
   reframe: (transform: Transform) => void;
   resetView: () => void;
   /**
-   * Draws around `origin`, a position in the root, which then sits at the scene's origin
-   * under the camera. Null is the root's own origin.
+   * Draws around `origin`, a position in the root, which then sits at the scene's origin.
+   * With `keepView`, the camera moves along so that nothing appears to move.
    */
-  setOrigin: (origin: number[] | null) => void;
+  setOrigin: (origin: number[], keepView?: boolean) => void;
 };
 
 export const matrixOf = ({ translation, rotation }: Transform) =>
