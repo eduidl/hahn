@@ -27,13 +27,21 @@ run = "cargo test --manifest-path server/Cargo.toml --locked"
 description = "Run the client tests and check the generated API types"
 run = "npm --prefix client test"
 
+[tasks."test:visual"]
+description = "Compare screenshots of the client with the references in test/visual"
+run = "npm --prefix client run test:visual"
+
+[tasks.e2e]
+description = "Drive the built client in a browser against synthetic recordings"
+run = "scripts/e2e.sh"
+
 [tasks.conformance]
 description = "Run the conformance tests against synthetic recordings"
 run = "scripts/conformance.sh"
 
 [tasks.check]
 description = "Run the checks in DEVELOPMENT.md"
-depends = ["test:server", "test:client", "client:build", "format:check", "lint", "conformance"]
+depends = ["test:server", "test:client", "test:visual", "client:build", "format:check", "lint", "conformance", "e2e"]
 
 [tasks.lint]
 description = "Lint the client"

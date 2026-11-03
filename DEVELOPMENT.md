@@ -18,6 +18,7 @@
 npm --prefix client ci                       # 初回のみ
 cargo test --manifest-path server/Cargo.toml --locked                      # 実録画テストは既定でignore
 npm --prefix client test                    # 生成型の一致も検査
+npm --prefix client run test:visual         # スクリーンショットを基準画像と比較
 npm --prefix client run build
 npm --prefix client run format:check      # Check formatting
 npm --prefix client run lint              # Lint
