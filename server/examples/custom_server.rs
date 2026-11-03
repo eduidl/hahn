@@ -72,6 +72,7 @@ impl TransformReader for AcmeLink2d {
             child: message.string("child")?.to_owned(),
             translation: [message.number("x")?, message.number("y")?, 0.],
             rotation: [0., 0., half.sin(), half.cos()],
+            stamp_ns: None,
         }])
     }
 }

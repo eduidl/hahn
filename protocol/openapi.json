@@ -458,6 +458,85 @@
           }
         }
       }
+    },
+    "/api/runs/{run}/transforms/static": {
+      "get": {
+        "operationId": "staticTransforms",
+        "description": "The transforms of the run's static frames, which hold at all times. The client resolves frames from these and the dynamic samples.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The static transforms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaticTransforms"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/runs/{run}/transforms/dynamic": {
+      "get": {
+        "operationId": "dynamicTransforms",
+        "description": "The samples of the run's dynamic frames recorded in a range of recording time. Request a margin beyond what is shown: measurement stamps lag recording time.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "name": "start_ns",
+            "in": "query",
+            "required": true,
+            "description": "Inclusive start of the recording-time range.",
+            "schema": {
+              "$ref": "#/components/schemas/TimeNs"
+            }
+          },
+          {
+            "name": "end_ns",
+            "in": "query",
+            "required": true,
+            "description": "Exclusive end of the recording-time range.",
+            "schema": {
+              "$ref": "#/components/schemas/TimeNs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The samples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DynamicTransforms"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1116,7 +1195,8 @@
         "description": "The frames of a run. A run without transforms has an empty list.",
         "type": "object",
         "required": [
-          "frames"
+          "frames",
+          "unreadable_groups"
         ],
         "properties": {
           "frames": {
@@ -1125,6 +1205,13 @@
             "items": {
               "$ref": "#/components/schemas/FrameInfo"
             }
+          },
+          "unreadable_groups": {
+            "description": "IDs of the run's groups left out of the graph because they could not be read.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "examples": [
@@ -1132,17 +1219,30 @@
             "frames": [
               {
                 "id": "base_link",
-                "parent": "map"
+                "parent": "map",
+                "kind": "dynamic",
+                "parents": [
+                  "map"
+                ],
+                "dropped_samples": 0
               },
               {
                 "id": "lidar",
-                "parent": "base_link"
+                "parent": "base_link",
+                "kind": "static",
+                "parents": [
+                  "base_link"
+                ],
+                "dropped_samples": 0
               },
               {
                 "id": "map",
-                "parent": null
+                "parent": null,
+                "parents": [],
+                "dropped_samples": 0
               }
-            ]
+            ],
+            "unreadable_groups": []
           }
         ]
       },
@@ -1150,18 +1250,39 @@
         "type": "object",
         "required": [
           "id",
-          "parent"
+          "parent",
+          "parents",
+          "dropped_samples"
         ],
         "properties": {
           "id": {
             "type": "string"
           },
           "parent": {
-            "description": "The parent last recorded, or `null` for a root.",
+            "description": "The parent last recorded. Superseded by `parents`.",
             "type": [
               "string",
               "null"
             ]
+          },
+          "kind": {
+            "description": "Whether the frame's transform to its parent holds at all times or changes with time. Omitted for a frame that is only ever a parent. A frame on both static and dynamic topics is dynamic.",
+            "type": "string",
+            "enum": [
+              "static",
+              "dynamic"
+            ]
+          },
+          "parents": {
+            "description": "Every parent recorded for the frame, in the order first recorded.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dropped_samples": {
+            "description": "Samples of this frame left out because they hold a number that is not finite or no parent.",
+            "$ref": "#/components/schemas/Count"
           }
         }
       },
@@ -1222,6 +1343,84 @@
             }
           }
         ]
+      },
+      "StaticTransform": {
+        "description": "A transform that holds at all times: `p_parent = rotation * p_child + translation`.",
+        "type": "object",
+        "required": [
+          "child",
+          "parent",
+          "translation",
+          "rotation"
+        ],
+        "properties": {
+          "child": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "string"
+          },
+          "translation": {
+            "$ref": "#/components/schemas/Vec3"
+          },
+          "rotation": {
+            "$ref": "#/components/schemas/Quaternion"
+          }
+        }
+      },
+      "StaticTransforms": {
+        "type": "object",
+        "required": [
+          "transforms"
+        ],
+        "properties": {
+          "transforms": {
+            "description": "One per static frame, the last recorded, sorted by `child`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaticTransform"
+            }
+          }
+        }
+      },
+      "DynamicTransform": {
+        "description": "One recorded sample of a changing transform.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StaticTransform"
+          },
+          {
+            "type": "object",
+            "required": [
+              "time_ns"
+            ],
+            "properties": {
+              "time_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "Recording time of its message."
+              },
+              "stamp_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "When the transform was measured, such as its `header.stamp`. Omitted when unknown or zero; never replaced by recording time."
+              }
+            }
+          }
+        ]
+      },
+      "DynamicTransforms": {
+        "type": "object",
+        "required": [
+          "samples"
+        ],
+        "properties": {
+          "samples": {
+            "description": "In recording order: by `time_ns`, then the order read. Samples are not merged: equal times stay separate rows.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DynamicTransform"
+            }
+          }
+        }
       },
       "ViewEvent": {
         "description": "The JSON header of one frame",

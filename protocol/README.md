@@ -132,6 +132,12 @@ The Rust server reads `foxglove.FrameTransform`, arrays in `foxglove.FrameTransf
 
 Coordinates are right-handed, in meters and radians. The server converts recordings on other conventions.
 
+The graph is also delivered as samples, for the client to resolve (the current client does not yet):
+
+- Each frame with a parent is either `static` or `dynamic` in `/frames`. A frame recorded on both static and dynamic topics is dynamic. `/frames` also lists every parent of a frame, the samples left out of it, and the groups that could not be read.
+- `/transforms/static` gives each static frame's last transform, without times.
+- `/transforms/dynamic` gives the samples of dynamic frames recorded in a range of recording time, in recording order, each with its recording time and, when its message has one, its measurement `stamp_ns`. Equal times stay separate rows.
+
 `/transforms` resolves the graph by these rules:
 
 - Dynamic transforms are interpolated between the samples around `time_ns`: linearly for translation, by slerp for rotation. Static ones hold at all times, and what counts as static is up to the server.

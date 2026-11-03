@@ -9,13 +9,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** A frame as `/frames` lists it, with one recorded parent or none. */
+const frame = (id: string, parent: string | null) => ({
+  id,
+  parent,
+  parents: parent ? [parent] : [],
+  dropped_samples: 0,
+});
+
 it("lays out disconnected roots, missing parents and cycles without dropping frames", () => {
   const nodes = layoutFrames([
-    { id: "root", parent: null },
-    { id: "child", parent: "root" },
-    { id: "orphan", parent: "missing" },
-    { id: "a", parent: "b" },
-    { id: "b", parent: "a" },
+    frame("root", null),
+    frame("child", "root"),
+    frame("orphan", "missing"),
+    frame("a", "b"),
+    frame("b", "a"),
   ]);
   expect(nodes).toHaveLength(5);
   expect(nodes.find((n) => n.id === "child")!.y).toBeGreaterThan(

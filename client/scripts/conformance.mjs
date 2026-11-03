@@ -315,6 +315,33 @@ await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "1" },
   code: "run_not_found",
 });
 
+const staticPath = "/api/runs/{run}/transforms/static";
+const dynamicPath = "/api/runs/{run}/transforms/dynamic";
+const [{ transforms: fixed }] = await check(staticPath, `${visualRun}/transforms/static`, 200);
+await check(staticPath, `${unknown}/transforms/static`, 404, { code: "run_not_found" });
+const [{ end_ns: visualEnd }] = await check(info, visual, 200);
+const dynamicUrl = (params, at = visualRun) =>
+  `${at}/transforms/dynamic?${new URLSearchParams(params)}`;
+const [{ samples }] = await check(
+  dynamicPath,
+  dynamicUrl({ start_ns: visualStart, end_ns: String(BigInt(visualEnd) + 1n) }),
+  200,
+);
+// Each frame is static or dynamic, never both.
+const fixedChildren = new Set(fixed.map((transform) => transform.child));
+if (samples.some((sample) => fixedChildren.has(sample.child)))
+  failures.push(`${dynamicPath}: a static frame has dynamic samples`);
+for (const frame of graph.filter((frame) => frame.kind))
+  if ((frame.kind === "static") !== fixedChildren.has(frame.id))
+    failures.push(`${framesPath}: ${frame.id} is ${frame.kind} but not served as such`);
+await check(dynamicPath, dynamicUrl({ start_ns: "2", end_ns: "1" }), 400, {
+  code: "invalid_request",
+});
+await check(dynamicPath, dynamicUrl({ start_ns: "1" }), 400, { code: "invalid_request" });
+await check(dynamicPath, dynamicUrl({ start_ns: "1", end_ns: "2" }, unknown), 404, {
+  code: "run_not_found",
+});
+
 // An operation added to the spec must be implemented and exercised here.
 for (const [path, item] of Object.entries(spec.paths))
   for (const method of Object.keys(item))

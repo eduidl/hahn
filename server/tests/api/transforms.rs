@@ -10,9 +10,9 @@ async fn frames_are_merged_from_every_transform_topic() {
     assert_eq!(
         body["frames"],
         json!([
-            {"id": "base_link", "parent": "map"},
-            {"id": "lidar", "parent": "base_link"},
-            {"id": "map", "parent": null},
+            {"id": "base_link", "parent": "map", "kind": "dynamic", "parents": ["map"], "dropped_samples": 0},
+            {"id": "lidar", "parent": "base_link", "kind": "static", "parents": ["base_link"], "dropped_samples": 0},
+            {"id": "map", "parent": null, "parents": [], "dropped_samples": 0},
         ])
     );
 }
@@ -62,11 +62,13 @@ async fn batched_transforms_are_merged_from_multiple_channels() {
     assert_eq!(
         frames["frames"],
         json!([
-            {"id":"base", "parent":"map"},
-            {"id":"camera", "parent":"base"},
-            {"id":"imu", "parent":"base"},
-            {"id":"lidar", "parent":"base"},
-            {"id":"map", "parent":null},
+            {"id": "base", "parent": "map", "kind": "dynamic", "parents": ["map"], "dropped_samples": 0},
+            // Its only sample has a number that is not finite.
+            {"id": "broken", "parent": null, "parents": [], "dropped_samples": 1},
+            {"id": "camera", "parent": "base", "kind": "static", "parents": ["base"], "dropped_samples": 0},
+            {"id": "imu", "parent": "base", "kind": "static", "parents": ["base"], "dropped_samples": 0},
+            {"id": "lidar", "parent": "base", "kind": "static", "parents": ["base"], "dropped_samples": 0},
+            {"id": "map", "parent": null, "parents": [], "dropped_samples": 0},
         ])
     );
     let (_, current) = get(app.clone(), "/r/transforms?target=map&time_ns=15").await;
@@ -149,7 +151,7 @@ async fn a_run_without_transforms_has_no_frames() {
     let app = hahn::router(dir.path()).unwrap();
     let (status, body) = get(app.clone(), "/r/frames").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({"frames": []}));
+    assert_eq!(body, json!({"frames": [], "unreadable_groups": []}));
     let (status, _) = get(app, "/r/transforms?target=map&time_ns=1").await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
@@ -201,6 +203,7 @@ impl hahn::TransformReader for Links {
             child: message.string("child")?.into(),
             translation: [message.number("x")?, 0., 0.],
             rotation: [0., 0., message.number("qz")?, message.number("qw")?],
+            stamp_ns: None,
         }])
     }
 }
@@ -377,5 +380,167 @@ async fn a_frame_changing_parent_is_not_interpolated_across() {
     close(
         &resolved(&app, "b", 200).await["base"]["translation"],
         &[9., 0., 0.],
+    );
+}
+
+/// Reads topics of `test/StampedLink`: a translation along x with a measurement
+/// stamp, zero for none.
+struct StampedLinks;
+
+impl hahn::TransformReader for StampedLinks {
+    fn accepts(&self, schema_name: &str, _: &hahn::FieldDefs) -> bool {
+        schema_name == "test/StampedLink"
+    }
+    fn read(&self, message: &hahn::Message<'_>) -> anyhow::Result<Vec<hahn::TransformSample>> {
+        Ok(vec![hahn::TransformSample {
+            parent: message.string("parent")?.into(),
+            child: message.string("child")?.into(),
+            translation: [message.number("x")?, 0., 0.],
+            rotation: [0., 0., 0., 1.],
+            stamp_ns: Some(message.number("stamp")? as u64).filter(|&stamp| stamp > 0),
+        }])
+    }
+}
+
+#[tokio::test]
+async fn samples_are_served_by_recording_time_with_their_stamps() {
+    use crate::memory::Topic;
+    use hahn::{DataTypeDef as D, Value as V};
+    // (recording time, parent, child, x, stamp)
+    let topic = |name, links: &[(u64, &str, &str, f64, u64)]| {
+        let mut topic = Topic::new(
+            name,
+            "test/StampedLink",
+            vec![
+                ("parent", D::String),
+                ("child", D::String),
+                ("x", D::F64),
+                ("stamp", D::U64),
+            ],
+        );
+        for &(time, parent, child, x, stamp) in links {
+            topic = topic.at(
+                time,
+                vec![
+                    V::string(parent),
+                    V::string(child),
+                    V::F64(x),
+                    V::U64(stamp),
+                ],
+            );
+        }
+        topic
+    };
+    let dynamic = topic(
+        "tf",
+        &[
+            (10, "map", "base", 1., 5),
+            (20, "map", "base", 2., 15),
+            (25, "base", "arm", 1., 24),
+            (30, "map", "base", 3., 0),
+        ],
+    );
+    // `arm` is also on the dynamic topic, so it is dynamic and keeps this sample.
+    let fixed = topic(
+        "tf_static",
+        &[(1, "base", "lidar", 0.5, 0), (5, "base", "arm", 0., 0)],
+    );
+    let (_dir, app) = crate::memory::app(vec![dynamic, fixed], |builder| {
+        builder.transforms(StampedLinks)
+    });
+
+    let (status, body) = get(app.clone(), "/r/transforms/static").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        json!({"transforms": [
+            {"child": "lidar", "parent": "base", "translation": [0.5, 0., 0.], "rotation": [0., 0., 0., 1.]},
+        ]})
+    );
+
+    let sample = |child, parent, x: f64, time: &str, stamp: Option<&str>| {
+        let mut row = json!({
+            "child": child, "parent": parent,
+            "translation": [x, 0., 0.], "rotation": [0., 0., 0., 1.],
+            "time_ns": time,
+        });
+        if let Some(stamp) = stamp {
+            row["stamp_ns"] = json!(stamp);
+        }
+        row
+    };
+    // Recording order, the end excluded; samples without a stamp have none.
+    let (status, body) = get(app.clone(), "/r/transforms/dynamic?start_ns=5&end_ns=30").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["samples"],
+        json!([
+            sample("arm", "base", 0., "5", None),
+            sample("base", "map", 1., "10", Some("5")),
+            sample("base", "map", 2., "20", Some("15")),
+            sample("arm", "base", 1., "25", Some("24")),
+        ])
+    );
+    let (_, body) = get(app.clone(), "/r/transforms/dynamic?start_ns=30&end_ns=31").await;
+    assert_eq!(
+        body["samples"],
+        json!([sample("base", "map", 3., "30", None)])
+    );
+
+    for query in ["start_ns=2&end_ns=1", "start_ns=1", "end_ns=1"] {
+        let (status, body) = get(app.clone(), &format!("/r/transforms/dynamic?{query}")).await;
+        assert_eq!(
+            (status, body["code"].clone()),
+            (StatusCode::BAD_REQUEST, json!("invalid_request")),
+            "{query}"
+        );
+    }
+
+    let (_, frames) = get(app, "/r/frames").await;
+    let kinds: Vec<_> = frames["frames"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|frame| (frame["id"].clone(), frame["kind"].clone()))
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            (json!("arm"), json!("dynamic")),
+            (json!("base"), json!("dynamic")),
+            (json!("lidar"), json!("static")),
+            (json!("map"), Value::Null),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn frames_name_the_groups_they_could_not_read() {
+    let root = tempfile::tempdir().unwrap();
+    let run = root.path().join("drive");
+    std::fs::create_dir(&run).unwrap();
+    support::write_visual_fixture(&run.join("good.mcap")).unwrap();
+    std::fs::write(run.join("bad.mcap"), b"not MCAP").unwrap();
+    let app = hahn::router(root.path()).unwrap();
+    let (_, runs) = get(app.clone(), "/api/runs").await;
+    let run = runs["items"][0]["id"].as_str().unwrap();
+    let (_, detail) = get(app.clone(), &format!("/api/runs/{run}")).await;
+    let bad = detail["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|group| group["name"] == "bad.mcap")
+        .unwrap()["id"]
+        .clone();
+    let (status, frames) = get(app, "/r/frames").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(frames["unreadable_groups"], json!([bad]));
+    // The readable group's frames are still there.
+    assert!(
+        frames["frames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|frame| frame["id"] == "lidar")
     );
 }

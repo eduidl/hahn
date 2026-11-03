@@ -174,6 +174,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run}/transforms/static": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The transforms of the run's static frames, which hold at all times. The client resolves frames from these and the dynamic samples. */
+        get: operations["staticTransforms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run}/transforms/dynamic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The samples of the run's dynamic frames recorded in a range of recording time. Request a margin beyond what is shown: measurement stamps lag recording time. */
+        get: operations["dynamicTransforms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -388,27 +422,51 @@ export interface components {
          *       "frames": [
          *         {
          *           "id": "base_link",
-         *           "parent": "map"
+         *           "parent": "map",
+         *           "kind": "dynamic",
+         *           "parents": [
+         *             "map"
+         *           ],
+         *           "dropped_samples": 0
          *         },
          *         {
          *           "id": "lidar",
-         *           "parent": "base_link"
+         *           "parent": "base_link",
+         *           "kind": "static",
+         *           "parents": [
+         *             "base_link"
+         *           ],
+         *           "dropped_samples": 0
          *         },
          *         {
          *           "id": "map",
-         *           "parent": null
+         *           "parent": null,
+         *           "parents": [],
+         *           "dropped_samples": 0
          *         }
-         *       ]
+         *       ],
+         *       "unreadable_groups": []
          *     }
          */
         FrameList: {
             /** @description Sorted by `id`. */
             frames: components["schemas"]["FrameInfo"][];
+            /** @description IDs of the run's groups left out of the graph because they could not be read. */
+            unreadable_groups: string[];
         };
         FrameInfo: {
             id: string;
-            /** @description The parent last recorded, or `null` for a root. */
+            /** @description The parent last recorded. Superseded by `parents`. */
             parent: string | null;
+            /**
+             * @description Whether the frame's transform to its parent holds at all times or changes with time. Omitted for a frame that is only ever a parent. A frame on both static and dynamic topics is dynamic.
+             * @enum {string}
+             */
+            kind?: "static" | "dynamic";
+            /** @description Every parent recorded for the frame, in the order first recorded. */
+            parents: string[];
+            /** @description Samples of this frame left out because they hold a number that is not finite or no parent. */
+            dropped_samples: components["schemas"]["Count"];
         };
         /**
          * @description Transforms into `target` at one time.
@@ -452,6 +510,28 @@ export interface components {
             frames: {
                 [key: string]: components["schemas"]["Transform"];
             };
+        };
+        /** @description A transform that holds at all times: `p_parent = rotation * p_child + translation`. */
+        StaticTransform: {
+            child: string;
+            parent: string;
+            translation: components["schemas"]["Vec3"];
+            rotation: components["schemas"]["Quaternion"];
+        };
+        StaticTransforms: {
+            /** @description One per static frame, the last recorded, sorted by `child`. */
+            transforms: components["schemas"]["StaticTransform"][];
+        };
+        /** @description One recorded sample of a changing transform. */
+        DynamicTransform: components["schemas"]["StaticTransform"] & {
+            /** @description Recording time of its message. */
+            time_ns: components["schemas"]["TimeNs"];
+            /** @description When the transform was measured, such as its `header.stamp`. Omitted when unknown or zero; never replaced by recording time. */
+            stamp_ns?: components["schemas"]["TimeNs"];
+        };
+        DynamicTransforms: {
+            /** @description In recording order: by `time_ns`, then the order read. Samples are not merged: equal times stay separate rows. */
+            samples: components["schemas"]["DynamicTransform"][];
         };
         /** @description The JSON header of one frame */
         ViewEvent: {
@@ -1005,6 +1085,60 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    staticTransforms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run: components["parameters"]["Run"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The static transforms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaticTransforms"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    dynamicTransforms: {
+        parameters: {
+            query: {
+                /** @description Inclusive start of the recording-time range. */
+                start_ns: components["schemas"]["TimeNs"];
+                /** @description Exclusive end of the recording-time range. */
+                end_ns: components["schemas"]["TimeNs"];
+            };
+            header?: never;
+            path: {
+                run: components["parameters"]["Run"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The samples */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicTransforms"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

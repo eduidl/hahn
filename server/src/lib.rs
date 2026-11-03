@@ -164,6 +164,14 @@ impl Builder {
             )
             .route("/api/runs/{run}/frames", get(view::frames))
             .route("/api/runs/{run}/transforms", get(view::transforms))
+            .route(
+                "/api/runs/{run}/transforms/static",
+                get(view::static_transforms),
+            )
+            .route(
+                "/api/runs/{run}/transforms/dynamic",
+                get(view::dynamic_transforms),
+            )
             .layer(map_response(json_errors))
             .with_state(AppState {
                 runs: Arc::new(runs),

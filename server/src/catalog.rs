@@ -36,8 +36,11 @@ impl Run {
         if let Some(tf) = self.tf.get() {
             return Ok(tf.clone());
         }
-        let sources = self.groups.iter().filter_map(|group| group.source().ok());
-        let tf = Arc::new(TfIndex::build(sources, readers)?);
+        let groups = self
+            .groups
+            .iter()
+            .map(|group| (group.id.clone(), group.source()));
+        let tf = Arc::new(TfIndex::build(groups, readers));
         Ok(self.tf.get_or_init(|| tf).clone())
     }
 }
