@@ -12,7 +12,7 @@
 
 `data/` 全体はGit管理外です。
 
-通常の確認には、READMEに記載のRust・Node.jsとローカルの `mcapdecode` 依存が必要です。
+通常の確認には、READMEに記載のRust・Node.jsが必要です。
 
 ```bash
 npm --prefix client ci                       # 初回のみ
