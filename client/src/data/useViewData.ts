@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { get, runUrl } from "./sources";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
+import { runTransforms } from "./runTransforms";
+import type { ResolveOptions } from "./tfGraph";
 import { fetchLatestFrame, type ViewFrame } from "./viewFrames";
 
 type Loaded<T> = { identity: string; value?: T; error?: string };
@@ -116,31 +118,49 @@ export const fixedFrameOf = (chosen: string | null, frames: FrameInfo[]) =>
     ? chosen
     : (frames.find((f) => f.parent === null)?.id ?? null);
 
-/** Transforms into `target` at `ns`, following it like `useViewFrame`. */
+const noSubscription = () => () => {};
+const noVersion = () => 0;
+
+/**
+ * Transforms into `target` at `ns`, resolved here from the run's samples (ADR 0003).
+ * While the samples around `ns` load, the last result stays, with its own `time_ns`.
+ */
 export function useTransforms(
   source: string | undefined,
   target: string | null,
   ns: string | null,
   /** Keeps a frame at its last known place once it is gone, as frames end at different times. */
   hold = false,
+  options: ResolveOptions = {},
 ) {
-  const identity = source && target ? `${runUrl(source)}:${target}` : null;
-  const loaded = useLatestOnly<Schemas["Transforms"]>(identity, ns, (key, _, signal) =>
-    get(
-      `${runUrl(source!)}/transforms?${new URLSearchParams({ target: target!, time_ns: key })}`,
-      signal,
-    ),
+  const { axis = "time", interpolate = true } = options;
+  const store = source ? runTransforms(runUrl(source)) : undefined;
+  const version = useSyncExternalStore(
+    store?.subscribe ?? noSubscription,
+    store?.getVersion ?? noVersion,
   );
+  useEffect(() => {
+    if (store && target && ns !== null) void store.ensure(BigInt(ns));
+  }, [store, target, ns]);
+  const identity = store && target ? JSON.stringify([store.run, target, axis, interpolate]) : null;
+  const current = useMemo(() => {
+    if (!store || !target || ns === null || !store.covers(BigInt(ns))) return undefined;
+    const frames = store.graph().resolve(target, BigInt(ns), { axis, interpolate });
+    return { time_ns: ns, target, frames };
+  }, [store, target, ns, axis, interpolate, version]);
+  const last = useRef<{ identity: string | null; value?: Schemas["Transforms"] }>({ identity });
+  if (last.current.identity !== identity) last.current = { identity };
+  if (current) last.current.value = current;
+  const value = current ?? last.current.value;
   const held = useRef<{ identity: string | null; frames: Schemas["Transforms"]["frames"] }>({
     identity,
     frames: {},
   });
   const transforms = useMemo(() => {
-    const value = loaded?.value;
     if (!hold || !value) return value;
     if (held.current.identity !== identity) held.current = { identity, frames: {} };
     held.current.frames = { ...held.current.frames, ...value.frames };
     return { ...value, frames: held.current.frames };
-  }, [hold, identity, loaded?.value]);
-  return { transforms, error: loaded?.error ?? "" };
+  }, [hold, identity, value]);
+  return { transforms, error: store?.error() ?? "" };
 }

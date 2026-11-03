@@ -9,8 +9,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { errorMessage, topicKey, type Info, type Schemas } from "../types";
-import { get, runUrl } from "../data/sources";
+import { errorMessage, topicKey, type Info } from "../types";
+import { runUrl } from "../data/sources";
+import { runTransforms } from "../data/runTransforms";
 import { usePlaybackStore } from "../workspace/playback";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import {
@@ -292,14 +293,15 @@ export function useSceneFrame(
       return;
     }
     const controller = new AbortController();
-    const time = String(BigInt(info.start_ns) + BigInt(Math.round(playback.getState().time * 1e9)));
-    get<Schemas["Transforms"]>(
-      `${run}/transforms?${new URLSearchParams({ target, time_ns: time })}`,
-      controller.signal,
-    )
-      .then((transforms) => {
+    const time = BigInt(info.start_ns) + BigInt(Math.round(playback.getState().time * 1e9));
+    const transforms = runTransforms(run);
+    transforms
+      .ensure(time)
+      .then(() => {
         if (controller.signal.aborted) return;
-        const transform = transforms.frames[old.frame];
+        const failure = transforms.error();
+        if (failure) throw new Error(failure);
+        const transform = transforms.graph().resolve(target, time)[old.frame];
         // Frames have samples for different spans of time. Without one here, the view
         // cannot be carried over, which is no reason to stay in the old frame.
         if (transform) stage.reframe(transform);

@@ -80,22 +80,17 @@ it("shows the selected frame relative to its last recorded parent at playback ti
           ],
         }),
       );
-    const params = new URL(url, "http://x").searchParams;
-    return new Response(
-      JSON.stringify({
-        target: params.get("target"),
-        time_ns: params.get("time_ns"),
-        frames:
-          params.get("time_ns") === "3000000000"
-            ? {}
-            : {
-                base: {
-                  translation: [Number(params.get("time_ns")) / 1e9, 2, 3],
-                  rotation: [0, 0, 0, 1],
-                },
-              },
-      }),
-    );
+    if (url.endsWith("/transforms/static")) return Response.json({ transforms: [] });
+    // Samples of base at 1 s and 2 s only: none to place it at 3 s.
+    const start = new URL(url, "http://x").searchParams.get("start_ns");
+    const at = (seconds: number) => ({
+      child: "base",
+      parent: "world",
+      translation: [seconds, 2, 3],
+      rotation: [0, 0, 0, 1],
+      time_ns: String(seconds * 1e9),
+    });
+    return Response.json({ samples: start === "0" ? [at(1), at(2)] : [] });
   });
   vi.stubGlobal("fetch", fetch);
   const store = createPlaybackStore(
