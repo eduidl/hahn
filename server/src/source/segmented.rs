@@ -24,14 +24,20 @@ pub fn open_segments(
     anyhow::ensure!(!sources.is_empty(), "No segments");
     // Segments without messages take no part in the time order.
     sources.sort_by_key(|(info, _)| info.time_range);
-    let ranges: Vec<_> = sources.iter().filter_map(|(info, _)| info.time_range).collect();
+    let ranges: Vec<_> = sources
+        .iter()
+        .filter_map(|(info, _)| info.time_range)
+        .collect();
     for pair in ranges.windows(2) {
         anyhow::ensure!(pair[0].1 <= pair[1].0, "Segments overlap in time");
     }
     let info = SourceInfo {
-        time_range: ranges
-            .first()
-            .map(|first| (first.0, ranges.iter().map(|range| range.1).max().unwrap_or(first.1))),
+        time_range: ranges.first().map(|first| {
+            (
+                first.0,
+                ranges.iter().map(|range| range.1).max().unwrap_or(first.1),
+            )
+        }),
         message_count: sources.iter().map(|(info, _)| info.message_count).sum(),
     };
     let mut topics = Vec::new();

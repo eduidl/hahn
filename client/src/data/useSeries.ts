@@ -77,7 +77,6 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                   { time_ns: row.time_ns, values: [row.value as number | string | boolean | null] },
                   0,
                   origin,
-                  field.enumValues,
                 ),
               ),
               status: "complete",
@@ -104,7 +103,6 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                         },
                         0,
                         origin,
-                        field.enumValues,
                       ),
                     ),
                   );
@@ -150,7 +148,6 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                           },
                           0,
                           origin,
-                          field.enumValues,
                         ),
                       ),
                     );

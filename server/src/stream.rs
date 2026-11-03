@@ -45,38 +45,6 @@ pub(crate) fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
     Some(result)
 }
 
-pub(crate) fn scalar(root: &Value, path: &[usize]) -> serde_json::Value {
-    let mut value = root;
-    for &index in path {
-        let Value::Struct(values) = value else {
-            return serde_json::Value::Null;
-        };
-        let Some(next) = values.get(index) else {
-            return serde_json::Value::Null;
-        };
-        value = next;
-    }
-    match value {
-        Value::I8(v) => (*v).into(),
-        Value::I16(v) => (*v).into(),
-        Value::Bool(v) => (*v).into(),
-        Value::I32(v) => (*v).into(),
-        Value::U8(v) => (*v).into(),
-        Value::U16(v) => (*v).into(),
-        Value::U32(v) => (*v).into(),
-        Value::I64(v) => v.to_string().into(),
-        Value::U64(v) => v.to_string().into(),
-        Value::String(v) => v.to_string().into(),
-        Value::F32(v) => {
-            serde_json::Number::from_f64(*v as f64).map_or(serde_json::Value::Null, Into::into)
-        }
-        Value::F64(v) => {
-            serde_json::Number::from_f64(*v).map_or(serde_json::Value::Null, Into::into)
-        }
-        _ => serde_json::Value::Null,
-    }
-}
-
 pub(crate) fn disconnected() -> io::Error {
     io::Error::new(io::ErrorKind::BrokenPipe, "Client disconnected")
 }

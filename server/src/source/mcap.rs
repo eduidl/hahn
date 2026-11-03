@@ -198,7 +198,10 @@ fn has_messages(summary: &mcap::read::Summary, mapping: &[u8]) -> anyhow::Result
     {
         return Ok(true);
     }
-    Ok(mcap::MessageStream::new(mapping)?.next().transpose()?.is_some())
+    Ok(mcap::MessageStream::new(mapping)?
+        .next()
+        .transpose()?
+        .is_some())
 }
 
 fn info_from_summary(summary: mcap::read::Summary) -> anyhow::Result<SourceInfo> {

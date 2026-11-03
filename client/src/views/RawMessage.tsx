@@ -1,10 +1,11 @@
 import "./RawMessage.css";
 import { memo, useMemo, useRef } from "react";
-import { secondsFrom } from "../data/data";
+import { secondsFrom, stateLabel } from "../data/data";
 import { useCurrentMessage } from "../data/useCurrentMessage";
 import { useTimeFormatter } from "../timeDisplay";
-import { isMetaPath, keyOf, topicKey, type Info, type Selected } from "../types";
+import { isMetaPath, keyOf, topicKey, type EnumValue, type Info, type Selected } from "../types";
 import type { FieldIndex } from "../workspace/fieldIndex";
+import { isShortenedText } from "./table";
 import type { Widget } from "../workspace/widgets";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -14,6 +15,12 @@ const initialDepth = 1;
 
 const isObject = (value: Json): value is { [key: string]: Json } =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** An enum's name with its number, or the number alone when it has no name. */
+function enumText(value: number | string, values: EnumValue[] | undefined) {
+  const name = stateLabel(value, values);
+  return name === String(value) ? name : `${name} (${value})`;
+}
 
 /** One node of the message tree; containers fold, the first level starts open. */
 const Node = memo(function MessageNode({
@@ -45,6 +52,18 @@ const Node = memo(function MessageNode({
       </div>
     );
   }
+  const field = index.byKey.get(
+    keyOf(series.source, series.topic, [...series.path, ...path]),
+  )?.field;
+  if (isShortenedText(value)) {
+    return (
+      <div className="raw-leaf">
+        <span className="raw-key">{name}</span>
+        <span className="raw-value raw-string">{JSON.stringify(value.text).slice(0, -1)}…"</span>
+        <span className="raw-meta"> ({value.length.toLocaleString()} characters)</span>
+      </div>
+    );
+  }
   const truncated = isObject(value) && value.$truncated === true;
   const children: [string, Json][] = truncated
     ? ((value as { items: Json[] }).items ?? []).map((item, i) => [String(i), item])
@@ -54,19 +73,24 @@ const Node = memo(function MessageNode({
         ? Object.entries(value)
         : [];
   if (!Array.isArray(value) && !isObject(value)) {
-    const type = index.byKey.get(keyOf(series.source, series.topic, [...series.path, ...path]))
-      ?.field.data_type;
-    const integer =
+    const type = field?.data_type ?? "";
+    // Exact integers, NaN and infinities arrive as strings but are numbers.
+    const numeric =
       typeof value === "string" &&
-      /^-?\d+$/.test(value) &&
-      /^(u?int)(8|16|32|64)$/.test(type ?? "");
+      ((/^-?\d+$/.test(value) && /^(u?int)(8|16|32|64)$/.test(type)) ||
+        (/^(NaN|-?Infinity)$/.test(value) && /^float(32|64)$/.test(type)));
+    const named = type === "enum" && value !== null && typeof value !== "boolean";
     return (
       <div className="raw-leaf">
         <span className="raw-key">{name}</span>
         <span
-          className={`raw-value raw-${integer ? "number" : value === null ? "null" : typeof value}`}
+          className={`raw-value raw-${numeric || named ? "number" : value === null ? "null" : typeof value}`}
         >
-          {typeof value === "string" && !integer ? JSON.stringify(value) : String(value)}
+          {named
+            ? enumText(value, field?.enum_values)
+            : typeof value === "string" && !numeric
+              ? JSON.stringify(value)
+              : String(value)}
         </span>
       </div>
     );

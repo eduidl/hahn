@@ -52,17 +52,19 @@ These are the values of `/messages` and `/messages/latest`.
 
 - A struct is an object keyed by field name, also inside lists.
 - A map is an array of `[key, value]` pairs, which preserves the key type.
-- i64 and u64 values are strings. Other numbers are JSON numbers.
-- Missing and non-finite values (NaN, Infinity) are `null`. **They cannot be told apart at present.**
+- i64 and u64 values are strings. Other integers are JSON numbers. Every nanosecond time in the protocol is a decimal string too.
+- Finite floats are JSON numbers. An f32 is written as the shortest decimal that reads back as the same f32, so `0.1` stays `0.1`.
+- NaN and infinities are the strings `"NaN"`, `"Infinity"` and `"-Infinity"`. `null` means only that the value is missing.
+- An enum is its recorded number. The client shows the name from the field's `enum_values`; with several names for one number, the first in `enum_values`. A number without a name is shown as the number.
 - Long values are cut down, unless `preview=false` asks for exact values.
 
 | Target | Condition | Form |
 |---|---|---|
 | List, array, map | 101 items or more | `{"$truncated": true, "length": total, "items": [first 100 items]}` |
 | bytes | Always | `{"$bytes": total bytes, "head": [first 32 bytes]}` |
-| String | Over 10,000 characters | The first 10,000 characters followed by `…` |
+| String | Over 10,000 characters | `{"$truncated": true, "length": total characters, "text": "first 10,000 characters"}` |
 
-At present, a shortened string can only be recognized by the trailing `…`.
+A client knows a shortened value by an object where the field's type is a string, list, array, map or bytes.
 
 A field with `data_type` `json` holds a JSON document as text. A `jsonschema` + `json` MCAP topic has one such field, `json`, holding the message text. Its preview value is the parsed document instead of the text, under the same limits, with integers beyond ±(2^53 − 1) as strings. Text that is not valid JSON stays a string, and `preview=false` always returns the text.
 
@@ -169,10 +171,7 @@ Not compressing is faster locally, and compressing wins on slow links. When comp
 
 ## Open issues
 
-- NaN, Infinity and missing values cannot be told apart
 - Relative times (starting at 0) cannot be told apart from epoch times
-- f32 is widened to f64, so `0.1` appears as `0.10000000149011612`
-- A shortened string cannot be recognized reliably
 - `/messages` transfers a lot (rows of JSON)
 - `known_time_ns` saves the transfer but not the server's work of reading the message
 - Measurement timestamps and clock resets are not implemented

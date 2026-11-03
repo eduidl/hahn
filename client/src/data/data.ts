@@ -21,19 +21,13 @@ export function stateLabel(raw: number | string | boolean | null, enumValues?: E
 export const secondsFrom = (ns: string, origin: string) =>
   Number(BigInt(ns) - BigInt(origin)) / 1e9;
 
-export function point(
-  row: Row,
-  field: number,
-  origin: string,
-  enumValues: EnumValue[] = [],
-): Point {
+/**
+ * A plotted value. Exact integers arrive as strings; NaN, infinities and missing
+ * values leave a gap, while `raw` keeps which one it was.
+ */
+export function point(row: Row, field: number, origin: string): Point {
   const raw = row.values[field];
-  const enumValue =
-    typeof raw === "string"
-      ? Number(enumValues.find((entry) => entry.name === raw)?.value ?? raw)
-      : NaN;
-  const n =
-    raw === null ? NaN : typeof raw === "string" && enumValues.length ? enumValue : Number(raw);
+  const n = raw === null ? NaN : Number(raw);
   return {
     x: secondsFrom(row.time_ns, origin),
     y: Number.isFinite(n) ? n : null,

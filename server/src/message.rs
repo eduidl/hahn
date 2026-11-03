@@ -3,13 +3,13 @@ use crate::{
     error::{ApiError, Code, coded},
     scalar_fields,
     source::{MessageTimes, Source, TimeRange},
-    stream::{indexes, scalar, stream_rows},
+    stream::{indexes, stream_rows},
 };
 use axum::{
     Json,
     extract::{Path, Query, State},
 };
-use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
+use mcapdecode::core::{DataTypeDef, EnumDef, FieldDefs, Value};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -232,21 +232,70 @@ fn limit_json(value: serde_json::Value) -> serde_json::Value {
     }
 }
 
+/// A long string as `{"$truncated", "length", "text"}`, so that it cannot be
+/// mistaken for a whole string.
 fn shorten(text: &str) -> serde_json::Value {
-    if text.chars().count() > MAX_CHARS {
-        format!("{}…", text.chars().take(MAX_CHARS).collect::<String>()).into()
+    let length = text.chars().count();
+    if length > MAX_CHARS {
+        let shown: String = text.chars().take(MAX_CHARS).collect();
+        json!({ "$truncated": true, "length": length, "text": shown })
     } else {
         text.into()
     }
 }
 
-/// JSON for display: named struct fields, exact 64-bit integers as strings,
-/// and large lists, byte buffers and strings cut down to a preview.
-fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
-    let number =
-        |v: f64| serde_json::Number::from_f64(v).map_or(serde_json::Value::Null, Into::into);
+/// A float as a JSON number, or `"NaN"`, `"Infinity"` or `"-Infinity"`, which JSON
+/// cannot hold as numbers and which must not read as missing.
+fn float(v: f64) -> serde_json::Value {
+    match serde_json::Number::from_f64(v) {
+        Some(number) => number.into(),
+        None if v.is_nan() => "NaN".into(),
+        None if v > 0. => "Infinity".into(),
+        None => "-Infinity".into(),
+    }
+}
+
+/// The shortest decimal that reads back as the same `f32`: `0.1`, not the
+/// `0.10000000149011612` the widened `f64` would print.
+fn single(v: f32) -> serde_json::Value {
+    if v.is_finite() {
+        float(v.to_string().parse().unwrap_or(v as f64))
+    } else {
+        float(v as f64)
+    }
+}
+
+/// A 64-bit integer: exact as a string, since a JSON reader may hold numbers as doubles.
+fn wide(v: impl ToString) -> serde_json::Value {
+    v.to_string().into()
+}
+
+/// An enum as its recorded number; the client looks up its name. Decoders that
+/// give the name are mapped back, and a number outside the variants is kept.
+fn enum_number(value: &Value, def: &EnumDef) -> serde_json::Value {
+    const MAX_SAFE_INTEGER: i64 = (1 << 53) - 1;
+    let number = match value {
+        Value::String(name) => def
+            .variants
+            .iter()
+            .find(|variant| variant.name == **name)
+            .map(|variant| variant.value)
+            .or_else(|| name.parse().ok()),
+        _ => None,
+    };
+    match number {
+        Some(n) if n.abs() <= MAX_SAFE_INTEGER => n.into(),
+        Some(n) => n.to_string().into(),
+        None => scalar_json(value, &DataTypeDef::Null, true),
+    }
+}
+
+/// A value that is not a struct, list or map. `exact` keeps strings whole.
+fn scalar_json(value: &Value, data_type: &DataTypeDef, exact: bool) -> serde_json::Value {
+    if let DataTypeDef::Enum(def) = data_type {
+        return enum_number(value, def);
+    }
     match value {
-        Value::Null => serde_json::Value::Null,
         Value::Bool(v) => (*v).into(),
         Value::I8(v) => (*v).into(),
         Value::I16(v) => (*v).into(),
@@ -254,11 +303,28 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
         Value::U8(v) => (*v).into(),
         Value::U16(v) => (*v).into(),
         Value::U32(v) => (*v).into(),
-        Value::I64(v) => v.to_string().into(),
-        Value::U64(v) => v.to_string().into(),
-        Value::F32(v) => number(*v as f64),
-        Value::F64(v) => number(*v),
+        Value::I64(v) => wide(v),
+        Value::U64(v) => wide(v),
+        Value::F32(v) => single(*v),
+        Value::F64(v) => float(*v),
+        Value::String(v) if exact => v.to_string().into(),
         Value::String(v) => shorten(v),
+        _ => serde_json::Value::Null,
+    }
+}
+
+/// The exact value of a scalar field, for `preview=false`.
+fn scalar(root: &Value, index: &[usize], data_type: &DataTypeDef) -> serde_json::Value {
+    select(root, index).map_or(serde_json::Value::Null, |value| {
+        scalar_json(value, data_type, true)
+    })
+}
+
+/// JSON for display: named struct fields, exact 64-bit integers as strings,
+/// and large lists, byte buffers and strings cut down to a preview.
+fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
+    match value {
+        Value::Null => serde_json::Value::Null,
         Value::Bytes(v) => json!({ "$bytes": v.len(), "head": &v[..v.len().min(MAX_BYTES)] }),
         Value::Uint8List(v) if v.len() > MAX_ITEMS => {
             json!({ "$truncated": true, "length": v.len(), "items": &v[..MAX_ITEMS] })
@@ -292,6 +358,7 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
                 .collect();
             preview(entries.len(), shown)
         }
+        scalar => scalar_json(scalar, data_type, false),
     }
 }
 
@@ -356,7 +423,7 @@ pub(crate) async fn messages(
             value: match &meta {
                 Some(name) => meta_value(name, times),
                 None if preview => displayed(&value, &index, &data_type, json_text),
-                None => scalar(&value, &index),
+                None => scalar(&value, &index, &data_type),
             },
         },
     ))

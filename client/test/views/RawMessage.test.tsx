@@ -66,6 +66,61 @@ it("shows integer fields without quotes while preserving strings and integer pre
   ]);
 });
 
+it("names enums, shows NaN as a number and marks shortened strings", () => {
+  const state = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "raw" });
+  const widget = state.widgets["widget-2"];
+  widget.series = [
+    {
+      key: keyOf("r/0", "/t", []),
+      source: "r/0",
+      topic: "/t",
+      path: [],
+      hidden: false,
+      color: "red",
+      lineWidth: 1,
+    },
+  ];
+  const modes = [
+    { name: "IDLE", value: "0" },
+    { name: "RUN", value: "1" },
+  ];
+  const topic: Topic = {
+    source: "r/0",
+    topic: "/t",
+    schema_name: "T",
+    schema_encoding: null,
+    views: [],
+    message_count: 1,
+    error: null,
+    fields: [
+      { path: ["mode"], data_type: "enum", enum_values: modes },
+      { path: ["other"], data_type: "enum", enum_values: modes },
+      { path: ["speed"], data_type: "float64" },
+      { path: ["note"], data_type: "string" },
+    ],
+  };
+  current.message = {
+    time_ns: "0",
+    value: {
+      mode: 1,
+      other: 7,
+      speed: "NaN",
+      note: { $truncated: true, length: 12000, text: "abc" },
+    },
+  };
+  const { container } = render(
+    <RawMessage
+      widget={widget}
+      info={{ start_ns: "0", end_ns: "1", message_count: 1 }}
+      index={buildFieldIndex([topic])}
+    />,
+  );
+  const values = [...container.querySelectorAll(".raw-value")];
+  expect(values.map((value) => value.textContent)).toEqual(["RUN (1)", "7", "NaN", '"abc…"']);
+  expect(values[2].className).toBe("raw-value raw-number");
+  expect(container.textContent).toContain("12,000 characters");
+});
+
 it("preserves folding when a message temporarily disappears while loading", () => {
   const state = workspaceReducer(initialWorkspace(), { type: "add", widgetType: "raw" });
   const widget = state.widgets["widget-2"];

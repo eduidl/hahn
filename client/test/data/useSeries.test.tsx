@@ -153,7 +153,7 @@ describe("full-recording series cache", () => {
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBe(fetches + 1));
     await waitFor(() => expect(result.current.records[0]?.status).toBe("loading"));
   });
-  it("decodes enum labels with the definition carried by the selection", async () => {
+  it("plots enums by their number, keeping it as the raw value", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -162,7 +162,7 @@ describe("full-recording series cache", () => {
             [
               JSON.stringify({
                 type: "batch",
-                rows: [{ time_ns: "1000000000", value: "RUN" }],
+                rows: [{ time_ns: "1000000000", value: 1 }],
                 scanned_messages: 1,
               }),
               JSON.stringify({ type: "complete", scanned_messages: 1 }),
@@ -182,7 +182,7 @@ describe("full-recording series cache", () => {
     };
     const { result } = renderHook(() => useSeries(info.start_ns, [mode]));
     await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
-    expect(result.current.plotted[0].points[0]).toMatchObject({ y: 1, raw: "RUN" });
+    expect(result.current.plotted[0].points[0]).toMatchObject({ y: 1, raw: 1 });
   });
 });
 

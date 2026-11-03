@@ -96,7 +96,8 @@ async fn stream_batches_exact_values_gaps_and_completion() {
     assert_eq!(rows.len(), 2200);
     assert_eq!(rows[0]["time_ns"], support::ORIGIN.to_string());
     assert_eq!(rows[0]["values"][1], "9007199254740993");
-    assert!(rows[9]["values"][0].is_null());
+    // NaN is told apart from a missing value.
+    assert_eq!(rows[9]["values"][0], "NaN");
     assert!(rows[10]["values"][2].is_null());
     for (i, row) in rows.iter().enumerate() {
         assert_eq!(
@@ -131,7 +132,7 @@ async fn state_stream_preserves_boolean_values() {
 }
 
 #[tokio::test]
-async fn state_stream_preserves_enum_labels() {
+async fn state_stream_returns_enum_numbers() {
     let dir = fixture(4, false);
     let (status, events) = series(
         hahn::router(dir.path()).unwrap(),
@@ -145,8 +146,9 @@ async fn state_stream_preserves_enum_labels() {
         .flatten()
         .collect();
     assert_eq!(rows.len(), 4);
-    assert_eq!(rows[0]["values"][0], "IDLE");
-    assert_eq!(rows[1]["values"][0], "ACTIVE");
+    // The client names them from the schema's enum values: IDLE and ACTIVE.
+    assert_eq!(rows[0]["values"][0], 0);
+    assert_eq!(rows[1]["values"][0], 1);
 }
 
 #[tokio::test]
@@ -535,9 +537,10 @@ async fn exact_values_do_not_shorten_strings_and_require_a_scalar() {
     let (_, exact) = read(false).await;
     assert_eq!(exact[0]["rows"][0]["value"], long);
     let (_, shortened) = read(true).await;
-    let shortened = shortened[0]["rows"][0]["value"].as_str().unwrap();
-    assert_eq!(shortened.chars().count(), 10_001);
-    assert!(shortened.ends_with('…'));
+    let shortened = &shortened[0]["rows"][0]["value"];
+    assert_eq!(shortened["$truncated"], true);
+    assert_eq!(shortened["length"], 10_050);
+    assert_eq!(shortened["text"], "x".repeat(10_000));
     let (status, _) = stream(
         app,
         "/g/messages",
@@ -649,6 +652,74 @@ async fn values_of_every_shape_are_shown_within_the_display_limits() {
 }
 
 #[tokio::test]
+async fn numbers_and_enums_keep_what_json_alone_would_lose() {
+    use crate::memory::Topic;
+    use hahn::{DataTypeDef, EnumDef, EnumVariant, Value as V};
+    let mode = || {
+        DataTypeDef::Enum(EnumDef::from(vec![
+            EnumVariant::new("RUN", 1),
+            EnumVariant::new("ACTIVE", 1),
+        ]))
+    };
+    let topic = Topic::new(
+        "numbers",
+        "test/Numbers",
+        vec![
+            ("single", DataTypeDef::F32),
+            ("nan", DataTypeDef::F64),
+            ("up", DataTypeDef::F64),
+            ("down", DataTypeDef::F32),
+            ("missing", DataTypeDef::F64),
+            ("named", mode()),
+            ("alias", mode()),
+            ("undefined", mode()),
+        ],
+    )
+    .at(
+        0,
+        vec![
+            V::F32(0.1),
+            V::F64(f64::NAN),
+            V::F64(f64::INFINITY),
+            V::F32(f32::NEG_INFINITY),
+            V::Null,
+            V::string("RUN"),
+            V::string("ACTIVE"),
+            V::string("-3"),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);
+    let value = latest(&app, "numbers", 0).await;
+    assert_eq!(
+        value,
+        json!({
+            "single": 0.1,
+            "nan": "NaN",
+            "up": "Infinity",
+            "down": "-Infinity",
+            "missing": null,
+            "named": 1,
+            "alias": 1,
+            "undefined": -3,
+        })
+    );
+    // Exact values follow the same rules.
+    for (field, expected) in [
+        ("single", json!(0.1)),
+        ("nan", json!("NaN")),
+        ("named", json!(1)),
+    ] {
+        let (_, events) = stream(
+            app.clone(),
+            "/g/messages",
+            json!({"topic":"numbers","path":[field],"preview":false}),
+        )
+        .await;
+        assert_eq!(events[0]["rows"][0]["value"], expected, "{field}");
+    }
+}
+
+#[tokio::test]
 async fn json_text_is_parsed_within_the_display_limits_or_stays_text() {
     use crate::memory::Topic;
     use hahn::{DataTypeDef, Value as V};
@@ -667,7 +738,8 @@ async fn json_text_is_parsed_within_the_display_limits_or_stays_text() {
     let shown = &latest(&app, "doc", 0).await["json"];
     assert_eq!(shown["speed"], 1.5);
     assert_eq!(shown["big"], "9007199254740993");
-    assert!(shown["text"].as_str().unwrap().ends_with('…'));
+    assert_eq!(shown["text"]["$truncated"], true);
+    assert_eq!(shown["text"]["length"], 10_001);
     assert_eq!(shown["list"]["$truncated"], true);
     assert_eq!(shown["list"]["items"].as_array().unwrap().len(), 100);
 

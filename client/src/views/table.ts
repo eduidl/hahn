@@ -78,6 +78,14 @@ export function tableColumns(index: FieldIndex, selected: Selected): TableColumn
     }));
 }
 
+/** A string the server shortened for display: its first characters and full length. */
+export const isShortenedText = (value: Json): value is { text: string; length: number } =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  value.$truncated === true &&
+  typeof value.text === "string";
+
 export function cellValue(value: Json, column: TableColumn): string {
   let cell: Json | undefined = value;
   for (const part of column.path) {
@@ -86,6 +94,7 @@ export function cellValue(value: Json, column: TableColumn): string {
   }
   if (cell == null) return "—";
   if (cell === "") return "(empty string)";
+  if (isShortenedText(cell)) return `${cell.text}…`;
   if (typeof cell === "object") return JSON.stringify(cell);
   return column.enumValues?.find((entry) => entry.value === String(cell))?.name ?? String(cell);
 }
