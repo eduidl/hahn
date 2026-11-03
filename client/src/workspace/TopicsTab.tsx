@@ -19,9 +19,9 @@ function TopicField({
   onDragEnd,
 }: DragHandlers & { topic: Topic; field: Field; search: string }) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Firefox does not drag a <button>.
     <div
       className="field topic-field"
-      // Not a <button>: Firefox does not drag those.
       role="button"
       tabIndex={0}
       draggable
@@ -121,6 +121,7 @@ export function TopicsTab({
           {visibleTopics.length} / {topics.length} topics
         </span>
         <button
+          type="button"
           className="collapse-topics"
           onClick={() => setExpandedTopics(new Set())}
           disabled={expandedTopics.size === 0}

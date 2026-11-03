@@ -85,6 +85,7 @@ export function TimeZoneSelect({
   return (
     <>
       <button
+        type="button"
         className="timezone-trigger"
         aria-label={`Time zone: ${zone} (${offset})`}
         title="Time zone"
@@ -145,6 +146,7 @@ export function TimeZoneSelect({
         >
           {shown.map((option, i) => (
             <button
+              type="button"
               key={option.value}
               id={`${id}-${i}`}
               className="field-option"
@@ -179,6 +181,7 @@ export function TimeDisplayToggle({
   const action = `Switch to ${next} time`;
   return (
     <button
+      type="button"
       className="time-display-toggle"
       aria-label={action}
       title={action}

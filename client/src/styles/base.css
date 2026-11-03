@@ -41,6 +41,17 @@
 body {
   margin: 0;
 }
+/* Used for grouping and resize handles, not for their default look. */
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+hr {
+  margin: 0;
+  border: 0;
+}
 button,
 input,
 select {

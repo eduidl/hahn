@@ -55,6 +55,7 @@ export function AppHeader({
           hahn
         </div>
         <button
+          type="button"
           className="runs-trigger"
           aria-label={run ? `Select run: ${run.name}` : undefined}
           title={run?.name}
@@ -71,6 +72,7 @@ export function AppHeader({
         </button>
         {groups.length > 1 && (
           <button
+            type="button"
             className="group-trigger"
             popoverTarget="group-menu"
             aria-label="Open groups"
@@ -123,6 +125,7 @@ export function AppHeader({
       </div>
 
       <button
+        type="button"
         className="sidebar-toggle"
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -142,6 +145,7 @@ export function AppHeader({
         </svg>
       </button>
       <button
+        type="button"
         className="add-widget"
         aria-label="Add widget"
         title="Add widget"
@@ -172,10 +176,10 @@ export function AppHeader({
       >
         <p className="help">Click to add on the left, or drag to a position.</p>
         {widgetTypes.map((type) => (
+          // biome-ignore lint/a11y/useSemanticElements: Firefox does not drag a <button>.
           <div
             key={type}
             className="widget-catalog-item"
-            // Not a <button>: Firefox does not drag those.
             role="button"
             tabIndex={0}
             draggable

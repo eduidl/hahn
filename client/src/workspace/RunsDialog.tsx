@@ -118,7 +118,7 @@ export function RunsDialog({
         ))}
       </ul>
       {list && !items.length && <p className="muted">No matching runs</p>}
-      <button className="runs-close" onClick={onClose}>
+      <button type="button" className="runs-close" onClick={onClose}>
         Close
       </button>
     </dialog>

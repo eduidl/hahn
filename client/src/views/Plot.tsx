@@ -585,6 +585,7 @@ export function Plot({
         <div className="overlay-box plot-legend" style={legendStyle}>
           {series.map((s) => (
             <button
+              type="button"
               key={s.key}
               className="plot-legend-item"
               aria-pressed={!s.hidden}

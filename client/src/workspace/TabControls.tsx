@@ -61,6 +61,7 @@ function RemoveTabButton({
   return (
     <>
       <button
+        type="button"
         className={className}
         aria-label={label}
         disabled={widget.tabs.length === 1}
@@ -86,6 +87,7 @@ export function TabSettings({ widget, dispatch }: Props) {
       {widget.tabs.map((tab, i) => (
         <div className="tab-settings-row" key={tab.id}>
           <button
+            type="button"
             className="small-button"
             aria-label={`Show ${tabLabel(tab)}`}
             aria-pressed={widget.activeTabId === tab.id}
@@ -95,6 +97,7 @@ export function TabSettings({ widget, dispatch }: Props) {
           </button>
           <TabName widget={widget} tab={tab} dispatch={dispatch} />
           <button
+            type="button"
             className="small-button"
             aria-label={`Move ${tabLabel(tab)} earlier`}
             disabled={i === 0}
@@ -110,6 +113,7 @@ export function TabSettings({ widget, dispatch }: Props) {
             ↑
           </button>
           <button
+            type="button"
             className="small-button"
             aria-label={`Move ${tabLabel(tab)} later`}
             disabled={i === widget.tabs.length - 1}
@@ -133,7 +137,11 @@ export function TabSettings({ widget, dispatch }: Props) {
           />
         </div>
       ))}
-      <button aria-label="Add tab" onClick={() => dispatch({ type: "tab-add", id: widget.id })}>
+      <button
+        type="button"
+        aria-label="Add tab"
+        onClick={() => dispatch({ type: "tab-add", id: widget.id })}
+      >
         + Tab
       </button>
     </div>
@@ -208,6 +216,7 @@ export function TabBar({
             </div>
           ) : (
             <button
+              type="button"
               role="tab"
               id={`${widget.id}-${tab.id}`}
               aria-controls={`${widget.id}-${tab.id}-panel`}
@@ -291,7 +300,11 @@ export function TabBar({
           )}
         </div>
       ))}
-      <button aria-label="Add tab" onClick={() => dispatch({ type: "tab-add", id: widget.id })}>
+      <button
+        type="button"
+        aria-label="Add tab"
+        onClick={() => dispatch({ type: "tab-add", id: widget.id })}
+      >
         +
       </button>
     </div>

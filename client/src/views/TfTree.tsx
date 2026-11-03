@@ -248,6 +248,7 @@ export function TfTree({
           ) : null;
         })}
         {nodes.map((node) => (
+          // biome-ignore lint/a11y/useSemanticElements: SVG has no <button>.
           <g
             key={node.id}
             tabIndex={0}
@@ -277,9 +278,9 @@ export function TfTree({
           className="overlay-box tf-tree-pose"
           style={{ transform: `translate(${poseOffset.x}px, ${poseOffset.y}px)` }}
         >
-          <strong
+          <button
+            type="button"
             className="tf-tree-pose-handle"
-            role="button"
             tabIndex={0}
             aria-label={`Move details for ${frame.id}`}
             title="Drag or use arrow keys to move"
@@ -315,7 +316,7 @@ export function TfTree({
             }}
           >
             {frame.id}
-          </strong>
+          </button>
           {frame.parent === null ? (
             <span>Root frame</span>
           ) : !parent ? (

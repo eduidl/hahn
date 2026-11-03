@@ -96,6 +96,7 @@ export function FieldPicker({
   return (
     <>
       <button
+        type="button"
         className="add-field"
         aria-label={label}
         popoverTarget={pickerId}
@@ -168,6 +169,7 @@ export function FieldPicker({
         >
           {shown.map((entry, i) => (
             <button
+              type="button"
               key={entry.key}
               id={`${pickerId}-${i}`}
               className="field-option"
