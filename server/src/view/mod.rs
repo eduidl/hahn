@@ -8,8 +8,10 @@ mod convert;
 mod frame;
 mod ros2;
 mod tf;
+mod value;
 
-pub(crate) use tf::{TfIndex, frames, transforms};
+pub(crate) use tf::{TfIndex, frames, readers, transforms};
+pub use tf::{TransformReader, TransformSample};
 
 use crate::{
     ApiError, AppState, blocking,
@@ -278,7 +280,7 @@ pub(crate) async fn views(
                     .iter()
                     .find(|item| item.id == run)
                     .expect("run checked by group");
-                Ok::<_, anyhow::Error>((target, run.tf()?))
+                Ok::<_, anyhow::Error>((target, run.tf(&state.transforms)?))
             })
             .transpose()?;
         Ok((source, topic, defs, converter, target))

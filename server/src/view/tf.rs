@@ -6,7 +6,6 @@ use crate::{
     message::parse_time,
     source::{Source, TimeRange},
 };
-use anyhow::ensure;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -151,24 +150,57 @@ fn stamped_list(data_type: &DataTypeDef) -> bool {
     list_of(data_type, stamped_fields)
 }
 
-/// How a message type holds its transforms.
-#[derive(Clone, Copy)]
-enum Layout {
-    Single,
-    Batch,
-    RosBatch,
+/// Reads the transforms that messages of the types it accepts hold.
+///
+/// Built-in readers implement this too. An application adds its own with
+/// [`Builder::transforms`](crate::Builder::transforms). Every transform of a run
+/// joins one graph of frames, whichever group or topic it came from.
+pub trait TransformReader: Send + Sync {
+    /// Decided from the schema alone, like [`ViewConverter::accepts`](super::ViewConverter::accepts).
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool;
+    /// The transforms one message holds. An error leaves out this message only. Hahn
+    /// leaves out a sample without both frame names or with a number that is not
+    /// finite, and normalizes rotations.
+    fn read(&self, message: &Message) -> anyhow::Result<Vec<TransformSample>>;
+    /// Whether the transforms of `topic` hold at all times. By default, those on a
+    /// topic whose last path segment is `tf_static` or `tf-static`. A frame with only
+    /// one sample holds at all times anyway.
+    fn is_static(&self, topic: &str) -> bool {
+        is_static_topic(topic)
+    }
 }
 
-fn layout(schema_name: &str, defs: &FieldDefs) -> Option<Layout> {
-    if is_foxglove(schema_name, "FrameTransform") && transform_fields(defs) {
-        Some(Layout::Single)
-    } else if is_foxglove(schema_name, "FrameTransforms") && has(defs, "transforms", transform_list)
-    {
-        Some(Layout::Batch)
-    } else if schema_name == "tf2_msgs/msg/TFMessage" && has(defs, "transforms", stamped_list) {
-        Some(Layout::RosBatch)
-    } else {
-        None
+/// A transform from `child` to `parent`: `p_parent = rotation * p_child + translation`,
+/// at the recording time of its message.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TransformSample {
+    pub parent: String,
+    pub child: String,
+    /// Meters.
+    pub translation: [f64; 3],
+    /// `[x, y, z, w]`.
+    pub rotation: [f64; 4],
+}
+
+pub(crate) fn readers(extra: Vec<Arc<dyn TransformReader>>) -> Vec<Arc<dyn TransformReader>> {
+    let mut readers: Vec<Arc<dyn TransformReader>> = vec![
+        Arc::new(FrameTransform),
+        Arc::new(FrameTransforms),
+        Arc::new(TfMessage),
+    ];
+    readers.extend(extra);
+    readers
+}
+
+/// `foxglove.FrameTransform`.
+struct FrameTransform;
+
+impl TransformReader for FrameTransform {
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        is_foxglove(schema_name, "FrameTransform") && transform_fields(defs)
+    }
+    fn read(&self, message: &Message) -> anyhow::Result<Vec<TransformSample>> {
+        Ok(vec![sample(*message)?])
     }
 }
 
@@ -188,24 +220,36 @@ impl TransformReader for FrameTransforms {
     }
 }
 
-/// The parent, child and transform of a message, if it holds a usable one.
-fn sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str, Transform)> {
-    let (parent, child) = named_frames(
-        message.string("parent_frame_id")?,
-        message.string("child_frame_id")?,
-    )?;
-    let transform = Transform {
+/// `tf2_msgs/msg/TFMessage`. A bad transform leaves out only itself.
+struct TfMessage;
+
+impl TransformReader for TfMessage {
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "tf2_msgs/msg/TFMessage" && has(defs, "transforms", stamped_list)
+    }
+    fn read(&self, message: &Message) -> anyhow::Result<Vec<TransformSample>> {
+        Ok(message
+            .children("transforms")?
+            .into_iter()
+            .filter_map(|message| stamped_sample(message).ok())
+            .collect())
+    }
+}
+
+/// The transform of a `foxglove.FrameTransform`.
+fn sample(message: Message) -> anyhow::Result<TransformSample> {
+    Ok(TransformSample {
+        parent: message.string("parent_frame_id")?.to_owned(),
+        child: message.string("child_frame_id")?.to_owned(),
         translation: vector(message.child("translation")?)?,
         rotation: quaternion(message.child("rotation")?)?,
-    };
-    Ok((parent, child, transform))
+    })
 }
 
 /// The same from a `geometry_msgs/msg/TransformStamped`.
-fn stamped_sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str, Transform)> {
+fn stamped_sample(message: Message) -> anyhow::Result<TransformSample> {
     let header = message.child("header")?;
     let parent = header.map_or(Ok(""), |header| header.string("frame_id"))?;
-    let (parent, child) = named_frames(parent, message.string("child_frame_id")?)?;
     let transform = message.child("transform")?;
     let part = |name| {
         transform
@@ -213,11 +257,42 @@ fn stamped_sample<'a>(message: Message<'a>) -> anyhow::Result<(&'a str, &'a str,
             .transpose()
             .map(Option::flatten)
     };
-    let transform = Transform {
+    Ok(TransformSample {
+        parent: parent.to_owned(),
+        child: message.string("child_frame_id")?.to_owned(),
         translation: vector(part("translation")?)?,
         rotation: quaternion(part("rotation")?)?,
+    })
+}
+
+/// A sample as Hahn uses it, or `None` if it must be left out.
+fn usable(sample: TransformSample) -> Option<(String, String, Transform)> {
+    let TransformSample {
+        parent,
+        child,
+        translation,
+        rotation,
+    } = sample;
+    if parent.is_empty() || child.is_empty() {
+        return None;
+    }
+    if !translation.iter().chain(&rotation).all(|v| v.is_finite()) {
+        return None;
+    }
+    let length = rotation.iter().map(|v| v * v).sum::<f64>().sqrt();
+    let rotation = if length == 0. {
+        [0., 0., 0., 1.]
+    } else {
+        rotation.map(|v| v / length)
     };
-    Ok((parent, child, transform))
+    Some((
+        parent,
+        child,
+        Transform {
+            translation,
+            rotation,
+        },
+    ))
 }
 
 /// Topics of latched, time-independent transforms.
@@ -279,6 +354,7 @@ impl TfIndex {
     /// Reads every transform topic of the recordings.
     pub(crate) fn build(
         sources: impl IntoIterator<Item = Arc<dyn Source>>,
+        readers: &[Arc<dyn TransformReader>],
     ) -> anyhow::Result<Self> {
         let mut index = Self::default();
         for source in sources {
@@ -286,34 +362,23 @@ impl TfIndex {
                 let (Ok(defs), Some(schema_name)) = (&meta.fields, &meta.schema_name) else {
                     continue;
                 };
-                let Some(layout) = layout(schema_name, defs) else {
+                let Some(reader) = readers.iter().find(|r| r.accepts(schema_name, defs)) else {
                     continue;
                 };
-                let from_static_topic = is_static_topic(&meta.topic);
+                let from_static_topic = reader.is_static(&meta.topic);
                 source.read(&meta.id, TimeRange::default(), &mut |times, value| {
                     // One bad sample must not take every frame of the run with it.
-                    if let Ok(message) = Message::new(defs, &value) {
-                        let messages = match layout {
-                            Layout::Single => vec![message],
-                            Layout::Batch | Layout::RosBatch => {
-                                message.children("transforms").unwrap_or_default()
-                            }
-                        };
-                        for message in messages {
-                            let sample = match layout {
-                                Layout::RosBatch => stamped_sample(message),
-                                Layout::Single | Layout::Batch => sample(message),
-                            };
-                            if let Ok((parent, child, transform)) = sample {
-                                index.add(
-                                    child,
-                                    parent,
-                                    times.log_time,
-                                    transform,
-                                    from_static_topic,
-                                );
-                            }
-                        }
+                    let samples = Message::new(defs, &value)
+                        .and_then(|message| reader.read(&message))
+                        .unwrap_or_default();
+                    for (parent, child, transform) in samples.into_iter().filter_map(usable) {
+                        index.add(
+                            &child,
+                            &parent,
+                            times.log_time,
+                            transform,
+                            from_static_topic,
+                        );
                     }
                     Ok(())
                 })?;
@@ -431,12 +496,14 @@ struct FrameInfo<'a> {
 
 async fn run_index(state: &AppState, run: &str) -> Result<Arc<TfIndex>, ApiError> {
     state.run(run)?;
-    let (runs, run) = (state.runs.clone(), run.to_owned());
+    let (state, run) = (state.clone(), run.to_owned());
     blocking(move || {
-        runs.iter()
+        state
+            .runs
+            .iter()
             .find(|r| r.id == run)
             .expect("checked above")
-            .tf()
+            .tf(&state.transforms)
     })
     .await
 }

@@ -551,6 +551,14 @@ pub fn write_ros2_fixture(path: &Path) -> anyhow::Result<()> {
     }
     writer.finish()
 }
+
+/// Another type of an application's own: where frame `child` is in `parent`, on a plane.
+pub const ACME_LINK2D: RosType = (
+    "acme_msgs/msg/Link2D",
+    "string parent\nstring child\nfloat64 x\nfloat64 y\nfloat64 theta\n",
+    &[],
+);
+
 fn link2d(parent: &str, child: &str, x: f64, y: f64, theta: f64) -> Cdr {
     let mut cdr = Cdr::new();
     cdr.string(parent).string(child).f64(x).f64(y).f64(theta);
@@ -561,3 +569,51 @@ fn link2d(parent: &str, child: &str, x: f64, y: f64, theta: f64) -> Cdr {
 pub const ACME_COUNT: u64 = 40;
 pub const ACME_STEP_NS: u64 = 100_000_000;
 
+/// `/acme_pose`, driving a circle of radius 5 m in `map` over the fixture, and
+/// `/acme_link`, placing `base` on the same circle and `sensor` 1 m ahead of `base`.
+///
+/// With `faults`, as tests use it, every 10th pose has no frame, and the link also
+/// holds a sample without a child and one that is not finite. Without, the fixture
+/// shows cleanly as a demo.
+pub fn write_acme_fixture(path: &Path, faults: bool) -> anyhow::Result<()> {
+    let mut writer = RosWriter::create(path)?;
+    for i in 0..ACME_COUNT {
+        let angle = i as f64 / ACME_COUNT as f64 * std::f64::consts::TAU;
+        let (x, y, theta) = (
+            5. * angle.cos(),
+            5. * angle.sin(),
+            angle + std::f64::consts::FRAC_PI_2,
+        );
+        let frame = if faults && i % 10 == 9 { "" } else { "map" };
+        let mut cdr = Cdr::new();
+        cdr.string(frame).f64(x).f64(y).f64(theta);
+        writer.write("/acme_pose", ACME_POSE2D, i * ACME_STEP_NS, &cdr)?;
+        writer.write(
+            "/acme_link",
+            ACME_LINK2D,
+            i * ACME_STEP_NS,
+            &link2d("map", "base", x, y, theta),
+        )?;
+    }
+    writer.write(
+        "/acme_link",
+        ACME_LINK2D,
+        0,
+        &link2d("base", "sensor", 1., 0., 0.),
+    )?;
+    if faults {
+        writer.write(
+            "/acme_link",
+            ACME_LINK2D,
+            0,
+            &link2d("base", "", 1., 0., 0.),
+        )?;
+        writer.write(
+            "/acme_link",
+            ACME_LINK2D,
+            0,
+            &link2d("base", "broken", f64::NAN, 0., 0.),
+        )?;
+    }
+    writer.finish()
+}
