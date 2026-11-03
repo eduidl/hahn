@@ -8,8 +8,6 @@ You need Rust 1.95 or later and Node.js 22.12 or later (or 20.19 or later).
 
 With [mise](https://mise.jdx.dev/), `mise install` sets up the versions the project is checked with (`mise.toml`).
 
-`server/Cargo.toml` depends on a local checkout at `~/repos/eduidl/mcapdecode-rs/mcapdecode/mcapdecode`. If yours is elsewhere, change that path.
-
 ```bash
 npm --prefix client ci
 npm --prefix client run build
