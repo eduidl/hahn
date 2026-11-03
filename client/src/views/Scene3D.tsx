@@ -84,6 +84,94 @@ function createStage(host: HTMLDivElement) {
     return created;
   };
   let controls = createControls(new THREE.Vector3());
+  // WASD moves the view along the ground while the canvas, focused by a click, has the keys.
+  const canvas = renderer.domElement;
+  canvas.tabIndex = 0;
+  const walkKeys: Record<string, [number, number]> = {
+    KeyW: [1, 0],
+    KeyS: [-1, 0],
+    KeyA: [0, -1],
+    KeyD: [0, 1],
+  };
+  const held = new Set<string>();
+  let fast = false;
+  let walking = 0;
+  let lastStep = 0;
+  const walk = (now: number) => {
+    walking = 0;
+    pivot.visible = held.size > 0;
+    if (held.size) {
+      // Capped, so a stalled frame does not throw the view far away.
+      const seconds = Math.min((now - lastStep) / 1000, 0.1);
+      lastStep = now;
+      let forward = 0;
+      let right = 0;
+      for (const code of held) {
+        forward += walkKeys[code][0];
+        right += walkKeys[code][1];
+      }
+      walkCamera(camera, controls.target, forward, right, seconds, fast);
+      controls.update();
+      walking = requestAnimationFrame(walk);
+    }
+    invalidate();
+  };
+  const onWalkKey = (event: KeyboardEvent) => {
+    const down = event.type === "keydown";
+    if (event.key === "Shift") fast = down;
+    if (!(event.code in walkKeys) || event.ctrlKey || event.metaKey || event.altKey) return;
+    event.preventDefault();
+    if (!down) {
+      held.delete(event.code);
+      return;
+    }
+    held.add(event.code);
+    if (!walking) {
+      lastStep = performance.now();
+      walking = requestAnimationFrame(walk);
+    }
+  };
+  const stopWalking = () => {
+    held.clear();
+    fast = false;
+  };
+  // Dragging with the middle button looks around from where the camera is.
+  let looking: { id: number; x: number; y: number } | null = null;
+  const onLookStart = (event: PointerEvent) => {
+    if (event.button !== 1) return;
+    event.preventDefault();
+    canvas.setPointerCapture(event.pointerId);
+    looking = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  };
+  const onLookMove = (event: PointerEvent) => {
+    if (looking?.id !== event.pointerId) return;
+    // As far per pixel as turning around the target with a drag.
+    const perPixel = (2 * Math.PI) / Math.max(canvas.clientHeight, 1);
+    const yaw = -(event.clientX - looking.x) * perPixel;
+    const pitch = -(event.clientY - looking.y) * perPixel;
+    looking.x = event.clientX;
+    looking.y = event.clientY;
+    lookCamera(camera, controls.target, yaw, pitch);
+    controls.update();
+    invalidate();
+  };
+  const onLookEnd = (event: PointerEvent) => {
+    if (looking?.id === event.pointerId) looking = null;
+  };
+  // Keeps a middle click from pasting or starting to scroll on some systems.
+  const onAuxClick = (event: MouseEvent) => {
+    if (event.button === 1) event.preventDefault();
+  };
+  canvas.addEventListener("pointerdown", onLookStart);
+  canvas.addEventListener("pointermove", onLookMove);
+  canvas.addEventListener("pointerup", onLookEnd);
+  canvas.addEventListener("pointercancel", onLookEnd);
+  canvas.addEventListener("auxclick", onAuxClick);
+  const focusCanvas = () => canvas.focus({ preventScroll: true });
+  canvas.addEventListener("pointerdown", focusCanvas);
+  canvas.addEventListener("keydown", onWalkKey);
+  canvas.addEventListener("keyup", onWalkKey);
+  canvas.addEventListener("blur", stopWalking);
   const resize = new ResizeObserver(() => {
     const { clientWidth: width, clientHeight: height } = host;
     if (!width || !height) return;
@@ -99,6 +187,11 @@ function createStage(host: HTMLDivElement) {
     if (box.isEmpty()) return;
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const distance = Math.max(sphere.radius, 1) * 2;
+    // Following no frame, the scene is drawn around the first thing shown instead.
+    if (!originSet) {
+      setOrigin(sphere.center.clone().add(origin).toArray());
+      sphere.center.set(0, 0, 0);
+    }
     // Turning around a point on the grid, below or above the middle of what is shown.
     sphere.center.z = 0;
     controls.target.copy(sphere.center);
@@ -130,8 +223,17 @@ function createStage(host: HTMLDivElement) {
     controls.update();
     invalidate();
   };
-  const setOrigin = (position: number[] | null) => {
-    origin.set(...((position ?? [0, 0, 0]) as [number, number, number]));
+  const setOrigin = (position: number[], keepView = false) => {
+    originSet = true;
+    const previous = origin.clone();
+    origin.set(...(position as [number, number, number]));
+    if (keepView) {
+      // Shifted by as much as the content is, so nothing appears to move.
+      const moved = origin.clone().sub(previous);
+      camera.position.sub(moved);
+      controls.target.sub(moved);
+      controls.update();
+    }
     content.position.copy(origin).negate();
     placeGrid();
     invalidate();
@@ -141,6 +243,16 @@ function createStage(host: HTMLDivElement) {
     stage: { scene: content, invalidate, fit, reframe, resetView, setOrigin },
     dispose: () => {
       cancelAnimationFrame(pending);
+      cancelAnimationFrame(walking);
+      canvas.removeEventListener("pointerdown", focusCanvas);
+      canvas.removeEventListener("pointerdown", onLookStart);
+      canvas.removeEventListener("pointermove", onLookMove);
+      canvas.removeEventListener("pointerup", onLookEnd);
+      canvas.removeEventListener("pointercancel", onLookEnd);
+      canvas.removeEventListener("auxclick", onAuxClick);
+      canvas.removeEventListener("keydown", onWalkKey);
+      canvas.removeEventListener("keyup", onWalkKey);
+      canvas.removeEventListener("blur", stopWalking);
       resize.disconnect();
       controls.dispose();
       pivot.geometry.dispose();
@@ -250,7 +362,7 @@ export default function Scene3D({
   const ns = usePlaybackNs(info);
   const { transforms } = useTransforms(sources[0], target, ns === null ? null : String(ns), true);
   const followed = fixedFrameOf(widget.followFrame, frames);
-  // Following the root itself leaves the scene around the root's origin.
+  // Following the root itself is not following anything.
   const pose =
     followed !== null && followed !== target && transforms?.target === target
       ? (transforms.frames[followed] ?? null)
