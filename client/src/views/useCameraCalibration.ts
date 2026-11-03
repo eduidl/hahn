@@ -1,7 +1,9 @@
 import { useLatestOnly } from "../data/useViewData";
+import { useRef } from "react";
 import {
   fetchLatestFrame,
   fetchViewHistory,
+  ViewWindowTooLarge,
   type ImageValue,
   type ViewFrame,
 } from "../data/viewFrames";
@@ -13,6 +15,7 @@ type CalibrationTarget = { source: string; topic: string; view: string };
 
 /** Recording time searched around an image for calibration values stamped like it. */
 const calibrationWindowNs = 2_000_000_000n;
+const cacheWindowNs = 1_000_000_000n;
 
 /**
  * Which calibration an image uses and whether its pixels are rectified (ADR 0004): the
@@ -84,6 +87,59 @@ export async function fetchCalibration(
   return pickCalibration(frames, image, byStamp);
 }
 
+/** Keeps one bounded window in the client; values may change during a recording. */
+export function createCalibrationLoader() {
+  let cached:
+    | { key: string; start: bigint; seed: ViewFrame | null; frames: ViewFrame[] }
+    | undefined;
+  return async (
+    target: CalibrationTarget,
+    image: ViewFrame,
+    signal: AbortSignal,
+    byStamp = true,
+  ) => {
+    const time = BigInt(image.time_ns);
+    const start = (time / cacheWindowNs) * cacheWindowNs;
+    const key = JSON.stringify(target);
+    if (!cached || cached.key !== key || cached.start !== start) {
+      const from = start > calibrationWindowNs ? start - calibrationWindowNs : 0n;
+      try {
+        const [seed, frames] = await Promise.all([
+          fetchLatestFrame(target, String(from), undefined, signal),
+          fetchViewHistory(
+            target,
+            signal,
+            {
+              start_ns: String(from),
+              end_ns: String(start + cacheWindowNs + calibrationWindowNs),
+            },
+            8 * 1024 * 1024,
+          ),
+        ]);
+        if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+        cached = { key, start, seed, frames };
+      } catch (error) {
+        if (error instanceof ViewWindowTooLarge)
+          return fetchCalibration(target, image, signal, byStamp);
+        throw error;
+      }
+    }
+    const from = time > calibrationWindowNs ? time - calibrationWindowNs : 0n;
+    const around = cached.frames.filter((frame) => {
+      const t = BigInt(frame.time_ns);
+      return t >= from && t < time + calibrationWindowNs;
+    });
+    const latest = [...(cached.seed ? [cached.seed] : []), ...cached.frames]
+      .filter((frame) => BigInt(frame.time_ns) <= time)
+      .at(-1);
+    const frames =
+      latest && !around.some((frame) => frame.time_ns === latest.time_ns)
+        ? [latest, ...around]
+        : around;
+    return pickCalibration(frames, image, byStamp);
+  };
+}
+
 /**
  * The calibration as it applies to the image's pixels: raw ones take the camera matrix
  * and distortion, rectified ones the projection without distortion. A reason instead
@@ -113,10 +169,12 @@ export function useCameraCalibration(
   index: FieldIndex,
 ) {
   const { target, rectified } = calibrationChoice(index, series);
+  const loader = useRef<ReturnType<typeof createCalibrationLoader>>(undefined);
+  loader.current ??= createCalibrationLoader();
   const loaded = useLatestOnly<ViewFrame | undefined>(
     series && target ? JSON.stringify(target) : null,
     image ? frame!.time_ns : null,
-    (_, __, signal) => fetchCalibration(target!, frame!, signal),
+    (_, __, signal) => loader.current!(target!, frame!, signal),
   );
   if (!image) return { calibration: undefined, error: "" };
   if (!target)
