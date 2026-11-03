@@ -100,8 +100,7 @@ export async function consumeStream<T = Row>(
     while (true) {
       const { value, done } = await reader.read();
       pending += decoder.decode(value, { stream: !done });
-      let end: number;
-      while ((end = pending.indexOf("\n")) >= 0) {
+      for (let end = pending.indexOf("\n"); end >= 0; end = pending.indexOf("\n")) {
         accept(pending.slice(0, end));
         pending = pending.slice(end + 1);
       }

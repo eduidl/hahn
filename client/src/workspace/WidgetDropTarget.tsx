@@ -40,12 +40,11 @@ export function WidgetDropTarget({
       bottom: "bottom",
     };
     return (
-      <div className="widget-drop tab-frame-drop" aria-label="Tabs widget drop target">
+      <div className="widget-drop tab-frame-drop">
         {(Object.keys(sides) as DropEdge[]).map((side) => (
           <div
             key={side}
             className={`widget-drop-edge ${side}`}
-            aria-label={`Drop on the ${sides[side]} of the Tabs widget`}
             onDragOver={(event) => accept(event, side)}
             onDragLeave={leave}
             onDrop={(event) => place(event, side)}
@@ -62,7 +61,6 @@ export function WidgetDropTarget({
   return (
     <div
       className="widget-drop"
-      aria-label="Widget drop target"
       onDragOver={(event) => accept(event, edgeAt(event))}
       onDragLeave={leave}
       onDrop={(event) => place(event, edgeAt(event))}

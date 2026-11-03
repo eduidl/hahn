@@ -13,7 +13,6 @@ export function WidgetHelp({ title, controls }: { title: string; controls: reado
       <button
         className="widget-icon widget-help"
         aria-label={`${title} controls`}
-        aria-describedby={id}
         style={{ anchorName: anchor }}
         onPointerEnter={() => show(true)}
         onPointerLeave={(event) => {

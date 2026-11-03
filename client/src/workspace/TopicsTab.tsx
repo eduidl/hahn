@@ -1,4 +1,4 @@
-import { type Dispatch, type DragEvent, type SetStateAction } from "react";
+import type { Dispatch, DragEvent, SetStateAction } from "react";
 import { Highlight } from "../Highlight";
 import { matchesTerms, searchTerms } from "../search";
 import { typeLabel } from "./fieldIndex";

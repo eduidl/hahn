@@ -12,7 +12,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { errorMessage, topicKey, type Info, type Schemas } from "../types";
 import { get, runUrl } from "../data/sources";
 import { usePlaybackStore } from "../workspace/playback";
-import { type FieldIndex } from "../workspace/fieldIndex";
+import type { FieldIndex } from "../workspace/fieldIndex";
 import {
   fixedFrameOf,
   useFrames,
@@ -20,8 +20,8 @@ import {
   useTransforms,
   useViewFrame,
 } from "../data/useViewData";
-import { type Transform } from "../data/viewFrames";
-import { type Widget } from "../workspace/widgets";
+import type { Transform } from "../data/viewFrames";
+import type { Widget } from "../workspace/widgets";
 import { gridOffset, lookCamera, reframeCamera, walkCamera } from "./sceneCamera";
 
 function createStage(host: HTMLDivElement) {

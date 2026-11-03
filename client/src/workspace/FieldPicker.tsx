@@ -1,10 +1,10 @@
 // The search popover that adds fields to a widget.
-import { type WidgetSettingsProps } from "./WidgetSettings";
+import type { WidgetSettingsProps } from "./WidgetSettings";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { pickableFields } from "./drop";
 import { SeriesName } from "../SeriesName";
 import { matchesTerms, searchTerms } from "../search";
-import { type IndexedField } from "./fieldIndex";
+import type { IndexedField } from "./fieldIndex";
 import { addFieldAction, viewFor, widgetSpecs } from "./widgets";
 
 /** Rows rendered at once; the search narrows the rest. */

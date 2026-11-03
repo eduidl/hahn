@@ -1,6 +1,6 @@
 // Queries and edits on the mosaic layout trees of the workspace and its tabs.
-import { type Container, type WorkspaceState } from "./widgetModel";
-import { type MosaicDirection, type MosaicNode } from "react-mosaic-component";
+import type { Container, WorkspaceState } from "./widgetModel";
+import type { MosaicDirection, MosaicNode } from "react-mosaic-component";
 
 export type DropEdge = "left" | "right" | "top" | "bottom";
 

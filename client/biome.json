@@ -8,9 +8,50 @@
     "indentWidth": 2,
     "lineWidth": 100
   },
+  "linter": {
+    "domains": {
+      "react": "recommended",
+      "test": "recommended"
+    },
+    "rules": {
+      "style": {
+        "noNonNullAssertion": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "useAriaPropsForRole": "off",
+        "useButtonType": "off",
+        "useSemanticElements": "off",
+        "noStaticElementInteractions": "off",
+        "noNoninteractiveElementToInteractiveRole": "off"
+      },
+      "suspicious": {
+        "useIterableCallbackReturn": "off",
+        "noArrayIndexKey": "off"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "off"
+      }
+    }
+  },
   "javascript": {
     "formatter": {
       "quoteStyle": "double"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["test/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          },
+          "correctness": {
+            "noComponentHookFactories": "off"
+          }
+        }
+      }
+    }
+  ]
 }

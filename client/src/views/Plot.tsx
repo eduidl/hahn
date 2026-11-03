@@ -467,7 +467,6 @@ export function Plot({
     drag,
     revision,
     time,
-    time,
     discrete,
     kind,
     categories,

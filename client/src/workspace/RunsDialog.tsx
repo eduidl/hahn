@@ -102,6 +102,8 @@ export function RunsDialog({
       {error && <p role="alert">{error}</p>}
       <ul ref={listRef} id="runs-list" className="runs-list" role="listbox" aria-label="Runs">
         {items.map((run, i) => (
+          // biome-ignore lint/a11y/useFocusableInteractive: focus stays in the search box (aria-activedescendant)
+          // biome-ignore lint/a11y/useKeyWithClickEvents: the search box handles the keys
           <li
             key={run.id}
             id={`run-option-${i}`}

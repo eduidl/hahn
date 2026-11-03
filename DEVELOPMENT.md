@@ -20,6 +20,7 @@ cargo test --manifest-path server/Cargo.toml --locked                      # 実
 npm --prefix client test                    # 生成型の一致も検査
 npm --prefix client run build
 npm --prefix client run format:check      # Check formatting
+npm --prefix client run lint              # Lint
 scripts/conformance.sh                   # 合成録画の生成・起動・削除を含む
 ```
 

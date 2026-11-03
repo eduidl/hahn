@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "format": "biome format --write .",
     "format:check": "biome format .",
+    "lint": "biome lint .",
     "gen:api": "openapi-typescript ../protocol/openapi.json -o src/api.gen.ts",
     "check:api": "openapi-typescript ../protocol/openapi.json -o src/api.gen.ts --check",
     "test": "npm run check:api && vitest run",

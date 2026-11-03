@@ -16,7 +16,7 @@ import {
   canPlaceWidget,
 } from "./widgetSpecs";
 import { type DropEdge, ownerOf } from "./layoutTree";
-import { type FieldIndex } from "./fieldIndex";
+import type { FieldIndex } from "./fieldIndex";
 import { defaultPlotView } from "../views/Plot";
 import { colors, keyOf, type Field, type Selected, type Topic } from "../types";
 

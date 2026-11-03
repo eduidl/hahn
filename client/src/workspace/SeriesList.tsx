@@ -1,12 +1,12 @@
 // The list of a widget's series and the controls of each.
 import { FieldPicker } from "./FieldPicker";
-import { type WidgetSettingsProps } from "./WidgetSettings";
+import type { WidgetSettingsProps } from "./WidgetSettings";
 import { useContext, type ReactNode } from "react";
 import { SeriesEnvironmentContext, seriesStates } from "./seriesState";
 import { SeriesName } from "../SeriesName";
 import { useSeriesViewProblem } from "../views/seriesViewProblem";
-import { type CachedSeries } from "../data/useSeries";
-import { type PointMarkers, type Selected } from "../types";
+import type { CachedSeries } from "../data/useSeries";
+import type { PointMarkers, Selected } from "../types";
 
 export function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefined) {
   if (!record) return "Waiting";
@@ -107,7 +107,7 @@ export function SeriesRow({
       {children}
       {problem ? (
         <span className="series-status series-problem">
-          <span aria-hidden="true">⚠ </span>
+          <span>⚠ </span>
           {problem}
         </span>
       ) : (

@@ -5,7 +5,6 @@ import type { Series } from "./Plot";
 import { SeriesName } from "../SeriesName";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { useTimeFormatter } from "../timeDisplay";
-import type { Widget } from "../workspace/widgets";
 
 type Row = { x: number; ns: string; series: number; value: string };
 
@@ -48,12 +47,10 @@ export function rowAt(rows: { x: number }[], time: number) {
 }
 
 export function ValueChangesView({
-  widget,
   series,
   originNs,
   revision,
 }: {
-  widget: Widget;
   series: Series[];
   originNs: string | null;
   revision: number;

@@ -81,7 +81,6 @@ export function WidgetControls({
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              aria-hidden="true"
             >
               <path d="M12 3v18M3 12h18M12 3l-3 3m3-3 3 3M12 21l-3-3m3 3 3-3M3 12l3-3m-3 3 3 3M21 12l-3-3m3 3-3 3" />
             </svg>
@@ -102,7 +101,6 @@ export function WidgetControls({
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              aria-hidden="true"
             >
               <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 9v6M9 12h6" />
             </svg>
@@ -132,7 +130,6 @@ export function WidgetControls({
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              aria-hidden="true"
             >
               <path d="M4 4v6h6" />
               <path d="M4.5 10a8 8 0 1 1-.5 4" />
@@ -165,7 +162,6 @@ export function WidgetControls({
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          aria-hidden="true"
         >
           <path
             d={
@@ -192,7 +188,6 @@ export function WidgetControls({
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
-          aria-hidden="true"
         >
           <path d="m10 3-.7 3-2 .9L4.5 6 2.5 9.5 5 11v2l-2.5 1.5L4.5 18l2.8-.9 2 .9.7 3h4l.7-3 2-.9 2.8.9 2-3.5L19 13v-2l2.5-1.5-2-3.5-2.8.9-2-.9L14 3Z" />
           <circle cx="12" cy="12" r="3" />
@@ -242,7 +237,7 @@ export function WidgetControls({
               if (event.key === "ArrowRight") setChangingType(true);
             }}
           >
-            Change widget <span aria-hidden="true">›</span>
+            Change widget <span>›</span>
           </button>
           {changingType && (
             <div

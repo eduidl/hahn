@@ -164,9 +164,8 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     ),
     "source-info": () => <SourceInfo info={info} sources={props.sources} />,
     tabs: () =>
-      widget.type === "tabs" ? (
-        <>
-          {widget.tabs.map((tab) => (
+      widget.type === "tabs"
+        ? widget.tabs.map((tab) => (
             <div
               key={tab.id}
               className="widget-tab-panel"
@@ -177,9 +176,8 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
             >
               <WorkspaceLayout {...props} container={{ widgetId: widget.id, tabId: tab.id }} />
             </div>
-          ))}
-        </>
-      ) : null,
+          ))
+        : null,
     plot: () => (
       <Plot
         series={widgetSeries(widget, data)}
@@ -247,7 +245,6 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
     ),
     "value-changes": () => (
       <ValueChangesView
-        widget={widget}
         series={widgetSeries(widget, data)}
         originNs={info?.start_ns ?? null}
         revision={revision}
@@ -281,7 +278,6 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
             <div
               className="mosaic-window-title"
               draggable={!state.expandedId}
-              aria-label={widget.type === "tabs" ? "Move Tabs widget" : undefined}
               title={widget.type === "tabs" ? "Move Tabs widget" : widget.title}
               onDragStart={(event) => {
                 event.stopPropagation();
@@ -306,13 +302,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
               onDragEnd={() => moving.setId(null)}
             >
               {widget.type === "tabs" ? (
-                <svg
-                  width="12"
-                  height="16"
-                  viewBox="0 0 12 16"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
+                <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
                   <circle cx="4" cy="4" r="1" />
                   <circle cx="8" cy="4" r="1" />
                   <circle cx="4" cy="8" r="1" />
@@ -365,7 +355,6 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                   event.dataTransfer.dropEffect = "copy";
                 }}
                 onDrop={(event) => drop(event, widget.id)}
-                aria-label={`Drop target for ${widget.title}`}
               >
                 <ViewWidget.Provider value={viewWidget}>{views[widget.type]()}</ViewWidget.Provider>
                 {verdict && (
@@ -433,7 +422,7 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
               moving.setId(null);
             }}
           >
-            <div className="empty-widget-catalog" aria-label="Widgets to add">
+            <div className="empty-widget-catalog" role="group" aria-label="Widgets to add">
               <p>Add widget</p>
               <div className="empty-widget-options">
                 {widgetTypes

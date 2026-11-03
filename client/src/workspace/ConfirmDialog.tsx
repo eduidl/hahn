@@ -38,7 +38,6 @@ export function ConfirmDialog({
       ref={dialog}
       className="dialog-surface confirm-dialog"
       aria-labelledby={`${id}-title`}
-      aria-describedby={`${id}-message`}
       onClose={onClose}
     >
       <h2 id={`${id}-title`}>{title}</h2>

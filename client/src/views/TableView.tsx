@@ -7,8 +7,6 @@ import {
   cellValue,
   clampColumnWidth,
   defaultColumnWidth,
-  minColumnWidth,
-  maxColumnWidth,
   tableColumns,
   type MessageRow,
   type TableColumn,
@@ -39,10 +37,7 @@ function ColumnResizeHandle({
       className="table-column-resize"
       role="separator"
       aria-label={`${label} width`}
-      aria-orientation="vertical"
       aria-valuenow={width}
-      aria-valuemin={minColumnWidth}
-      aria-valuemax={maxColumnWidth}
       tabIndex={0}
       title="Drag to resize; double-click to reset"
       onPointerDown={(event) => {
@@ -216,7 +211,7 @@ export function TableView({
                       })
                     }
                   >
-                    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 16 16">
                       <path
                         d="m4 4 8 8m0-8-8 8"
                         fill="none"
@@ -237,7 +232,7 @@ export function TableView({
           </thead>
           <tbody>
             {first > 0 && (
-              <tr aria-hidden="true">
+              <tr>
                 <td
                   colSpan={columns.length + 1}
                   className="table-spacer"
@@ -281,7 +276,7 @@ export function TableView({
               );
             })}
             {last < rows.length && (
-              <tr aria-hidden="true">
+              <tr>
                 <td
                   colSpan={columns.length + 1}
                   className="table-spacer"

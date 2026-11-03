@@ -11,8 +11,8 @@ import {
 import { TabSettings } from "./TabControls";
 import { useMemo, type Dispatch, type ReactNode } from "react";
 import { SeriesName } from "../SeriesName";
-import { type FieldIndex } from "./fieldIndex";
-import { type CachedSeries } from "../data/useSeries";
+import type { FieldIndex } from "./fieldIndex";
+import type { CachedSeries } from "../data/useSeries";
 import { tableColumns } from "../views/table";
 import { defaultImageDistance } from "../views/camera";
 import { fixedFrameOf, useFrames } from "../data/useViewData";
