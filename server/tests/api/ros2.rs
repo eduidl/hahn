@@ -1,3 +1,7 @@
+//! The standard ROS 2 types, read like their Foxglove counterparts.
+
+use crate::common::*;
+
 fn ros2_app() -> (tempfile::TempDir, axum::Router) {
     let dir = tempfile::tempdir().unwrap();
     support::ros2::write_ros2_fixture(&dir.path().join("ros2.mcap")).unwrap();
