@@ -88,7 +88,11 @@ export function poseTrail(frames: ViewFrame[]) {
 
 /** The visible line segments and an interpolated first point at the time boundary. */
 export function trailWindow(
-  trail: ReturnType<typeof poseTrail>,
+  trail: {
+    positions: ArrayLike<number>;
+    starts: Pick<ViewFrame, "time_ns">[];
+    ends: Pick<ViewFrame, "time_ns">[];
+  },
   now: bigint | null,
   seconds?: number,
 ) {

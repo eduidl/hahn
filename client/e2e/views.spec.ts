@@ -44,9 +44,19 @@ test("the 3D view starts with a point cloud", async ({ page }) => {
 
 test("the map draws the location track", async ({ page }) => {
   const widget = await show(page, "Map", ["/gps"]);
-  await expect(widget.locator(".leaflet-overlay-pane path")).not.toHaveCount(0);
+  const paths = widget.locator(".leaflet-overlay-pane path");
+  await expect(paths).toHaveCount(2);
+  await page.getByRole("button", { name: "Go to end" }).click();
+  await expect(paths).toHaveCount(3);
   await expect(errors(page)).toHaveText("Errors");
   await expect(widget).toHaveScreenshot("map.png");
+  await page.getByRole("tab", { name: "Settings" }).click();
+  await page.getByRole("spinbutton", { name: /Trail duration for/ }).fill("0");
+  await expect(paths).toHaveCount(2);
+  await page.getByRole("spinbutton", { name: /Trail duration for/ }).fill("");
+  await expect(paths).toHaveCount(3);
+  await page.getByRole("button", { name: "Go to start" }).click();
+  await expect(paths).toHaveCount(2);
 });
 
 test("the TF tree shows frames and the selected one's pose", async ({ page }) => {

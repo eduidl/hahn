@@ -77,6 +77,42 @@ it("separates the image from additional topics and removes them together", () =>
   expect(screen.getByRole("button", { name: "Add topic" }).hasAttribute("disabled")).toBe(true);
 });
 
+it("shows the original type below the view name in a map", () => {
+  const topic: Topic = {
+    source: "r/0",
+    topic: "/location",
+    schema_name: "sensor_msgs/msg/NavSatFix",
+    schema_encoding: null,
+    views: [{ id: "location", kind: "geo_location", name: "Location" }],
+    message_count: 1,
+    error: null,
+    fields: [],
+  };
+  const index = buildFieldIndex([topic]);
+  let state = workspaceReducer(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "map",
+  });
+  const entry = index.candidates.map[0];
+  state = workspaceReducer(
+    state,
+    addFieldAction(state.widgets["widget-1"], entry.topic, entry.field, index),
+  );
+  render(
+    <WidgetSettings
+      widget={state.widgets["widget-1"]}
+      dispatch={vi.fn()}
+      records={[]}
+      index={index}
+    />,
+  );
+  const view = screen.getByText("Location");
+  expect(view.nextSibling?.nodeName).toBe("BR");
+  expect(view.nextSibling?.nextSibling?.textContent).toBe("sensor_msgs/msg/NavSatFix");
+  expect(screen.getByRole("spinbutton", { name: /Trail duration for/ })).toBeTruthy();
+});
+
 it("sets an independent image distance in the 3D panel", () => {
   const image: Topic = {
     source: "r/0",
