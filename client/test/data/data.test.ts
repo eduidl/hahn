@@ -31,14 +31,13 @@ describe("plot data", () => {
     expect(nearest([], 0)).toBeUndefined();
     expect(point({ time_ns: "1", values: [null] }, 0, "0").y).toBeNull();
   });
-  it("maps enum labels to their numeric discrete-axis category while preserving the label", () => {
-    const p = point({ time_ns: "12", values: ["ACTIVE"] }, 0, "10", [
-      { name: "IDLE", value: "0" },
-      { name: "ACTIVE", value: "1" },
-    ]);
-    expect(p.y).toBe(1);
-    expect(p.raw).toBe("ACTIVE");
-    expect(p.x).toBe(2e-9);
+  it("plots enums by number and leaves gaps for NaN and infinities, keeping the raw value", () => {
+    const p = point({ time_ns: "12", values: [1] }, 0, "10");
+    expect([p.y, p.raw, p.x]).toEqual([1, 1, 2e-9]);
+    for (const raw of ["NaN", "Infinity", "-Infinity"]) {
+      const gap = point({ time_ns: "1", values: [raw] }, 0, "0");
+      expect([gap.y, gap.raw]).toEqual([null, raw]);
+    }
   });
   it("merges out-of-order batches stably while retaining duplicate timestamps", () => {
     const p = (x: number, raw: string) => ({ x, y: x, ns: String(x), raw });

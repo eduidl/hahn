@@ -15,7 +15,9 @@ mod source;
 mod stream;
 mod view;
 
-pub use mcapdecode::core::{DataTypeDef, ElementDef, FieldDef, FieldDefs, Value};
+pub use mcapdecode::core::{
+    DataTypeDef, ElementDef, EnumDef, EnumVariant, FieldDef, FieldDefs, Value,
+};
 pub use source::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit};
 pub use view::{
     CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, Message, NumericType, PackedField,

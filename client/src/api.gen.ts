@@ -325,7 +325,7 @@ export interface components {
             data_type: "null" | "bool" | "int8" | "int16" | "int32" | "int64" | "uint8" | "uint16" | "uint32" | "uint64" | "float32" | "float64" | "string" | "wstring" | "json" | "bytes" | "enum" | "struct" | "list" | "array" | "map";
             /** @description The type name for display. */
             type_name?: string;
-            /** @description The names and values of an enum. */
+            /** @description The ordered names and values of an enum. Values hold the number; the name shown for it is the first entry with that value. */
             enum_values?: components["schemas"]["EnumValue"][];
             /** @description The fields of a struct. */
             fields?: components["schemas"]["Field"][];

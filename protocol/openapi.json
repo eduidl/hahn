@@ -888,7 +888,7 @@
             "type": "string"
           },
           "enum_values": {
-            "description": "The names and values of an enum.",
+            "description": "The ordered names and values of an enum. Values hold the number; the name shown for it is the first entry with that value.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EnumValue"

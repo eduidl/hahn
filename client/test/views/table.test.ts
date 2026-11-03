@@ -85,6 +85,10 @@ describe("table data", () => {
     expect(cellValue(1, { label: "値", path: [], enumValues: [{ name: "ON", value: "1" }] })).toBe(
       "ON",
     );
+    expect(cellValue("NaN", { label: "値", path: [] })).toBe("NaN");
+    expect(
+      cellValue({ $truncated: true, length: 20000, text: "abc" }, { label: "値", path: [] }),
+    ).toBe("abc…");
   });
   it("merges exact ns order and preserves stable duplicate messages across batches", () => {
     const rows = appendMessages([], [{ time_ns: "9007199254740994", value: "a" }]);
