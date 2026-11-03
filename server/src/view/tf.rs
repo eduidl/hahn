@@ -4,7 +4,7 @@ use super::convert::{Message, has, is_foxglove, is_string, is_struct, quaternion
 use crate::{
     AppState, blocking,
     error::{ApiError, Code},
-    message::parse_time,
+    message::{parse_range, parse_time},
     source::{Source, TimeRange},
 };
 use axum::{
@@ -171,7 +171,7 @@ pub trait TransformReader: Send + Sync {
 }
 
 /// A transform from `child` to `parent`: `p_parent = rotation * p_child + translation`,
-/// at the recording time of its message.
+/// recorded with its message.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TransformSample {
     pub parent: String,
@@ -180,6 +180,10 @@ pub struct TransformSample {
     pub translation: [f64; 3],
     /// `[x, y, z, w]`.
     pub rotation: [f64; 4],
+    /// When the transform was measured, on the recording's measurement clock, such as
+    /// its `header.stamp`. `None` when the message does not say; never the recording
+    /// time, which Hahn keeps beside it.
+    pub stamp_ns: Option<u64>,
 }
 
 pub(crate) fn readers(extra: Vec<Arc<dyn TransformReader>>) -> Vec<Arc<dyn TransformReader>> {
@@ -243,6 +247,7 @@ fn sample(message: Message) -> anyhow::Result<TransformSample> {
         child: message.string("child_frame_id")?.to_owned(),
         translation: vector(message.child("translation")?)?,
         rotation: quaternion(message.child("rotation")?)?,
+        stamp_ns: message.time("timestamp")?,
     })
 }
 
@@ -262,16 +267,21 @@ fn stamped_sample(message: Message) -> anyhow::Result<TransformSample> {
         child: message.string("child_frame_id")?.to_owned(),
         translation: vector(part("translation")?)?,
         rotation: quaternion(part("rotation")?)?,
+        stamp_ns: match header {
+            Some(header) => header.time("stamp")?,
+            None => None,
+        },
     })
 }
 
 /// A sample as Hahn uses it, or `None` if it must be left out.
-fn usable(sample: TransformSample) -> Option<(String, String, Transform)> {
+fn usable(sample: TransformSample) -> Option<(String, String, Transform, Option<u64>)> {
     let TransformSample {
         parent,
         child,
         translation,
         rotation,
+        stamp_ns,
     } = sample;
     if parent.is_empty() || child.is_empty() {
         return None;
@@ -292,6 +302,7 @@ fn usable(sample: TransformSample) -> Option<(String, String, Transform)> {
             translation,
             rotation,
         },
+        stamp_ns,
     ))
 }
 
@@ -301,7 +312,11 @@ fn is_static_topic(topic: &str) -> bool {
 }
 
 struct Sample {
+    /// Recording time.
     time: u64,
+    /// Where the sample was read: run group, then topic, then message order.
+    order: u64,
+    stamp: Option<u64>,
     parent: Arc<str>,
     transform: Transform,
 }
@@ -310,13 +325,18 @@ struct Sample {
 #[derive(Default)]
 struct Edge {
     samples: Vec<Sample>,
-    from_static_topic: bool,
+    on_static_topic: bool,
+    on_dynamic_topic: bool,
+    /// Samples of this frame left out because they hold no usable transform.
+    dropped: u64,
 }
 
 impl Edge {
-    /// A lone sample is all there is to know about a frame, so it holds at all times.
+    /// Static when only static topics hold the frame: one that also appears on a
+    /// dynamic topic may change. A lone sample is all there is to know about a frame,
+    /// so it holds at all times.
     fn is_static(&self) -> bool {
-        self.from_static_topic || self.samples.len() == 1
+        (self.on_static_topic && !self.on_dynamic_topic) || self.samples.len() == 1
     }
 
     /// The parent and transform at `time`. Never extrapolates a dynamic edge.
@@ -343,69 +363,71 @@ impl Edge {
     }
 }
 
+/// A sample read from a group, kept apart until the whole group has been read.
+struct Read {
+    child: String,
+    parent: String,
+    time: u64,
+    stamp: Option<u64>,
+    transform: Transform,
+    static_topic: bool,
+}
+
 #[derive(Default)]
 pub(crate) struct TfIndex {
     edges: HashMap<Arc<str>, Edge>,
     /// Every frame named, shared by the samples referring to it.
     names: HashSet<Arc<str>>,
+    /// Groups left out because they could not be read.
+    unreadable: Vec<String>,
+    /// The order of the next sample added.
+    next: u64,
 }
 
 impl TfIndex {
-    /// Reads every transform topic of the recordings.
+    /// Reads every transform topic of the run's groups, in run order. A group that
+    /// cannot be opened or read is left out as a whole and listed, so that it does
+    /// not take the other groups' frames with it.
     pub(crate) fn build(
-        sources: impl IntoIterator<Item = Arc<dyn Source>>,
+        groups: impl IntoIterator<Item = (String, anyhow::Result<Arc<dyn Source>>)>,
         readers: &[Arc<dyn TransformReader>],
-    ) -> anyhow::Result<Self> {
+    ) -> Self {
         let mut index = Self::default();
-        for source in sources {
-            for meta in source.topics()? {
-                let (Ok(defs), Some(schema_name)) = (&meta.fields, &meta.schema_name) else {
-                    continue;
-                };
-                let Some(reader) = readers.iter().find(|r| r.accepts(schema_name, defs)) else {
-                    continue;
-                };
-                let from_static_topic = reader.is_static(&meta.topic);
-                source.read(&meta.id, TimeRange::default(), &mut |times, value| {
-                    // One bad sample must not take every frame of the run with it.
-                    let samples = Message::new(defs, &value)
-                        .and_then(|message| reader.read(&message))
-                        .unwrap_or_default();
-                    for (parent, child, transform) in samples.into_iter().filter_map(usable) {
-                        index.add(
-                            &child,
-                            &parent,
-                            times.log_time,
-                            transform,
-                            from_static_topic,
-                        );
+        for (id, source) in groups {
+            let mut dropped = Vec::new();
+            match source.and_then(|source| read_group(&*source, readers, &mut dropped)) {
+                Ok(samples) => {
+                    for sample in samples {
+                        index.add(sample);
                     }
-                    Ok(())
-                })?;
+                    for child in dropped {
+                        let child = index.intern(&child);
+                        index.edges.entry(child).or_default().dropped += 1;
+                    }
+                }
+                Err(_) => index.unreadable.push(id),
             }
         }
         for edge in index.edges.values_mut() {
             // Stable, so that the last of equal times stays the last recorded.
             edge.samples.sort_by_key(|s| s.time);
         }
-        Ok(index)
+        index
     }
 
-    fn add(
-        &mut self,
-        child: &str,
-        parent: &str,
-        time: u64,
-        transform: Transform,
-        from_static_topic: bool,
-    ) {
-        let (child, parent) = (self.intern(child), self.intern(parent));
+    fn add(&mut self, read: Read) {
+        let (child, parent) = (self.intern(&read.child), self.intern(&read.parent));
+        let order = self.next;
+        self.next += 1;
         let edge = self.edges.entry(child).or_default();
-        edge.from_static_topic |= from_static_topic;
+        edge.on_static_topic |= read.static_topic;
+        edge.on_dynamic_topic |= !read.static_topic;
         edge.samples.push(Sample {
-            time,
+            time: read.time,
+            order,
+            stamp: read.stamp,
             parent,
-            transform,
+            transform: read.transform,
         });
     }
 
@@ -444,15 +466,63 @@ impl TfIndex {
             .names
             .iter()
             .map(|id| {
-                let edge = self.edges.get(id);
+                let edge = self.edges.get(id).filter(|edge| !edge.samples.is_empty());
+                let mut parents: Vec<&str> = Vec::new();
+                for sample in edge.iter().flat_map(|edge| &edge.samples) {
+                    if !parents.contains(&&*sample.parent) {
+                        parents.push(&sample.parent);
+                    }
+                }
                 FrameInfo {
                     id,
                     parent: edge.and_then(|e| e.samples.last()).map(|s| &*s.parent),
+                    kind: edge.map(|edge| {
+                        if edge.is_static() {
+                            "static"
+                        } else {
+                            "dynamic"
+                        }
+                    }),
+                    parents,
+                    dropped_samples: self.edges.get(id).map_or(0, |edge| edge.dropped),
                 }
             })
             .collect();
         frames.sort_by_key(|frame| frame.id);
         frames
+    }
+
+    /// The transform of each static frame: its last sample.
+    fn static_transforms(&self) -> Vec<TransformRow<'_>> {
+        let mut rows: Vec<_> = self
+            .edges
+            .iter()
+            .filter(|(_, edge)| edge.is_static())
+            .filter_map(|(child, edge)| {
+                let last = edge.samples.last()?;
+                Some(TransformRow::of(child, last, false))
+            })
+            .collect();
+        rows.sort_by_key(|row| row.child);
+        rows
+    }
+
+    /// The samples of dynamic frames recorded in `[start, end)`, in recording order.
+    fn dynamic_samples(&self, start: u64, end: u64) -> Vec<TransformRow<'_>> {
+        let mut found: Vec<(&Arc<str>, &Sample)> = Vec::new();
+        for (child, edge) in &self.edges {
+            if edge.is_static() {
+                continue;
+            }
+            let from = edge.samples.partition_point(|s| s.time < start);
+            let to = edge.samples.partition_point(|s| s.time < end);
+            found.extend(edge.samples[from..to.max(from)].iter().map(|s| (child, s)));
+        }
+        found.sort_by_key(|(_, sample)| (sample.time, sample.order));
+        found
+            .into_iter()
+            .map(|(child, sample)| TransformRow::of(child, sample, true))
+            .collect()
     }
 
     /// Every frame connected to `target` at `time`, with the transform into `target`.
@@ -488,10 +558,86 @@ impl TfIndex {
     }
 }
 
+/// Reads one group's transforms, collecting the children of samples left out.
+fn read_group(
+    source: &dyn Source,
+    readers: &[Arc<dyn TransformReader>],
+    dropped: &mut Vec<String>,
+) -> anyhow::Result<Vec<Read>> {
+    let mut samples = Vec::new();
+    for meta in source.topics()? {
+        let (Ok(defs), Some(schema_name)) = (&meta.fields, &meta.schema_name) else {
+            continue;
+        };
+        let Some(reader) = readers.iter().find(|r| r.accepts(schema_name, defs)) else {
+            continue;
+        };
+        let static_topic = reader.is_static(&meta.topic);
+        source.read(&meta.id, TimeRange::default(), &mut |times, value| {
+            // One bad sample must not take every frame of the run with it.
+            let read = Message::new(defs, &value)
+                .and_then(|message| reader.read(&message))
+                .unwrap_or_default();
+            for sample in read {
+                let child = sample.child.clone();
+                match usable(sample) {
+                    Some((parent, child, transform, stamp)) => samples.push(Read {
+                        child,
+                        parent,
+                        time: times.log_time,
+                        stamp,
+                        transform,
+                        static_topic,
+                    }),
+                    None if !child.is_empty() => dropped.push(child),
+                    None => {}
+                }
+            }
+            Ok(())
+        })?;
+    }
+    Ok(samples)
+}
+
 #[derive(Serialize)]
 struct FrameInfo<'a> {
     id: &'a str,
+    /// The last parent recorded. Superseded by `parents`.
     parent: Option<&'a str>,
+    /// `None` for a frame that is only ever a parent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'static str>,
+    parents: Vec<&'a str>,
+    dropped_samples: u64,
+}
+
+/// A transform as sent: static ones without times, dynamic samples with them.
+#[derive(Serialize)]
+struct TransformRow<'a> {
+    child: &'a str,
+    parent: &'a str,
+    translation: [f64; 3],
+    rotation: [f64; 4],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_ns: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stamp_ns: Option<String>,
+}
+
+impl<'a> TransformRow<'a> {
+    fn of(child: &'a str, sample: &'a Sample, timed: bool) -> Self {
+        Self {
+            child,
+            parent: &sample.parent,
+            translation: sample.transform.translation,
+            rotation: sample.transform.rotation,
+            time_ns: timed.then(|| sample.time.to_string()),
+            stamp_ns: sample
+                .stamp
+                .filter(|_| timed)
+                .map(|stamp| stamp.to_string()),
+        }
+    }
 }
 
 async fn run_index(state: &AppState, run: &str) -> Result<Arc<TfIndex>, ApiError> {
@@ -511,6 +657,8 @@ async fn run_index(state: &AppState, run: &str) -> Result<Arc<TfIndex>, ApiError
 #[derive(Serialize)]
 struct FrameList<'a> {
     frames: Vec<FrameInfo<'a>>,
+    /// Groups whose transforms are missing because they could not be read.
+    unreadable_groups: &'a [String],
 }
 
 pub(crate) async fn frames(
@@ -521,8 +669,36 @@ pub(crate) async fn frames(
     let index = run_index(&state, &run).await?;
     Ok(Json(FrameList {
         frames: index.frames(),
+        unreadable_groups: &index.unreadable,
     })
     .into_response())
+}
+
+pub(crate) async fn static_transforms(
+    State(state): State<AppState>,
+    Path(run): Path<String>,
+) -> Result<axum::response::Response, ApiError> {
+    use axum::response::IntoResponse;
+    let index = run_index(&state, &run).await?;
+    Ok(Json(serde_json::json!({ "transforms": index.static_transforms() })).into_response())
+}
+
+#[derive(Deserialize)]
+pub(crate) struct DynamicQuery {
+    start_ns: String,
+    end_ns: String,
+}
+
+pub(crate) async fn dynamic_transforms(
+    State(state): State<AppState>,
+    Path(run): Path<String>,
+    Query(query): Query<DynamicQuery>,
+) -> Result<axum::response::Response, ApiError> {
+    use axum::response::IntoResponse;
+    let range = parse_range(&Some(query.start_ns), &Some(query.end_ns))?;
+    let (start, end) = (range.start.unwrap_or(0), range.end.unwrap_or(u64::MAX));
+    let index = run_index(&state, &run).await?;
+    Ok(Json(serde_json::json!({ "samples": index.dynamic_samples(start, end) })).into_response())
 }
 
 #[derive(Deserialize)]

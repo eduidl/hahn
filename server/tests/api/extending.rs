@@ -155,6 +155,7 @@ impl hahn::TransformReader for AcmeLink2d {
             child: message.string("child")?.into(),
             translation: [message.number("x")?, message.number("y")?, 0.],
             rotation: [0., 0., half.sin(), half.cos()],
+            stamp_ns: None,
         }])
     }
 }
@@ -176,13 +177,15 @@ async fn an_applications_own_type_is_read_as_transforms() {
     let (dir, app) = acme_app();
     let (status, body) = get(app.clone(), "/r/frames").await;
     assert_eq!(status, StatusCode::OK);
-    // The samples without a child or with a number that is not finite are left out.
+    // The samples without a child or with a number that is not finite are left out,
+    // and counted for their child when it has a name.
     assert_eq!(
         body["frames"],
         json!([
-            {"id": "base", "parent": "map"},
-            {"id": "map", "parent": null},
-            {"id": "sensor", "parent": "base"},
+            {"id": "base", "parent": "map", "kind": "dynamic", "parents": ["map"], "dropped_samples": 0},
+            {"id": "broken", "parent": null, "parents": [], "dropped_samples": 1},
+            {"id": "map", "parent": null, "parents": [], "dropped_samples": 0},
+            {"id": "sensor", "parent": "base", "kind": "static", "parents": ["base"], "dropped_samples": 0},
         ])
     );
     let quarter = support::ros2::ACME_COUNT / 4 * support::ros2::ACME_STEP_NS;

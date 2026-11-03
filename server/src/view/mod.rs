@@ -10,7 +10,7 @@ mod ros2;
 mod tf;
 mod value;
 
-pub(crate) use tf::{TfIndex, frames, readers, transforms};
+pub(crate) use tf::{TfIndex, dynamic_transforms, frames, readers, static_transforms, transforms};
 pub use tf::{TransformReader, TransformSample};
 
 use crate::{

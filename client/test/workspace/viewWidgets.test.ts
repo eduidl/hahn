@@ -159,11 +159,16 @@ describe("the frame of a 3D widget", () => {
   });
 });
 
+/** A frame as `/frames` lists it, with one recorded parent or none. */
+const frame = (id: string, parent: string | null) => ({
+  id,
+  parent,
+  parents: parent ? [parent] : [],
+  dropped_samples: 0,
+});
+
 describe("fixedFrameOf", () => {
-  const frames = [
-    { id: "base", parent: "map" },
-    { id: "map", parent: null },
-  ];
+  const frames = [frame("base", "map"), frame("map", null)];
   it("prefers the chosen frame and falls back to a root", () => {
     expect(fixedFrameOf("base", frames)).toBe("base");
     expect(fixedFrameOf(null, frames)).toBe("map");
