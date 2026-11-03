@@ -2,6 +2,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import * as THREE from "three";
 import { expect, it, vi } from "vitest";
+import { TfGraph } from "../../src/data/tfGraph";
 import { PoseLayer, PoseTrail } from "../../src/views/sceneLayers";
 import { useSeriesViewProblems } from "../../src/views/seriesViewProblem";
 
@@ -14,12 +15,20 @@ const mocks = vi.hoisted(() => ({
   transforms: undefined as any,
   ns: 2n,
   history: vi.fn(),
+  graph: vi.fn(),
 }));
 vi.mock("../../src/data/useViewData", async (original) => ({
   ...(await original<typeof import("../../src/data/useViewData")>()),
   useViewFrame: () => ({ frame: mocks.frame, error: "" }),
   useTransforms: () => ({ transforms: mocks.transforms, error: "" }),
   usePlaybackNs: () => mocks.ns,
+}));
+
+mocks.graph.mockResolvedValue(new TfGraph());
+
+vi.mock("../../src/data/runTransforms", async (original) => ({
+  ...(await original<typeof import("../../src/data/runTransforms")>()),
+  fetchTransformGraph: mocks.graph,
 }));
 
 vi.mock("../../src/data/viewFrames", async (original) => ({
@@ -119,7 +128,7 @@ it("shows the trajectory up to playback and updates it when seeking", async () =
   );
   const line = stage.scene.children[0] as THREE.LineSegments;
   expect(line.geometry.drawRange.count).toBe(2);
-  expect(mocks.history).toHaveBeenCalledWith(series, expect.any(AbortSignal), "map");
+  expect(mocks.history).toHaveBeenCalledWith(series, expect.any(AbortSignal));
   mocks.ns = 3n;
   view.rerender(<PoseTrail series={series} info={info} target="map" world="map" stage={stage} />);
   expect(line.geometry.drawRange.count).toBe(4);
@@ -183,8 +192,17 @@ it("shows a trail recorded in a stable frame from where the fixed frame is now",
   );
   const view = render(trail());
   await waitFor(() => expect(mocks.history).toHaveBeenCalled());
-  // In the stable frame, not in the moving one, where every sample would be at its origin.
-  expect(mocks.history).toHaveBeenCalledWith(series, expect.any(AbortSignal), "map");
+  // In the stable frame, not in the moving one, where every sample would be at its origin:
+  // the poses, recorded in it, are placed with the run's samples over their span.
+  expect(mocks.history).toHaveBeenCalledWith(series, expect.any(AbortSignal));
+  await waitFor(() =>
+    expect(mocks.graph).toHaveBeenCalledWith(
+      "/api/runs/r",
+      0n,
+      1_000_000_002n,
+      expect.any(AbortSignal),
+    ),
+  );
   const line = stage.scene.children[0] as THREE.LineSegments;
   expect(line.visible).toBe(true);
   expect(new THREE.Vector3(2, 0, 0).applyMatrix4(line.matrix).x).toBeCloseTo(0);

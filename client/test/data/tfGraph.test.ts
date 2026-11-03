@@ -121,6 +121,32 @@ describe("TfGraph", () => {
     expect(Object.keys(graph.resolve("map", 20n))).toEqual(["map"]);
   });
 
+  it("finds the transform between two frames like resolving the whole graph", () => {
+    const graph = new TfGraph(
+      [{ child: "lidar", parent: "base", translation: [1, 0, 0], rotation: still }],
+      [
+        sample("base", "map", 10, 0, undefined, turn),
+        sample("base", "map", 20, 10, undefined, still),
+        sample("other", "elsewhere", 0, 0),
+        sample("other", "elsewhere", 0, 10),
+      ],
+    );
+    for (const [target, source] of [
+      ["map", "lidar"],
+      ["lidar", "map"],
+      ["base", "lidar"],
+      ["map", "map"],
+    ]) {
+      const between = graph.between(target, source, 5n)!;
+      const resolved = graph.resolve(target, 5n)[source];
+      for (const [i, v] of between.translation.entries())
+        expect(v).toBeCloseTo(resolved.translation[i]);
+      for (const [i, v] of between.rotation.entries()) expect(v).toBeCloseTo(resolved.rotation[i]);
+    }
+    expect(graph.between("map", "other", 5n)).toBeUndefined();
+    expect(graph.between("map", "lidar", 50n)).toBeUndefined();
+  });
+
   it("treats any frame name as a name", () => {
     const graph = new TfGraph(
       [{ child: "__proto__", parent: "constructor", translation: [1, 0, 0], rotation: still }],

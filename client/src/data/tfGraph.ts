@@ -228,6 +228,32 @@ export class TfGraph {
     };
   }
 
+  /** `frame` in the root of its tree at `at`, and that root, by walking up its parents. */
+  private toRoot(frame: string, at: bigint, axis: Axis, interpolate: boolean) {
+    let transform = identity;
+    const seen = new Set([frame]);
+    for (;;) {
+      const link = this.at(frame, at, axis, interpolate);
+      if (!link || seen.has(link.parent)) return { root: frame, transform };
+      transform = compose(link.transform, transform);
+      frame = link.parent;
+      seen.add(frame);
+    }
+  }
+
+  /**
+   * The transform from `source` into `target` at `at`, walking only the parents of
+   * the two: far cheaper than `resolve` when placing many values one by one. Undefined
+   * when they are not connected then.
+   */
+  between(target: string, source: string, at: bigint, options: ResolveOptions = {}) {
+    const { axis = "time", interpolate = true } = options;
+    const from = this.toRoot(source, at, axis, interpolate);
+    const to = this.toRoot(target, at, axis, interpolate);
+    if (from.root !== to.root) return undefined;
+    return compose(invert(to.transform), from.transform);
+  }
+
   /**
    * Every frame connected to `target` at `at`, with its transform into `target`. A
    * frame not connected, or reached through a dynamic frame outside its samples, is

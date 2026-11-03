@@ -21,6 +21,7 @@ import {
   osmTiles,
   selectedViewKind,
   type FrameAxesSettings,
+  type PlacementSettings,
   type LegendPosition,
   type Widget,
   type WorkspaceAction,
@@ -379,9 +380,43 @@ function SceneSettings(props: WidgetSettingsProps) {
           </select>
         </label>
       </SettingsSection>
+      <PlacementSection {...props} />
       <FrameAxesSection {...props} frames={frames.map((frame) => frame.id)} />
       <ViewSeriesList {...props} />
     </>
+  );
+}
+
+/** Which time places values in space, and whether transforms blend between samples. */
+function PlacementSection({ widget, dispatch }: WidgetSettingsProps) {
+  const settings = widget.placement;
+  const set = (value: Partial<PlacementSettings>) =>
+    dispatch({ type: "placement", id: widget.id, value });
+  return (
+    <SettingsSection title="Placement">
+      <label className="time-display-setting">
+        Align by
+        <select
+          aria-label="Align by"
+          title="The time whose transforms place each value. Values without a measurement time use their log time."
+          value={settings.alignment}
+          onChange={(event) =>
+            set({ alignment: event.target.value as PlacementSettings["alignment"] })
+          }
+        >
+          <option value="stamp">Measurement time</option>
+          <option value="time">Log time</option>
+        </select>
+      </label>
+      <label className="settings-checkbox">
+        <input
+          type="checkbox"
+          checked={settings.interpolate}
+          onChange={(event) => set({ interpolate: event.target.checked })}
+        />
+        Interpolate transforms
+      </label>
+    </SettingsSection>
   );
 }
 

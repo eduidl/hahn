@@ -5,6 +5,7 @@ import {
   CameraLayer,
   FrameAxes,
   FollowContext,
+  PlacementContext,
 } from "./sceneLayers";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -393,44 +394,46 @@ export default function Scene3D({
   return (
     <div className="view-scene" ref={host}>
       {stage && <FrameAxes transforms={transforms} stage={stage} settings={widget.frameAxes} />}
-      <FollowContext.Provider value={anchor}>
-        <div className="view-problems">
-          {problem && <p className="view-error">{problem}</p>}
-          {stage &&
-            widget.series.map((series) => {
-              const kind = index.topics
-                .get(topicKey(series.source, series.topic))
-                ?.views.find((view) => view.id === series.view)?.kind;
-              return kind === "image" ? (
-                <CameraLayer
-                  key={series.key}
-                  series={series}
-                  info={info}
-                  target={target}
-                  stage={stage}
-                  index={index}
-                />
-              ) : kind === "pose" ? (
-                <PoseLayer
-                  key={series.key}
-                  series={series}
-                  info={info}
-                  target={target}
-                  world={world}
-                  stage={stage}
-                />
-              ) : (
-                <PointsLayer
-                  key={series.key}
-                  series={series}
-                  info={info}
-                  target={target}
-                  stage={stage}
-                />
-              );
-            })}
-        </div>
-      </FollowContext.Provider>
+      <PlacementContext.Provider value={widget.placement}>
+        <FollowContext.Provider value={anchor}>
+          <div className="view-problems">
+            {problem && <p className="view-error">{problem}</p>}
+            {stage &&
+              widget.series.map((series) => {
+                const kind = index.topics
+                  .get(topicKey(series.source, series.topic))
+                  ?.views.find((view) => view.id === series.view)?.kind;
+                return kind === "image" ? (
+                  <CameraLayer
+                    key={series.key}
+                    series={series}
+                    info={info}
+                    target={target}
+                    stage={stage}
+                    index={index}
+                  />
+                ) : kind === "pose" ? (
+                  <PoseLayer
+                    key={series.key}
+                    series={series}
+                    info={info}
+                    target={target}
+                    world={world}
+                    stage={stage}
+                  />
+                ) : (
+                  <PointsLayer
+                    key={series.key}
+                    series={series}
+                    info={info}
+                    target={target}
+                    stage={stage}
+                  />
+                );
+              })}
+          </div>
+        </FollowContext.Provider>
+      </PlacementContext.Provider>
     </div>
   );
 }

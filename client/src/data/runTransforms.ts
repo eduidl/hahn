@@ -129,3 +129,21 @@ export function runTransforms(run: string) {
   if (current?.run !== run) current = new RunTransforms(run);
   return current;
 }
+
+/**
+ * A graph of `run`'s transforms over a range of recording time, loaded at once: for
+ * placing a whole history, such as a trail, rather than the moment being played.
+ */
+export async function fetchTransformGraph(
+  run: string,
+  start: bigint,
+  end: bigint,
+  signal?: AbortSignal,
+): Promise<TfGraph> {
+  const params = new URLSearchParams({ start_ns: String(start), end_ns: String(end) });
+  const [fixed, dynamic] = await Promise.all([
+    get<Schemas["StaticTransforms"]>(`${run}/transforms/static`, signal),
+    get<Schemas["DynamicTransforms"]>(`${run}/transforms/dynamic?${params}`, signal),
+  ]);
+  return new TfGraph(fixed.transforms, dynamic.samples);
+}

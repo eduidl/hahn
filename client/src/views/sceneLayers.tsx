@@ -6,7 +6,11 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
-import type { FrameAxesSettings } from "../workspace/widgetModel";
+import {
+  defaultPlacement,
+  type FrameAxesSettings,
+  type PlacementSettings,
+} from "../workspace/widgetModel";
 import { decodeImage } from "../data/imagePixels";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import { usePlaybackNs, useTransforms, useViewFrame } from "../data/useViewData";
@@ -19,7 +23,9 @@ import {
 } from "../data/viewFrames";
 import { cameraSurface, defaultImageDistance } from "./camera";
 import { useCameraCalibration } from "./useCameraCalibration";
-import { poseTrail, trailWindow } from "./poseTrail";
+import { placePoses, poseTrail, trailWindow } from "./poseTrail";
+import { fetchTransformGraph } from "../data/runTransforms";
+import { runUrl } from "../data/sources";
 
 export type Stage = {
   /** What layers draw into, in the graph's root, shifted so that the origin is in view. */
@@ -49,6 +55,16 @@ export type FollowAnchor = { frame: string; pose: Transform } | null;
 /** Set by a 3D view while its camera follows a frame other than the one it renders in. */
 export const FollowContext = createContext<FollowAnchor>(null);
 
+/** How the 3D widget around a layer places values: its placement settings. */
+export const PlacementContext = createContext<PlacementSettings>(defaultPlacement());
+
+/** A value's measurement time, if it has one. */
+/** Said of a value placed by log time because it has no measurement time. */
+export const estimatedPlacement = "No measurement time: placed by log time";
+
+const stampOf = (frame: ViewFrame | null | undefined) =>
+  frame?.value && "stamp_ns" in frame.value ? frame.value.stamp_ns : undefined;
+
 /**
  * Where the latest data of `frameId` sits in `target`, by the transform at the data's own time.
  * It counts as the present, so what is rigid to `target` stays still between messages.
@@ -60,16 +76,22 @@ export function useFramePlacement(
   source: string | undefined,
   frameId: string | null | undefined,
   target: string | null,
-  dataNs: string | null,
+  frame: ViewFrame | null | undefined,
 ) {
   const anchor = useContext(FollowContext);
+  const { alignment, interpolate } = useContext(PlacementContext);
   const placed = !!frameId && !!target;
   const via = anchor?.frame ?? target;
+  // By its measurement time when chosen and known, else by its recording time (ADR 0002).
+  const stamp = stampOf(frame);
+  const byStamp = alignment === "stamp" && stamp !== undefined;
+  const dataNs = frame ? (byStamp ? stamp : frame.time_ns) : null;
   const { transforms, error } = useTransforms(
     source,
     placed && frameId !== via ? via : null,
     dataNs,
     true,
+    { axis: byStamp ? "stamp" : "time", interpolate, near: frame?.time_ns ?? null },
   );
   const transform = frameId ? transforms?.frames[frameId] : undefined;
   const matrix = useMemo(() => {
@@ -84,6 +106,8 @@ export function useFramePlacement(
   return {
     matrix,
     missing: placed && frameId !== via && !!transforms && !transform,
+    /** Placed by recording time for want of a measurement time. */
+    estimated: alignment === "stamp" && placed && frameId !== via && !!frame?.value && !byStamp,
     error,
     settled,
   };
@@ -120,7 +144,8 @@ export function PointsLayer({
     missing: unresolved,
     error: transformError,
     settled,
-  } = useFramePlacement(series.source, value?.frame_id, target, frame?.time_ns ?? null);
+    estimated,
+  } = useFramePlacement(series.source, value?.frame_id, target, frame);
   const points = useMemo(() => {
     const object = new THREE.Points(
       new THREE.BufferGeometry(),
@@ -167,7 +192,8 @@ export function PointsLayer({
     error ||
     frame?.error ||
     transformError ||
-    (unresolved ? `No transform from ${frameId} to ${target} at this time` : "");
+    (unresolved ? `No transform from ${frameId} to ${target} at this time` : "") ||
+    (estimated ? estimatedPlacement : "");
   return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
@@ -187,7 +213,15 @@ export function PoseTrail({
   stage: Stage;
 }) {
   const ns = usePlaybackNs(info);
-  const identity = JSON.stringify([series.key, series.view, info?.start_ns, world]);
+  const { alignment, interpolate } = useContext(PlacementContext);
+  const identity = JSON.stringify([
+    series.key,
+    series.view,
+    info?.start_ns,
+    world,
+    alignment,
+    interpolate,
+  ]);
   // The whole trail is then seen from where the fixed frame is now.
   const { transforms, error: transformError } = useTransforms(
     series.source,
@@ -200,8 +234,25 @@ export function PoseTrail({
   useEffect(() => {
     if (!info) return;
     const controller = new AbortController();
-    fetchViewHistory(series, controller.signal, world ?? undefined)
-      .then((frames) => {
+    fetchViewHistory(series, controller.signal)
+      .then(async (frames) => {
+        if (world && frames.length) {
+          // Each pose by the transform at its own time, from samples spanning the history
+          // with a margin for stamps that lag their log time.
+          const margin = 1_000_000_000n;
+          const first = BigInt(frames[0].time_ns);
+          const last = BigInt(frames[frames.length - 1].time_ns);
+          const graph = await fetchTransformGraph(
+            runUrl(series.source),
+            first > margin ? first - margin : 0n,
+            last + margin,
+            controller.signal,
+          );
+          frames = placePoses(frames, graph, world, {
+            axis: alignment === "stamp" ? "stamp" : "time",
+            interpolate,
+          });
+        }
         if (!controller.signal.aborted) setLoaded({ identity, frames, error: "" });
       })
       .catch((error) => {
@@ -294,7 +345,8 @@ export function PoseLayer({
     missing,
     error: transformError,
     settled,
-  } = useFramePlacement(series.source, frameId, target, frame?.time_ns ?? null);
+    estimated,
+  } = useFramePlacement(series.source, frameId, target, frame);
   const arrow = useMemo(() => {
     const arrow = new THREE.ArrowHelper(
       new THREE.Vector3(1, 0, 0),
@@ -329,7 +381,8 @@ export function PoseLayer({
     frame?.error ||
     transformError ||
     (value && !frameId ? "Pose has no frame ID" : "") ||
-    (missing ? `No transform from ${frameId} to ${target} at this time` : "");
+    (missing ? `No transform from ${frameId} to ${target} at this time` : "") ||
+    (estimated ? estimatedPlacement : "");
   return (
     <>
       {info && (
@@ -377,7 +430,8 @@ export function CameraLayer({
     missing: unresolved,
     error: transformError,
     settled,
-  } = useFramePlacement(series.source, image?.frame_id, target, frame?.time_ns ?? null);
+    estimated,
+  } = useFramePlacement(series.source, image?.frame_id, target, frame);
   const group = useMemo(() => {
     const group = new THREE.Group();
     group.matrixAutoUpdate = false;
@@ -500,7 +554,8 @@ export function CameraLayer({
     calibrationError ||
     transformError ||
     (image && !image.frame_id ? "Image has no frame ID" : "") ||
-    (unresolved ? `No transform from ${image?.frame_id} to ${target} at this time` : "");
+    (unresolved ? `No transform from ${image?.frame_id} to ${target} at this time` : "") ||
+    (estimated ? estimatedPlacement : "");
   return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
