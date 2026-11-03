@@ -23,6 +23,7 @@ npm --prefix client run build
 npm --prefix client run format:check      # Check formatting
 npm --prefix client run lint              # Lint
 scripts/conformance.sh                   # 合成録画の生成・起動・削除を含む
+scripts/e2e.sh                           # ブラウザでの通しテスト（合成録画を使用）
 ```
 
 Run `npm --prefix client run format` to format the client. Generated API types are excluded.
@@ -30,6 +31,8 @@ Run `npm --prefix client run format` to format the client. Generated API types a
 With mise, `mise run check` runs all of the checks above. `mise tasks` lists the individual tasks.
 
 適合性テストは既定で `127.0.0.1:3918` を使います。使用中なら `CONFORMANCE_PORT=3919 scripts/conformance.sh` のように変更します。
+
+通しテストは、ビルドしたクライアントを合成録画とともに `127.0.0.1:3920`（`E2E_PORT` で変更）で配信し、Chromium で操作します。結果は `client/playwright-report/index.html` に、各テストのスクリーンショットと操作の記録付きで残ります。意図して見た目を変えたときは `scripts/e2e.sh --update-snapshots` で基準画像を撮り直し、差分を確認してからコミットします。ウィジェット単位の基準画像（`client/test/visual/`）は `npm --prefix client run test:visual -- --update` で撮り直します。
 
 別のサーバを検査する合成録画は、次のコマンドで生成できます。出力先は `data/` 以下かリポジトリ外にしてください。
 
