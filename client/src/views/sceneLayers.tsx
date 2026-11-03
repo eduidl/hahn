@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
-import { errorMessage, type Info, type Schemas, type Selected } from "../types";
+import { errorMessage, type Info, type Selected } from "../types";
 import {
   defaultPlacement,
   type FrameAxesSettings,
@@ -24,6 +24,7 @@ import {
 import { cameraSurface, defaultImageDistance } from "./camera";
 import { useCameraCalibration } from "./useCameraCalibration";
 import { placePoses, poseTrail, trailWindow } from "./poseTrail";
+import type { ResolvedFrames } from "../data/tfGraph";
 import { fetchTransformGraph } from "../data/runTransforms";
 import { runUrl } from "../data/sources";
 
@@ -574,7 +575,7 @@ export function FrameAxes({
   settings,
 }: {
   /** Every frame placed in the fixed frame at the playback position. */
-  transforms: Schemas["Transforms"] | undefined;
+  transforms: ResolvedFrames | undefined;
   stage: Stage;
   settings: FrameAxesSettings;
 }) {

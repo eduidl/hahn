@@ -188,17 +188,23 @@ async fn an_applications_own_type_is_read_as_transforms() {
             {"id": "sensor", "parent": "base", "kind": "static", "parents": ["base"], "dropped_samples": 0},
         ])
     );
+    // The reader's samples: `sensor` fixed on `base`, `base` driving round `map`.
+    let (_, body) = get(app.clone(), "/r/transforms/static").await;
+    assert_eq!(body["transforms"][0]["child"], "sensor");
+    assert_eq!(body["transforms"][0]["parent"], "base");
     let quarter = support::ros2::ACME_COUNT / 4 * support::ros2::ACME_STEP_NS;
-    let (status, body) = get(
+    let (_, body) = get(
         app.clone(),
-        &format!("/r/transforms?target=map&time_ns={quarter}"),
+        &format!(
+            "/r/transforms/dynamic?start_ns={quarter}&end_ns={}",
+            quarter + 1
+        ),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
-    // `base` faces -x at the top of the circle, so `sensor` is 1 m further in -x.
-    let sensor = &body["frames"]["sensor"]["translation"];
-    assert!((sensor[0].as_f64().unwrap() + 1.).abs() < 1e-9, "{sensor}");
-    assert!((sensor[1].as_f64().unwrap() - 5.).abs() < 1e-9, "{sensor}");
+    // At the top of the circle of radius 5.
+    let base = &body["samples"][0]["translation"];
+    assert!(base[0].as_f64().unwrap().abs() < 1e-9, "{base}");
+    assert!((base[1].as_f64().unwrap() - 5.).abs() < 1e-9, "{base}");
 
     // Without the reader, the type is not a transform.
     let plain = hahn::Builder::new(dir.path()).router().unwrap();

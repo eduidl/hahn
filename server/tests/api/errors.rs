@@ -90,16 +90,11 @@ async fn views_name_what_is_missing() {
     expect(
         failure(
             &app,
-            &view_url("views", "/camera", "image", "&target_frame=map"),
+            &view_url("views", "/camera", "image", "&start_ns=2&end_ns=1"),
         )
         .await,
         StatusCode::BAD_REQUEST,
         "invalid_request",
-    );
-    expect(
-        failure(&app, "/r/transforms?target=none&time_ns=1").await,
-        unprocessable,
-        "unknown_frame",
     );
 }
 

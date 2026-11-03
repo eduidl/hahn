@@ -3,7 +3,7 @@ import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { get, runUrl } from "./sources";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
 import { runTransforms } from "./runTransforms";
-import type { ResolveOptions } from "./tfGraph";
+import type { ResolvedFrames, ResolveOptions } from "./tfGraph";
 import { fetchLatestFrame, type ViewFrame } from "./viewFrames";
 
 type Loaded<T> = { identity: string; value?: T; error?: string };
@@ -156,11 +156,11 @@ export function useTransforms(
     const frames = store.graph().resolve(target, BigInt(ns), { axis, interpolate });
     return { time_ns: ns, target, frames };
   }, [store, target, ns, near, axis, interpolate, version]);
-  const last = useRef<{ identity: string | null; value?: Schemas["Transforms"] }>({ identity });
+  const last = useRef<{ identity: string | null; value?: ResolvedFrames }>({ identity });
   if (last.current.identity !== identity) last.current = { identity };
   if (current) last.current.value = current;
   const value = current ?? last.current.value;
-  const held = useRef<{ identity: string | null; frames: Schemas["Transforms"]["frames"] }>({
+  const held = useRef<{ identity: string | null; frames: ResolvedFrames["frames"] }>({
     identity,
     frames: {},
   });

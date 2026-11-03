@@ -183,9 +183,10 @@ async fn ros2_transforms_join_the_frame_graph() {
     let (_, frames) = get(app.clone(), "/r/frames").await;
     let frames = frames.to_string();
     assert!(frames.contains("lidar") && frames.contains("base"));
-    // Interpolated on /tf, and held at all times on /tf_static.
-    let (_, body) = get(app.clone(), "/r/transforms?target=map&time_ns=15").await;
-    assert_eq!(body["frames"]["lidar"]["translation"], json!([5., 0., 2.]));
+    // /tf_static holds at all times, /tf changes.
+    let (_, body) = get(app.clone(), "/r/transforms/static").await;
+    assert_eq!(body["transforms"][0]["child"], "lidar");
+    assert_eq!(body["transforms"][0]["translation"], json!([0., 0., 2.]));
     // Each sample keeps the stamp of its own header.
     let (_, body) = get(app, "/r/transforms/dynamic?start_ns=0&end_ns=100").await;
     let stamps: Vec<_> = body["samples"]
