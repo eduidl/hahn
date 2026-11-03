@@ -21,21 +21,17 @@ pub fn open_segments(
             Ok((source.info()?, source))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    sources.sort_by_key(|(info, _)| info.start_ns);
     anyhow::ensure!(!sources.is_empty(), "No segments");
-    for pair in sources.windows(2) {
-        anyhow::ensure!(
-            pair[0].0.end_ns <= pair[1].0.start_ns,
-            "Segments overlap in time"
-        );
+    // Segments without messages take no part in the time order.
+    sources.sort_by_key(|(info, _)| info.time_range);
+    let ranges: Vec<_> = sources.iter().filter_map(|(info, _)| info.time_range).collect();
+    for pair in ranges.windows(2) {
+        anyhow::ensure!(pair[0].1 <= pair[1].0, "Segments overlap in time");
     }
     let info = SourceInfo {
-        start_ns: sources[0].0.start_ns,
-        end_ns: sources
-            .iter()
-            .map(|(info, _)| info.end_ns)
-            .max()
-            .unwrap_or(0),
+        time_range: ranges
+            .first()
+            .map(|first| (first.0, ranges.iter().map(|range| range.1).max().unwrap_or(first.1))),
         message_count: sources.iter().map(|(info, _)| info.message_count).sum(),
     };
     let mut topics = Vec::new();

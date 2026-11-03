@@ -271,8 +271,8 @@ async fn info(
     blocking(move || {
         let info = group.source()?.info()?;
         Ok(RecordingInfo {
-            start_ns: info.start_ns.to_string(),
-            end_ns: info.end_ns.to_string(),
+            start_ns: info.time_range.map(|(start, _)| start.to_string()),
+            end_ns: info.time_range.map(|(_, end)| end.to_string()),
             message_count: info.message_count,
         })
     })
@@ -282,9 +282,12 @@ async fn info(
 
 #[derive(Serialize)]
 struct RecordingInfo {
-    start_ns: String,
+    /// Omitted for a group without messages, like `end_ns`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start_ns: Option<String>,
     /// Last message timestamp, inclusive.
-    end_ns: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end_ns: Option<String>,
     message_count: Option<u64>,
 }
 

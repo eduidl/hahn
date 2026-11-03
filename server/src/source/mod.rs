@@ -26,9 +26,9 @@ pub struct TimeRange {
 
 #[derive(Debug, Clone)]
 pub struct SourceInfo {
-    pub start_ns: u64,
-    /// Last message timestamp, inclusive.
-    pub end_ns: u64,
+    /// The first and last message timestamps, both inclusive. `None` for a readable
+    /// recording without messages, which is not a failure.
+    pub time_range: Option<(u64, u64)>,
     pub message_count: Option<u64>,
 }
 
@@ -72,7 +72,7 @@ pub trait Source: Send + Sync {
     fn meta_fields(&self) -> &'static [&'static str] {
         &[]
     }
-    /// The time range of all messages. Fails for a recording without messages.
+    /// The time range of all messages.
     fn info(&self) -> anyhow::Result<SourceInfo>;
     fn topics(&self) -> anyhow::Result<Vec<TopicMeta>>;
     fn field_defs(&self, topic: &str) -> anyhow::Result<FieldDefs>;
@@ -85,7 +85,9 @@ pub trait Source: Send + Sync {
 
     /// The latest message at or before `time`, searched backwards in growing windows.
     fn latest_at(&self, topic: &str, time: u64) -> anyhow::Result<Option<(MessageTimes, Value)>> {
-        let start = self.info()?.start_ns;
+        let Some((start, _)) = self.info()?.time_range else {
+            return Ok(None);
+        };
         let end = time.saturating_add(1);
         let mut window = FIRST_WINDOW_NS;
         loop {

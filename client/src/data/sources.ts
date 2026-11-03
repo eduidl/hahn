@@ -4,6 +4,7 @@ import {
   isMetaPath,
   metaFields,
   type Info,
+  type RecordingInfo,
   type Run,
   type Schemas,
   type Topic,
@@ -81,7 +82,7 @@ export function useSourceLabel(source: string): string | undefined {
 
 /** One open group as loaded from the server. */
 export type LoadedSource = {
-  info: Info | null;
+  info: RecordingInfo | null;
   topics: Topic[];
   error: string;
   loading: boolean;
@@ -93,17 +94,19 @@ export type OpenSource = LoadedSource & { id: string };
 /**
  * The shared time axis of the open groups: earliest start to latest end.
  * Null until every group has settled, so the origin does not move while
- * loading; groups that failed to load are left out.
+ * loading; groups that failed to load are left out. Groups without messages
+ * add to the count but not to the axis, and with no messages at all there is none.
  */
 export function mergeInfo(sources: (LoadedSource | undefined)[]): Info | null {
   if (sources.some((s) => !s || s.loading)) return null;
   const infos = sources.flatMap((s) => (s?.info ? [s.info] : []));
-  if (!infos.length) return null;
+  const ranged = infos.filter((i): i is Info => i.start_ns !== undefined && i.end_ns !== undefined);
+  if (!ranged.length) return null;
   const min = (a: string, b: string) => (BigInt(a) <= BigInt(b) ? a : b);
   const max = (a: string, b: string) => (BigInt(a) >= BigInt(b) ? a : b);
   return {
-    start_ns: infos.map((i) => i.start_ns).reduce(min),
-    end_ns: infos.map((i) => i.end_ns).reduce(max),
+    start_ns: ranged.map((i) => i.start_ns).reduce(min),
+    end_ns: ranged.map((i) => i.end_ns).reduce(max),
     message_count: infos.every((i) => i.message_count !== null)
       ? infos.reduce((n, i) => n + i.message_count!, 0)
       : null,

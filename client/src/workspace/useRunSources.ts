@@ -11,7 +11,7 @@ import {
   sourceUrl,
   type LoadedSource,
 } from "../data/sources";
-import { errorMessage, type Info, type Run, type Schemas } from "../types";
+import { errorMessage, type RecordingInfo, type Run, type Schemas } from "../types";
 
 /**
  * The open run and its groups: what is open, what has loaded, and the restore of a saved session.
@@ -132,7 +132,7 @@ export function useRunSources(
       };
       settle({ info: null, topics: [], error: "", loading: true });
       Promise.all([
-        get<Info>(sourceUrl(id), controller.signal),
+        get<RecordingInfo>(sourceUrl(id), controller.signal),
         get<Schemas["Topic"][]>(`${sourceUrl(id)}/topics`, controller.signal),
       ])
         .then(([info, topics]) => {

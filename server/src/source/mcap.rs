@@ -1,7 +1,7 @@
 //! Indexed, chunked MCAP recordings decoded by `mcapdecode`.
 
 use super::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit, has_extension};
-use anyhow::{Context, bail, ensure};
+use anyhow::{Context, bail};
 use mcapdecode::{McapReader, ReadOptions, core::FieldDefs};
 use std::{
     fs::File,
@@ -166,6 +166,10 @@ fn recording_summary(path: &Path) -> anyhow::Result<mcap::read::Summary> {
     let mapping = unsafe { memmap2::Mmap::map(&file)? };
     let summary = mcap::read::Summary::read(&mapping)?
         .context("MCAP has no Summary; indexed recordings are required")?;
+    // A recording without messages needs no index to be read correctly.
+    if !has_messages(&summary, &mapping)? {
+        return Ok(summary);
+    }
     if summary.chunk_indexes.is_empty() {
         bail!("MCAP has no ChunkIndex; indexed, chunked recordings are required");
     }
@@ -181,30 +185,41 @@ fn recording_summary(path: &Path) -> anyhow::Result<mcap::read::Summary> {
     Ok(summary)
 }
 
+/// Whether the recording holds any message, indexed or not. Statistics or message
+/// indexes say so directly; otherwise the data section is read up to its first message.
+fn has_messages(summary: &mcap::read::Summary, mapping: &[u8]) -> anyhow::Result<bool> {
+    if let Some(stats) = &summary.stats {
+        return Ok(stats.message_count > 0);
+    }
+    if summary
+        .chunk_indexes
+        .iter()
+        .any(|c| !c.message_index_offsets.is_empty())
+    {
+        return Ok(true);
+    }
+    Ok(mcap::MessageStream::new(mapping)?.next().transpose()?.is_some())
+}
+
 fn info_from_summary(summary: mcap::read::Summary) -> anyhow::Result<SourceInfo> {
     if let Some(stats) = summary.stats {
-        ensure!(stats.message_count > 0, "No message time range");
         return Ok(SourceInfo {
-            start_ns: stats.message_start_time,
-            end_ns: stats.message_end_time,
+            time_range: (stats.message_count > 0)
+                .then_some((stats.message_start_time, stats.message_end_time)),
             message_count: Some(stats.message_count),
         });
     }
-    let start = summary
+    // Without statistics, chunks without message indexes hold no messages: reading
+    // the summary rejected them otherwise.
+    let chunks: Vec<_> = summary
         .chunk_indexes
         .iter()
-        .map(|c| c.message_start_time)
-        .min()
-        .context("No message time range")?;
-    let end = summary
-        .chunk_indexes
-        .iter()
-        .map(|c| c.message_end_time)
-        .max()
-        .context("No message time range")?;
+        .filter(|c| !c.message_index_offsets.is_empty())
+        .collect();
+    let start = chunks.iter().map(|c| c.message_start_time).min();
+    let end = chunks.iter().map(|c| c.message_end_time).max();
     Ok(SourceInfo {
-        start_ns: start,
-        end_ns: end,
-        message_count: None,
+        time_range: start.zip(end),
+        message_count: chunks.is_empty().then_some(0),
     })
 }

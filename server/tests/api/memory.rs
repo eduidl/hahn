@@ -98,12 +98,8 @@ impl Source for MemorySource {
             .0
             .iter()
             .flat_map(|topic| topic.messages.iter().map(|(time, _)| *time));
-        let (Some(start_ns), Some(end_ns)) = (times.clone().min(), times.max()) else {
-            anyhow::bail!("The recording has no messages");
-        };
         Ok(SourceInfo {
-            start_ns,
-            end_ns,
+            time_range: times.clone().min().zip(times.max()),
             message_count: None,
         })
     }

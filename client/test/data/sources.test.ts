@@ -43,6 +43,7 @@ const source = (start: string, end: string, count: number | null = 1): LoadedSou
   loading: false,
 });
 const failed: LoadedSource = { info: null, topics: [], error: "bad", loading: false };
+const empty: LoadedSource = { info: { message_count: 0 }, topics: [], error: "", loading: false };
 const loading: LoadedSource = { ...failed, error: "", loading: true };
 
 describe("merged time axis", () => {
@@ -66,6 +67,15 @@ describe("merged time axis", () => {
     expect(mergeInfo([failed, source("5", "6")])?.start_ns).toBe("5");
     expect(mergeInfo([failed])).toBeNull();
     expect(mergeInfo([])).toBeNull();
+  });
+
+  it("counts groups without messages but takes no time from them", () => {
+    expect(mergeInfo([empty, source("3", "4", 2)])).toEqual({
+      start_ns: "3",
+      end_ns: "4",
+      message_count: 2,
+    });
+    expect(mergeInfo([empty])).toBeNull();
   });
 });
 
