@@ -15,6 +15,7 @@ import type { FieldIndex } from "./fieldIndex";
 import type { CachedSeries } from "../data/useSeries";
 import { tableColumns } from "../views/table";
 import { defaultImageDistance } from "../views/camera";
+import { topicKey, type Selected } from "../types";
 import { fixedFrameOf, useFrames } from "../data/useViewData";
 import {
   legendPositions,
@@ -227,6 +228,101 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
   );
 }
 
+/**
+ * Which calibration places an image and whether its pixels are rectified (ADR 0004).
+ * Unchosen, both follow what the server suggests from topic names.
+ */
+function CalibrationSetting({
+  widget,
+  dispatch,
+  index,
+  series,
+}: WidgetSettingsProps & { series: Selected }) {
+  const view = index.topics
+    .get(topicKey(series.source, series.topic))
+    ?.views.find((item) => item.id === series.view);
+  const options = [...index.topics.values()]
+    .filter((topic) => topic.source === series.source)
+    .flatMap((topic) =>
+      topic.views
+        .filter((item) => item.kind === "camera_calibration")
+        .map((item) => ({
+          topic: topic.topic,
+          view: item.id,
+          name: topic.topicName ?? topic.topic,
+        })),
+    );
+  const suggested = view?.calibration;
+  const suggestedName = options.find(
+    (option) => option.topic === suggested?.topic && option.view === suggested.view,
+  )?.name;
+  const value =
+    series.calibration === undefined
+      ? "suggested"
+      : series.calibration === null
+        ? "none"
+        : JSON.stringify([series.calibration.topic, series.calibration.view]);
+  const update = (change: Partial<Selected>) =>
+    dispatch({
+      type: "series",
+      id: widget.id,
+      update: (list) =>
+        list.map((item) => {
+          if (item.key !== series.key) return item;
+          const next = { ...item, ...change };
+          for (const key of ["calibration", "rectified"] as const)
+            if (key in change && change[key] === undefined) delete next[key];
+          return next;
+        }),
+    });
+  const rectified = series.rectified ?? view?.rectified ?? false;
+  return (
+    <>
+      <label className="series-style">
+        Calibration
+        <select
+          aria-label={`Calibration for ${series.topicName ?? series.topic}`}
+          value={value}
+          onChange={(event) => {
+            const chosen = event.target.value;
+            if (chosen === "suggested") update({ calibration: undefined });
+            else if (chosen === "none") update({ calibration: null });
+            else {
+              const [topic, view] = JSON.parse(chosen) as [string, string];
+              update({ calibration: { topic, view } });
+            }
+          }}
+        >
+          <option value="suggested">
+            {suggestedName ? `Suggested: ${suggestedName}` : "Suggested: none"}
+          </option>
+          {options.map((option) => (
+            <option
+              key={`${option.topic}:${option.view}`}
+              value={JSON.stringify([option.topic, option.view])}
+            >
+              {option.name}
+            </option>
+          ))}
+          <option value="none">None</option>
+        </select>
+      </label>
+      <label className="series-style">
+        Pixels
+        <select
+          aria-label={`Pixels of ${series.topicName ?? series.topic}`}
+          title="Raw pixels use the camera matrix and distortion; rectified ones the projection."
+          value={rectified ? "rectified" : "raw"}
+          onChange={(event) => update({ rectified: event.target.value === "rectified" })}
+        >
+          <option value="raw">Raw</option>
+          <option value="rectified">Rectified</option>
+        </select>
+      </label>
+    </>
+  );
+}
+
 /** Series of a view have nothing to load in advance, and take no line width. */
 function ViewSeriesList(props: WidgetSettingsProps) {
   return (
@@ -240,6 +336,9 @@ function ViewSeriesList(props: WidgetSettingsProps) {
           showStatus={false}
           marker={<i className="series-dot" style={{ background: s.color }} />}
         >
+          {props.widget.type === "scene" && selectedViewKind(props.index, s) === "image" && (
+            <CalibrationSetting {...props} series={s} />
+          )}
           {props.widget.type === "scene" && selectedViewKind(props.index, s) === "image" && (
             <label className="series-style">
               Image distance (m)
@@ -334,6 +433,7 @@ function ImageSettings(props: WidgetSettingsProps) {
         ) : (
           <p className="muted">Not selected</p>
         )}
+        {image && <CalibrationSetting {...props} series={image} />}
         <FieldPicker {...props} kind="image" />
       </SettingsSection>
       <SettingsSection title="Additional topics">
@@ -347,7 +447,7 @@ function ImageSettings(props: WidgetSettingsProps) {
             marker={<i className="series-dot" style={{ background: series.color }} />}
           />
         ))}
-        <FieldPicker {...props} kind="pointcloud" />
+        <FieldPicker {...props} kind="overlay" />
       </SettingsSection>
     </>
   );

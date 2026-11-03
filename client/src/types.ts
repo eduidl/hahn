@@ -96,6 +96,13 @@ export type Selected = {
   imageDistance?: number;
   /** How many seconds of pose history to show; absent means all history. */
   trailDuration?: number;
+  /**
+   * For an image: the calibration view of a topic in the same group chosen in place of
+   * the one its name suggests; null for none (ADR 0004).
+   */
+  calibration?: { topic: string; view: string } | null;
+  /** For an image: whether its pixels are rectified, in place of what its name suggests. */
+  rectified?: boolean;
   /** The view of the topic to read, in widgets that show converted values. */
   view?: string;
 };

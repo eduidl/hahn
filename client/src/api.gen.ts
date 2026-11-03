@@ -369,6 +369,14 @@ export interface components {
             kind: string;
             /** @description For display. */
             name: string;
+            /** @description For an image: the calibration view of the same camera that topic names suggest, such as `/cam/camera_info` for `/cam/image_raw`, or `/cam/calibration` for `/cam`. Omitted when none or several are found. A suggestion: the client lets the user choose another. */
+            calibration?: {
+                /** @description A topic `id` in the same group. */
+                topic: string;
+                view: string;
+            };
+            /** @description For an image: whether its pixels are rectified, when its topic name says so (`rect` or `raw`). Omitted when unknown; a client then treats them as raw. */
+            rectified?: boolean;
         };
         /** @description One line of a message stream */
         MessagesEvent: {
@@ -597,6 +605,8 @@ export interface components {
                 /** @description Blob of one value per point. */
                 data: components["schemas"]["BlobRef"];
             }[];
+            /** @description Points left out because their position was not finite. */
+            omitted: components["schemas"]["Count"];
         };
         /**
          * @description One location on the earth, WGS 84, such as a GNSS fix. A single value: a client may draw a topic's history of them as a trail.
@@ -685,6 +695,8 @@ export interface components {
             distortion_model: string;
             /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
             stamp_ns?: components["schemas"]["TimeNs"];
+            /** @description Row-major 3 by 4 projection matrix P, for rectified images, which take it without distortion. Omitted when not recorded or unusable. */
+            projection?: number[];
         };
         /** @description A position and orientation in frame_id. */
         PoseValue: components["schemas"]["FramedValue"] & {

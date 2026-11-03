@@ -1,5 +1,5 @@
 import "./ImageView.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { secondsFrom } from "../data/data";
 import { runUrl } from "../data/sources";
@@ -25,7 +25,7 @@ import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 import { cameraDistortionError, cloudToCameraMatrix, projectCameraPoint } from "./camera";
 import { wheelZoomFactor } from "./Plot";
-import { cameraCandidates } from "./useCameraCalibration";
+import { applyCalibration, calibrationChoice, fetchCalibration } from "./useCameraCalibration";
 
 const mimeTypes: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -160,13 +160,13 @@ export function ImageView({
   );
   const { frame, error } = useViewFrame(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null);
-  const candidates = useMemo(() => cameraCandidates(index, series), [index, series?.source]);
+  const choice = calibrationChoice(index, series);
   const identity =
     series && info
       ? JSON.stringify([
           series.key,
           info.start_ns,
-          candidates,
+          choice,
           clouds.map((c) => [c.key, c.view]),
           overlays.map((o) => [o.key, o.view]),
         ])
@@ -198,24 +198,14 @@ export function ImageView({
       if (!clouds.length) return { frame: imageFrame, clouds: [], marks };
       if (!image.frame_id)
         return { frame: imageFrame, clouds: [], marks, error: "Image has no frame ID" };
-      const calibrations = await Promise.all(
-        candidates.map((candidate) => fetchLatestFrame(candidate, time, null, signal)),
-      );
-      const matches = calibrations.flatMap((item) =>
-        item?.value?.kind === "camera_calibration" && item.value.frame_id === image.frame_id
-          ? [item.value]
-          : [],
-      );
-      if (matches.length !== 1)
-        return {
-          frame: imageFrame,
-          clouds: [],
-          marks,
-          error: matches.length
-            ? "Multiple camera calibrations match this frame"
-            : calibrations.find((item) => item?.error)?.error ||
-              "No camera calibration for this frame",
-        };
+      const failed = (error: string) => ({ frame: imageFrame, clouds: [], marks, error });
+      if (!choice.target) return failed("No camera calibration chosen for this image");
+      const found = await fetchCalibration(choice.target, imageFrame, signal);
+      if (found?.error) return failed(found.error);
+      if (found?.value?.kind !== "camera_calibration")
+        return failed("No camera calibration for this image");
+      const applied = applyCalibration(found.value, choice.rectified);
+      if (!applied.calibration) return failed(applied.error!);
       const resolved = await Promise.all(
         clouds.map(async (series) => {
           const previous = known?.clouds.find((item) => item.series.key === series.key)?.frame;
@@ -244,7 +234,7 @@ export function ImageView({
           };
         }),
       );
-      return { frame: imageFrame, calibration: matches[0], clouds: resolved, marks };
+      return { frame: imageFrame, calibration: applied.calibration, clouds: resolved, marks };
     },
   );
   const [view, setView] = useState(fullImage);

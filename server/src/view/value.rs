@@ -136,6 +136,8 @@ pub struct CameraCalibrationView {
     pub distortion: Vec<f64>,
     /// Such as `plumb_bob` or `rational_polynomial`.
     pub distortion_model: String,
+    /// Row-major 3 by 4 projection matrix P, for rectified images, when recorded.
+    pub projection: Option<[f64; 12]>,
 }
 
 /// A position and orientation, moving a point into the parent frame:
@@ -581,6 +583,7 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
                 intrinsics: k,
                 distortion,
                 distortion_model,
+                projection,
             } = calibration;
             ensure!(
                 width.is_finite() && width > 0. && height.is_finite() && height > 0.,
@@ -591,7 +594,13 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
                 "Invalid camera matrix"
             );
             ensure!(finite(&distortion), "Invalid distortion coefficients");
-            json!({"kind":"camera_calibration", "frame_id":frame_id, "width":width, "height":height, "intrinsics":k, "distortion":distortion, "distortion_model":distortion_model})
+            let mut value = json!({"kind":"camera_calibration", "frame_id":frame_id, "width":width, "height":height, "intrinsics":k, "distortion":distortion, "distortion_model":distortion_model});
+            // A projection left unset, all zero, or unusable is left out: the raw
+            // intrinsics still serve unrectified images (ADR 0004).
+            if let Some(p) = projection.filter(|p| finite(p) && p[0] > 0. && p[5] > 0.) {
+                value["projection"] = json!(p);
+            }
+            value
         }
         View::Pose(pose) => {
             json!({"kind":"pose", "frame_id":pose.frame_id, "pose":pose_json(checked(pose.pose)?)})
@@ -665,6 +674,8 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
                 "kind": "pointcloud",
                 "frame_id": cloud.frame_id,
                 "count": count,
+                // Points without a finite position, left out (ADR 0007).
+                "omitted": keep.len() - count,
                 "pose": pose_json(pose),
                 "positions": payload.add(positions.into()),
                 "fields": fields,

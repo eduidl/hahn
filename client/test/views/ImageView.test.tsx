@@ -91,11 +91,22 @@ it("keeps the previous image and points visible while the next projection loads"
     topic: name,
     schema_name: "T",
     schema_encoding: null,
-    views: [{ id: kind, kind, name: kind }],
+    views: [
+      {
+        id: kind,
+        kind,
+        name: kind,
+        // As the server suggests from the names of a camera's topics.
+        ...(kind === "image"
+          ? { calibration: { topic: "/calibration", view: "camera_calibration" } }
+          : {}),
+      },
+    ],
     message_count: 1,
     error: null,
     fields: [],
   });
+  mocks.history.mockResolvedValue([]);
   const index = buildFieldIndex([
     topic("/image", "image"),
     topic("/cloud", "pointcloud"),
@@ -207,11 +218,22 @@ it("projects a cloud of another frame with transforms resolved at the image's st
     topic: name,
     schema_name: "T",
     schema_encoding: null,
-    views: [{ id: kind, kind, name: kind }],
+    views: [
+      {
+        id: kind,
+        kind,
+        name: kind,
+        // As the server suggests from the names of a camera's topics.
+        ...(kind === "image"
+          ? { calibration: { topic: "/calibration", view: "camera_calibration" } }
+          : {}),
+      },
+    ],
     message_count: 1,
     error: null,
     fields: [],
   });
+  mocks.history.mockResolvedValue([]);
   const index = buildFieldIndex([
     topic("/image", "image"),
     topic("/cloud", "pointcloud"),

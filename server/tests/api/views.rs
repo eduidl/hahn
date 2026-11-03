@@ -248,7 +248,7 @@ async fn camera_calibration_view_validates_and_converts() {
     let app = hahn::router(dir.path()).unwrap();
     let (_, events) = frames(
         &app,
-        &view_url("views", "/calibration", "camera_calibration", ""),
+        &view_url("views", "/camera/calibration", "camera_calibration", ""),
     )
     .await;
     assert_eq!(events[0].0["value"]["frame_id"], "camera");
@@ -411,6 +411,7 @@ async fn points_without_a_position_are_left_out_with_their_values() {
     let (header, payload) = &events[0];
     let value = &header["value"];
     assert_eq!(value["count"], 2);
+    assert_eq!(value["omitted"], 1);
     let blob = &value["fields"][0]["data"]["$blob"];
     let offset = blob["offset"].as_u64().unwrap() as usize;
     assert_eq!(blob["length"], 2);
@@ -664,4 +665,77 @@ async fn values_carry_the_measurement_time_their_message_records() {
         stamps("foxglove").await,
         vec![(json!("5"), json!("2000000007"))]
     );
+}
+
+#[tokio::test]
+async fn images_suggest_the_calibration_their_names_share() {
+    use crate::memory::{Topic, list};
+    use hahn::DataTypeDef as D;
+    let image = |name: &'static str| {
+        Topic::new(
+            name,
+            "foxglove.CompressedImage",
+            vec![
+                ("frame_id", D::String),
+                ("format", D::String),
+                ("data", D::Bytes),
+            ],
+        )
+    };
+    let calibration = |name: &'static str| {
+        Topic::new(
+            name,
+            "foxglove.CameraCalibration",
+            vec![
+                ("frame_id", D::String),
+                ("width", D::U32),
+                ("height", D::U32),
+                ("K", list(D::F64)),
+                ("D", list(D::F64)),
+                ("distortion_model", D::String),
+            ],
+        )
+    };
+    let (_dir, app) = crate::memory::app(
+        vec![
+            image("/front/image_raw"),
+            image("/front/image_rect/compressed"),
+            calibration("/front/camera_info"),
+            image("/left"),
+            calibration("/left/calibration"),
+            image("/twin"),
+            calibration("/twin/a"),
+            calibration("/twin/b"),
+            image("/lonely/image"),
+        ],
+        |builder| builder,
+    );
+    let (_, topics) = get(app, "/g/topics").await;
+    let view = |name: &str| {
+        topics
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["topic"] == name)
+            .unwrap()["views"][0]
+            .clone()
+    };
+    let suggested = |name: &str| view(name)["calibration"]["topic"].clone();
+    assert_eq!(suggested("/front/image_raw"), "/front/camera_info");
+    assert_eq!(view("/front/image_raw")["rectified"], false);
+    assert_eq!(
+        suggested("/front/image_rect/compressed"),
+        "/front/camera_info"
+    );
+    assert_eq!(view("/front/image_rect/compressed")["rectified"], true);
+    assert_eq!(
+        view("/front/image_raw")["calibration"]["view"],
+        "camera_calibration"
+    );
+    // A Foxglove camera named by its image topic.
+    assert_eq!(suggested("/left"), "/left/calibration");
+    assert!(view("/left").get("rectified").is_none());
+    // Two candidates, or none, suggest nothing.
+    assert!(view("/twin").get("calibration").is_none());
+    assert!(view("/lonely/image").get("calibration").is_none());
 }

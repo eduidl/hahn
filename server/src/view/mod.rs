@@ -64,6 +64,19 @@ pub(crate) struct ViewInfo {
     pub(crate) id: &'static str,
     pub(crate) kind: &'static str,
     pub(crate) name: &'static str,
+    /// For an image: the calibration that topic names suggest for it (ADR 0004).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) calibration: Option<ViewRef>,
+    /// For an image: whether its pixels are rectified, when topic names say so.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) rectified: Option<bool>,
+}
+
+/// A view of another topic of the same group.
+#[derive(Clone, Serialize)]
+pub(crate) struct ViewRef {
+    pub(crate) topic: String,
+    pub(crate) view: &'static str,
 }
 
 impl ViewInfo {
@@ -72,6 +85,65 @@ impl ViewInfo {
             id: converter.id(),
             kind: converter.kind().as_str(),
             name: converter.name(),
+            calibration: None,
+            rectified: None,
+        }
+    }
+}
+
+/// Where a camera's topics live, from one of its image topics, by the conventions of
+/// ROS and Foxglove recordings: `/cam/image_raw`, `/cam/image_rect/compressed` and
+/// `/cam` all name the camera `/cam`. Also whether the name says the pixels are
+/// rectified (`rect`) or raw (`raw`).
+fn camera_of(image_topic: &str) -> (&str, Option<bool>) {
+    let mut camera = image_topic.trim_end_matches('/');
+    let mut rectified = None;
+    while let Some((parent, last)) = camera.rsplit_once('/') {
+        if last != "compressed" && !last.starts_with("image") {
+            break;
+        }
+        if last.contains("rect") {
+            rectified = Some(true);
+        } else if last.contains("raw") && rectified.is_none() {
+            rectified = Some(false);
+        }
+        camera = parent;
+    }
+    (camera, rectified)
+}
+
+/// Fills in, for each image view, the calibration of the same camera when exactly one
+/// calibration topic of the group lives directly under it, and whether its pixels
+/// are rectified. Neither is certain: the client lets the user choose otherwise.
+pub(crate) fn suggest_calibrations(topics: &mut [(String, String, Vec<ViewInfo>)]) {
+    let calibrations: Vec<(String, String, &'static str)> = topics
+        .iter()
+        .flat_map(|(id, name, views)| {
+            views
+                .iter()
+                .filter(|view| view.kind == Kind::CameraCalibration.as_str())
+                .map(|view| (id.clone(), name.clone(), view.id))
+        })
+        .collect();
+    for (_, name, views) in topics.iter_mut() {
+        let (camera, rectified) = camera_of(name);
+        let matches: Vec<_> = calibrations
+            .iter()
+            .filter(|(_, calibration, _)| {
+                calibration.rsplit_once('/').map(|(parent, _)| parent) == Some(camera)
+            })
+            .collect();
+        for view in views
+            .iter_mut()
+            .filter(|view| view.kind == Kind::Image.as_str())
+        {
+            view.rectified = rectified;
+            if let [(id, _, calibration)] = matches[..] {
+                view.calibration = Some(ViewRef {
+                    topic: id.clone(),
+                    view: calibration,
+                });
+            }
         }
     }
 }

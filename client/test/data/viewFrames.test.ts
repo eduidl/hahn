@@ -88,6 +88,7 @@ describe("pointBuffers", () => {
   it("views positions without copying", () => {
     const value: PointCloudValue = {
       kind: "pointcloud",
+      omitted: 0,
       frame_id: null,
       count: 2,
       pose,
@@ -102,6 +103,7 @@ describe("pointBuffers", () => {
   it("scales an intensity of any type over the frame's range", () => {
     const value: PointCloudValue = {
       kind: "pointcloud",
+      omitted: 0,
       frame_id: null,
       count: 2,
       pose,

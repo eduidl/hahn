@@ -442,7 +442,7 @@ async fn topics(
             })
             .collect();
         let topics = source.topics()?;
-        topics
+        let mut topics = topics
             .into_iter()
             .map(|meta| {
                 // Only this encoding can be JSON text; the check reads the channel list.
@@ -473,7 +473,16 @@ async fn topics(
                     error,
                 })
             })
-            .collect::<anyhow::Result<Vec<_>>>()
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let mut views: Vec<_> = topics
+            .iter_mut()
+            .map(|t| (t.id.clone(), t.topic.clone(), std::mem::take(&mut t.views)))
+            .collect();
+        view::suggest_calibrations(&mut views);
+        for (topic, (_, _, views)) in topics.iter_mut().zip(views) {
+            topic.views = views;
+        }
+        Ok(topics)
     })
     .await
     .map(Json)

@@ -1019,6 +1019,27 @@
           "name": {
             "description": "For display.",
             "type": "string"
+          },
+          "calibration": {
+            "description": "For an image: the calibration view of the same camera that topic names suggest, such as `/cam/camera_info` for `/cam/image_raw`, or `/cam/calibration` for `/cam`. Omitted when none or several are found. A suggestion: the client lets the user choose another.",
+            "type": "object",
+            "required": [
+              "topic",
+              "view"
+            ],
+            "properties": {
+              "topic": {
+                "description": "A topic `id` in the same group.",
+                "type": "string"
+              },
+              "view": {
+                "type": "string"
+              }
+            }
+          },
+          "rectified": {
+            "description": "For an image: whether its pixels are rectified, when its topic name says so (`rect` or `raw`). Omitted when unknown; a client then treats them as raw.",
+            "type": "boolean"
           }
         },
         "examples": [
@@ -1587,7 +1608,8 @@
               "count",
               "pose",
               "positions",
-              "fields"
+              "fields",
+              "omitted"
             ],
             "properties": {
               "kind": {
@@ -1643,6 +1665,10 @@
                     }
                   }
                 }
+              },
+              "omitted": {
+                "description": "Points left out because their position was not finite.",
+                "$ref": "#/components/schemas/Count"
               }
             }
           }
@@ -1875,6 +1901,15 @@
           "stamp_ns": {
             "$ref": "#/components/schemas/TimeNs",
             "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
+          },
+          "projection": {
+            "description": "Row-major 3 by 4 projection matrix P, for rectified images, which take it without distortion. Omitted when not recorded or unusable.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 12,
+            "maxItems": 12
           }
         }
       },
