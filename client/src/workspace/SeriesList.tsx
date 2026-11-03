@@ -77,11 +77,14 @@ export function SeriesRow({
   series: s,
   marker,
   children,
+  detail,
   showStatus = true,
 }: WidgetSettingsProps & {
   series: Selected;
   marker?: ReactNode;
   children?: ReactNode;
+  /** What the series is shown as, such as the view of a topic. */
+  detail?: string;
   /** Off for widgets that do not stream series, so there is no loading state. */
   showStatus?: boolean;
 }) {
@@ -105,6 +108,7 @@ export function SeriesRow({
         {marker}
         <SeriesName source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
       </button>
+      {detail && <span className="series-status">{detail}</span>}
       {children}
       {problem ? (
         <span className="series-status series-problem">

@@ -323,6 +323,12 @@ function CalibrationSetting({
   );
 }
 
+/** The name of the view a series shows, such as `Point cloud` or `Boxes`. */
+const viewName = (index: FieldIndex, series: Selected) =>
+  index.topics
+    .get(topicKey(series.source, series.topic))
+    ?.views.find((view) => view.id === series.view)?.name;
+
 /** Series of a view have nothing to load in advance, and take no line width. */
 function ViewSeriesList(props: WidgetSettingsProps) {
   return (
@@ -334,6 +340,7 @@ function ViewSeriesList(props: WidgetSettingsProps) {
           {...props}
           series={s}
           showStatus={false}
+          detail={viewName(props.index, s)}
           marker={<i className="series-dot" style={{ background: s.color }} />}
         >
           {props.widget.type === "scene" && selectedViewKind(props.index, s) === "image" && (
@@ -444,6 +451,7 @@ function ImageSettings(props: WidgetSettingsProps) {
             {...props}
             series={series}
             showStatus={false}
+            detail={viewName(props.index, series)}
             marker={<i className="series-dot" style={{ background: series.color }} />}
           />
         ))}

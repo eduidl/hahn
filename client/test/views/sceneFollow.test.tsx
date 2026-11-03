@@ -227,3 +227,43 @@ describe("looking around", () => {
     expect(Math.hypot(target.x, target.y + 10)).toBeLessThan(0.2);
   });
 });
+
+it("names what each series of a 3D view is shown as", () => {
+  const topic = (name: string, view: { id: string; kind: string; name: string }) => ({
+    source: "r/0",
+    topic: name,
+    schema_name: "T",
+    schema_encoding: null,
+    views: [view],
+    message_count: 1,
+    error: null,
+    fields: [],
+  });
+  const scene = widget(1, "scene");
+  scene.series = [
+    ["/lidar", "ros_pointcloud"],
+    ["/objects", "ros_boxes"],
+  ].map(([name, view]) => ({
+    key: name,
+    source: "r/0",
+    topic: name,
+    path: [],
+    color: "red",
+    lineWidth: 1,
+    hidden: false,
+    view,
+  }));
+  render(
+    <WidgetSettings
+      widget={scene}
+      dispatch={vi.fn()}
+      records={[]}
+      index={buildFieldIndex([
+        topic("/lidar", { id: "ros_pointcloud", kind: "pointcloud", name: "Point cloud" }),
+        topic("/objects", { id: "ros_boxes", kind: "bbox3d", name: "Boxes" }),
+      ])}
+    />,
+  );
+  expect(screen.getByText("Point cloud")).toBeTruthy();
+  expect(screen.getByText("Boxes")).toBeTruthy();
+});
