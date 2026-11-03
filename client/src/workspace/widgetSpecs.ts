@@ -142,7 +142,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     sameKind: false,
     maxSeries: Infinity,
     loadsSeries: false,
-    viewKinds: new Set(["geo"]),
+    viewKinds: new Set(["geo_location", "geo"]),
   },
 };
 

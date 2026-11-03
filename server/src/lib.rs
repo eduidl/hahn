@@ -20,9 +20,9 @@ pub use mcapdecode::core::{
 };
 pub use source::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit};
 pub use view::{
-    CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, Message, NumericType, PackedField,
-    PathView, PointCloudView, PointField, Pose, PoseView, PosesView, PositionView, RawImageView,
-    TransformReader, TransformSample, View, ViewConverter, schema,
+    CameraCalibrationView, GeoFeature, GeoLocationView, GeoView, ImageView, Kind, Message,
+    NumericType, PackedField, PathView, PointCloudView, PointField, Pose, PoseView, PosesView,
+    PositionView, RawImageView, TransformReader, TransformSample, View, ViewConverter, schema,
 };
 
 use axum::{

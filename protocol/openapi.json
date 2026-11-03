@@ -1425,6 +1425,9 @@
           },
           {
             "$ref": "#/components/schemas/PathValue"
+          },
+          {
+            "$ref": "#/components/schemas/GeoLocationValue"
           }
         ]
       },
@@ -1677,14 +1680,68 @@
           }
         ]
       },
+      "GeoLocationValue": {
+        "description": "One location on the earth, WGS 84, such as a GNSS fix. A single value: a client may draw a topic's history of them as a trail.",
+        "type": "object",
+        "required": [
+          "kind",
+          "position"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "geo_location"
+            ]
+          },
+          "position": {
+            "description": "`[longitude, latitude]` in degrees, longitude first.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "altitude": {
+            "description": "Meters above the WGS 84 ellipsoid, when known.",
+            "type": "number"
+          },
+          "heading": {
+            "description": "Radians clockwise from true north, when known.",
+            "type": "number"
+          },
+          "accuracy_m": {
+            "description": "Horizontal standard deviation in meters, when known.",
+            "type": "number",
+            "minimum": 0
+          },
+          "stamp_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
+          }
+        },
+        "examples": [
+          {
+            "kind": "geo_location",
+            "position": [
+              139.76,
+              35.68
+            ],
+            "altitude": 40,
+            "accuracy_m": 3
+          }
+        ]
+      },
       "GeoValue": {
-        "description": "GeoJSON features on a map, held by one message. Each message replaces the previous features. The current converters turn foxglove.LocationFix and sensor_msgs/msg/NavSatFix into a Point feature; the map client connects the history into a trail.",
+        "description": "Shapes on a map, all held by one message, such as foxglove.GeoJSON. Each message replaces them entirely, and they are never joined across messages. A single location is a `geo_location`.",
         "allOf": [
           {
             "type": "object",
             "required": [
               "kind",
-              "features"
+              "features",
+              "omitted"
             ],
             "properties": {
               "kind": {
@@ -1726,6 +1783,10 @@
               "stamp_ns": {
                 "$ref": "#/components/schemas/TimeNs",
                 "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
+              },
+              "omitted": {
+                "description": "Features left out because their geometry was missing or off the earth.",
+                "$ref": "#/components/schemas/Count"
               }
             }
           }

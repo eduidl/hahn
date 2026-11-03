@@ -28,7 +28,7 @@ async fn ros2_topics_declare_the_same_kinds_as_foxglove_ones() {
     assert_eq!(kind("/odom"), "pose");
     assert_eq!(kind("/pose"), "pose");
     assert_eq!(kind("/pose_covariance"), "pose");
-    assert_eq!(kind("/fix"), "geo");
+    assert_eq!(kind("/fix"), "geo_location");
 }
 
 #[tokio::test]
@@ -159,10 +159,13 @@ async fn ros2_poses_unwrap_their_covariance() {
 async fn ros2_location_needs_a_fix_and_a_known_covariance() {
     let (_dir, app) = ros2_app();
     let (_, events) = frames(&app, &view_url("views", "/fix", "ros_location", "")).await;
-    let feature = &events[0].0["value"]["features"][0];
-    assert_eq!(feature["geometry"]["coordinates"], json!([139., 35., 40.]));
-    assert_eq!(feature["properties"]["accuracy_m"], 3.);
-    assert_eq!(events[1].0["value"]["features"][0]["properties"], json!({}));
+    let location = &events[0].0["value"];
+    assert_eq!(location["kind"], "geo_location");
+    assert_eq!(location["position"], json!([139., 35.]));
+    assert_eq!(location["altitude"], 40.);
+    assert_eq!(location["accuracy_m"], 3.);
+    // An unknown covariance holds no accuracy.
+    assert!(events[1].0["value"].get("accuracy_m").is_none());
     assert!(
         events[2].0["error"]
             .as_str()

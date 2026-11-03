@@ -7,7 +7,7 @@ import { usePlaybackNs } from "../data/useViewData";
 import {
   fetchViewHistory,
   frameIndexAt,
-  geoPoints,
+  type GeoLocationValue,
   type GeoValue,
   type ViewFrame,
 } from "../data/viewFrames";
@@ -15,10 +15,20 @@ import type { Widget } from "../workspace/widgets";
 
 const osmAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
-const geoValue = (frame: ViewFrame) =>
+const shapes = (frame: ViewFrame) =>
   frame.value?.kind === "geo" ? (frame.value as GeoValue) : undefined;
+const location = (frame: ViewFrame) =>
+  frame.value?.kind === "geo_location" ? (frame.value as GeoLocationValue) : undefined;
+/** Leaflet's order: latitude first. */
+const latLng = (value: GeoLocationValue): [number, number] => [
+  value.position[1],
+  value.position[0],
+];
 
-/** One geo topic: its whole trail, and its features at the playback position. */
+/**
+ * One topic on the map at the playback position. Locations draw their history as a
+ * trail; shapes replace each other and are never joined (ADR 0005).
+ */
 function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; map: L.Map }) {
   const ns = usePlaybackNs(info);
   const [history, setHistory] = useState<{ frames: ViewFrame[]; error: string }>();
@@ -26,7 +36,9 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
     const controller = new AbortController();
     setHistory(undefined);
     fetchViewHistory(series, controller.signal)
-      .then((all) => setHistory({ frames: all.filter((frame) => geoValue(frame)), error: "" }))
+      .then((all) =>
+        setHistory({ frames: all.filter((frame) => shapes(frame) || location(frame)), error: "" }),
+      )
       .catch((error) => {
         if (!controller.signal.aborted) setHistory({ frames: [], error: errorMessage(error) });
       });
@@ -34,7 +46,7 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
   }, [series.key, series.view, info?.start_ns]);
   const frames = history?.frames;
   const trail = useMemo(
-    () => frames?.flatMap((frame) => geoPoints(geoValue(frame)!)) ?? [],
+    () => frames?.flatMap((frame) => (location(frame) ? [latLng(location(frame)!)] : [])) ?? [],
     [frames],
   );
   const fitted = useRef(false);
@@ -48,10 +60,31 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
     return () => void line.remove();
   }, [map, trail, series.color, series.hidden]);
   const index = frames && ns !== null ? frameIndexAt(frames, ns) : -1;
-  const current = index >= 0 ? geoValue(frames![index]) : undefined;
+  const currentShapes = index >= 0 ? shapes(frames![index]) : undefined;
+  const currentLocation = index >= 0 ? location(frames![index]) : undefined;
   useEffect(() => {
-    if (series.hidden || !current) return;
-    const layer = L.geoJSON(current.features as unknown as GeoJSON.Feature[], {
+    if (series.hidden || !currentLocation) return;
+    const at = latLng(currentLocation);
+    const layer = L.layerGroup().addTo(map);
+    if (currentLocation.accuracy_m)
+      L.circle(at, {
+        radius: currentLocation.accuracy_m,
+        color: series.color,
+        weight: 1,
+        fillOpacity: 0.15,
+      }).addTo(layer);
+    L.circleMarker(at, {
+      radius: 6,
+      color: "#fff",
+      weight: 2,
+      fillColor: series.color,
+      fillOpacity: 1,
+    }).addTo(layer);
+    return () => void layer.remove();
+  }, [map, currentLocation, series.color, series.hidden]);
+  useEffect(() => {
+    if (series.hidden || !currentShapes) return;
+    const layer = L.geoJSON(currentShapes.features as unknown as GeoJSON.Feature[], {
       style: { color: series.color },
       pointToLayer: (_, position) =>
         L.circleMarker(position, {
@@ -63,7 +96,7 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
         }),
     }).addTo(map);
     return () => void layer.remove();
-  }, [map, current, series.color, series.hidden]);
+  }, [map, currentShapes, series.color, series.hidden]);
   if (history?.error)
     return (
       <p className="view-error">

@@ -19,6 +19,7 @@ pub enum Kind {
     Pose,
     Poses,
     Path,
+    GeoLocation,
     Geo,
 }
 
@@ -33,6 +34,7 @@ impl Kind {
             Kind::Pose => "pose",
             Kind::Poses => "poses",
             Kind::Path => "path",
+            Kind::GeoLocation => "geo_location",
             Kind::Geo => "geo",
         }
     }
@@ -49,6 +51,7 @@ pub enum View {
     Pose(PoseView),
     Poses(PosesView),
     Path(PathView),
+    GeoLocation(GeoLocationView),
     Geo(GeoView),
 }
 
@@ -62,6 +65,7 @@ impl View {
             View::Pose(_) => Kind::Pose,
             View::Poses(_) => Kind::Poses,
             View::Path(_) => Kind::Path,
+            View::GeoLocation(_) => Kind::GeoLocation,
             View::Geo(_) => Kind::Geo,
         }
     }
@@ -85,6 +89,7 @@ into_view!(
     Pose(PoseView),
     Poses(PosesView),
     Path(PathView),
+    GeoLocation(GeoLocationView),
     Geo(GeoView)
 );
 
@@ -332,6 +337,22 @@ pub struct GeoFeature {
     pub properties: serde_json::Map<String, serde_json::Value>,
 }
 
+/// One location on the earth, WGS 84, such as a GNSS fix. A single value: clients
+/// may draw a topic's history of them as a trail (ADR 0005).
+#[derive(Clone, Debug, Default)]
+pub struct GeoLocationView {
+    /// Degrees.
+    pub latitude: f64,
+    /// Degrees.
+    pub longitude: f64,
+    /// Meters above the WGS 84 ellipsoid, when known.
+    pub altitude: Option<f64>,
+    /// Radians clockwise from true north, when known.
+    pub heading: Option<f64>,
+    /// Meters: the horizontal standard deviation, when known.
+    pub accuracy_m: Option<f64>,
+}
+
 impl GeoFeature {
     /// A point at a location. An altitude that is not finite is left out.
     pub fn point(latitude: f64, longitude: f64, altitude: Option<f64>) -> Self {
@@ -565,8 +586,36 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
                         "properties": feature.properties,
                     }))
                 })
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            json!({ "kind": "geo", "frame_id": geo.frame_id, "features": features })
+                .collect::<Vec<anyhow::Result<_>>>();
+            // Each shape stands alone: a bad one is left out and counted (ADR 0007).
+            let omitted = features.iter().filter(|feature| feature.is_err()).count();
+            let features: Vec<_> = features.into_iter().flatten().collect();
+            json!({ "kind": "geo", "features": features, "omitted": omitted })
+        }
+        View::GeoLocation(location) => {
+            let GeoLocationView {
+                latitude,
+                longitude,
+                altitude,
+                heading,
+                accuracy_m,
+            } = location;
+            ensure!(
+                (-90. ..=90.).contains(&latitude) && (-180. ..=180.).contains(&longitude),
+                "Invalid location: {latitude}, {longitude}"
+            );
+            let mut value = json!({ "kind": "geo_location", "position": [longitude, latitude] });
+            // Optional numbers that are not finite are left out.
+            for (name, number) in [
+                ("altitude", altitude),
+                ("heading", heading),
+                ("accuracy_m", accuracy_m.filter(|a| *a >= 0.)),
+            ] {
+                if let Some(number) = number.filter(|n| n.is_finite()) {
+                    value[name] = number.into();
+                }
+            }
+            value
         }
     })
 }

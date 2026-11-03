@@ -492,7 +492,7 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"];
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"] | components["schemas"]["GeoLocationValue"];
         /** @description Coordinate frame and measurement time of a spatial value. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
@@ -599,7 +599,33 @@ export interface components {
             }[];
         };
         /**
-         * @description GeoJSON features on a map, held by one message. Each message replaces the previous features. The current converters turn foxglove.LocationFix and sensor_msgs/msg/NavSatFix into a Point feature; the map client connects the history into a trail.
+         * @description One location on the earth, WGS 84, such as a GNSS fix. A single value: a client may draw a topic's history of them as a trail.
+         * @example {
+         *       "kind": "geo_location",
+         *       "position": [
+         *         139.76,
+         *         35.68
+         *       ],
+         *       "altitude": 40,
+         *       "accuracy_m": 3
+         *     }
+         */
+        GeoLocationValue: {
+            /** @enum {string} */
+            kind: "geo_location";
+            /** @description `[longitude, latitude]` in degrees, longitude first. */
+            position: number[];
+            /** @description Meters above the WGS 84 ellipsoid, when known. */
+            altitude?: number;
+            /** @description Radians clockwise from true north, when known. */
+            heading?: number;
+            /** @description Horizontal standard deviation in meters, when known. */
+            accuracy_m?: number;
+            /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
+            stamp_ns?: components["schemas"]["TimeNs"];
+        };
+        /**
+         * @description Shapes on a map, all held by one message, such as foxglove.GeoJSON. Each message replaces them entirely, and they are never joined across messages. A single location is a `geo_location`.
          * @example {
          *       "kind": "geo",
          *       "features": [
@@ -641,6 +667,8 @@ export interface components {
             }[];
             /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
             stamp_ns?: components["schemas"]["TimeNs"];
+            /** @description Features left out because their geometry was missing or off the earth. */
+            omitted: components["schemas"]["Count"];
         };
         /** @description Pinhole camera calibration. Image coordinates have x right and y down; the optical axis is positive z. */
         CameraCalibrationValue: {

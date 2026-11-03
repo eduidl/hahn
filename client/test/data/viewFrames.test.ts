@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   frameIndexAt,
-  geoPoints,
   parseFrames,
   pointBuffers,
-  type GeoValue,
   type PointCloudValue,
 } from "../../src/data/viewFrames";
 
@@ -111,32 +109,5 @@ describe("pointBuffers", () => {
       fields: [{ name: "intensity", type: "u16", data: ref(24, 4) }],
     };
     expect([...pointBuffers(value, blob).intensities!]).toEqual([0, 1]);
-  });
-});
-
-describe("geoPoints", () => {
-  it("swaps GeoJSON's longitude first order and skips other geometries", () => {
-    const value: GeoValue = {
-      kind: "geo",
-      features: [
-        {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "Point", coordinates: [139, 35, 40] },
-        },
-        {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "LineString",
-            coordinates: [
-              [0, 0],
-              [1, 1],
-            ],
-          },
-        },
-      ],
-    };
-    expect(geoPoints(value)).toEqual([[35, 139]]);
   });
 });

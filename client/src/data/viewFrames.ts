@@ -6,6 +6,7 @@ export type ViewValue = Schemas["ViewValue"];
 export type ImageValue = Schemas["ImageValue"];
 export type PointCloudValue = Schemas["PointCloudValue"];
 export type GeoValue = Schemas["GeoValue"];
+export type GeoLocationValue = Schemas["GeoLocationValue"];
 export type Transform = Schemas["Transform"];
 export type BlobRef = Schemas["BlobRef"];
 type Header = Schemas["ViewEvent"];
@@ -146,15 +147,4 @@ export function pointBuffers(value: PointCloudValue, blob: ViewFrame["blob"]): P
   }
   const span = max - min || 1;
   return { positions, intensities: Float32Array.from(raw, (v) => (v - min) / span) };
-}
-
-/** The position of each `Point` of a geo value, as `[latitude, longitude]`. */
-export function geoPoints(value: GeoValue): [number, number][] {
-  return value.features.flatMap((feature) => {
-    const geometry = feature.geometry as { type?: string; coordinates?: number[] };
-    const [longitude, latitude] = geometry.coordinates ?? [];
-    return geometry.type === "Point" && longitude !== undefined && latitude !== undefined
-      ? [[latitude, longitude] as [number, number]]
-      : [];
-  });
 }
