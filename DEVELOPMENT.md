@@ -48,7 +48,7 @@ cargo run --manifest-path server/Cargo.toml --locked --example generate_visual -
 ROS 2 と Foxglove の型を画面で見て確かめる録画は、次のコマンドで生成できます。車両が20秒かけて円を描き、カメラ画像とキャリブレーション、計測から 100 ms 遅れて記録される点群、画像と同じ計測時刻で 50 ms 遅れて記録される2Dの検出、3Dの箱、経路、姿勢の集まり、位置、GNSS、GeoJSON の図形を含みます。3D 表示の「Align by」を Log time にすると点群が遅れの分ずれ、画像ウィジェットに `/camera/detections` を足すと検出枠が動く四角に重なります。
 
 ```bash
-cargo run --manifest-path server/Cargo.toml --locked --example generate_ros2_scene -- data/samples/ros2_scene.mcap
+cargo run --manifest-path server/Cargo.toml --locked --example generate_ros2_scene -- data/ros2_scene.mcap
 ```
 
 ROS 2（CDR）の型を確認する録画は、次のコマンドで生成できます。`generate_ros2` は合成データです。`foxglove_to_ros2` はFoxgloveの録画を実際の画像や点群のままROS 2へ変換するので表示の確認に使えますが、実機のドライバが書くメッセージとは限りません。変換前の録画のライセンスは変換後にも適用されます。
