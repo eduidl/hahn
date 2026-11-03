@@ -21,6 +21,7 @@ pub enum Kind {
     Path,
     GeoLocation,
     Geo,
+    Bbox3d,
 }
 
 impl Kind {
@@ -35,6 +36,7 @@ impl Kind {
             Kind::Poses => "poses",
             Kind::Path => "path",
             Kind::GeoLocation => "geo_location",
+            Kind::Bbox3d => "bbox3d",
             Kind::Geo => "geo",
         }
     }
@@ -53,6 +55,7 @@ pub enum View {
     Path(PathView),
     GeoLocation(GeoLocationView),
     Geo(GeoView),
+    Boxes(BoxesView),
 }
 
 impl View {
@@ -67,6 +70,7 @@ impl View {
             View::Path(_) => Kind::Path,
             View::GeoLocation(_) => Kind::GeoLocation,
             View::Geo(_) => Kind::Geo,
+            View::Boxes(_) => Kind::Bbox3d,
         }
     }
 }
@@ -90,7 +94,8 @@ into_view!(
     Poses(PosesView),
     Path(PathView),
     GeoLocation(GeoLocationView),
-    Geo(GeoView)
+    Geo(GeoView),
+    Boxes(BoxesView)
 );
 
 /// An encoded image file: `jpeg` (or `jpg`), `png`, `webp` or `avif`, in any case.
@@ -335,6 +340,28 @@ pub struct GeoFeature {
     pub geometry: serde_json::Value,
     /// Free to fill. The client may show them; `accuracy_m` and `heading` it uses.
     pub properties: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Boxes in `frame_id`, such as detected objects. Each stands alone: one that is not
+/// finite or has a negative size is left out and counted (ADR 0007).
+#[derive(Clone, Debug, Default)]
+pub struct BoxesView {
+    pub frame_id: Option<String>,
+    pub boxes: Vec<Box3>,
+}
+
+/// A box: its center and orientation, and its full size along its own axes.
+#[derive(Clone, Debug, Default)]
+pub struct Box3 {
+    pub pose: Pose,
+    /// Meters, along the box's x, y and z.
+    pub size: [f64; 3],
+    /// What it is, such as a class name.
+    pub label: Option<String>,
+    /// How sure the detector is, usually 0 to 1.
+    pub score: Option<f64>,
+    /// Which object it is, as a tracker names it.
+    pub id: Option<String>,
 }
 
 /// One location on the earth, WGS 84, such as a GNSS fix. A single value: clients
@@ -591,6 +618,32 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
             let omitted = features.iter().filter(|feature| feature.is_err()).count();
             let features: Vec<_> = features.into_iter().flatten().collect();
             json!({ "kind": "geo", "features": features, "omitted": omitted })
+        }
+        View::Boxes(boxes) => {
+            let total = boxes.boxes.len();
+            let kept: Vec<_> = boxes
+                .boxes
+                .into_iter()
+                .filter_map(|b| {
+                    let pose = checked(b.pose).ok()?;
+                    if !finite(&b.size) || b.size.iter().any(|s| *s < 0.) {
+                        return None;
+                    }
+                    let mut value = json!({ "pose": pose_json(pose), "size": b.size });
+                    if let Some(label) = b.label.filter(|l| !l.is_empty()) {
+                        value["label"] = label.into();
+                    }
+                    if let Some(score) = b.score.filter(|s| s.is_finite()) {
+                        value["score"] = score.into();
+                    }
+                    if let Some(id) = b.id.filter(|id| !id.is_empty()) {
+                        value["id"] = id.into();
+                    }
+                    Some(value)
+                })
+                .collect();
+            let omitted = total - kept.len();
+            json!({ "kind": "bbox3d", "frame_id": boxes.frame_id, "boxes": kept, "omitted": omitted })
         }
         View::GeoLocation(location) => {
             let GeoLocationView {

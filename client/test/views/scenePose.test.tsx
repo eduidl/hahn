@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import * as THREE from "three";
 import { expect, it, vi } from "vitest";
 import { TfGraph } from "../../src/data/tfGraph";
-import { PoseLayer, PoseSetLayer, PoseTrail } from "../../src/views/sceneLayers";
+import { BoxesLayer, PoseLayer, PoseSetLayer, PoseTrail } from "../../src/views/sceneLayers";
 import { useSeriesViewProblems } from "../../src/views/seriesViewProblem";
 
 function ReportedProblems() {
@@ -345,4 +345,35 @@ it("draws a path joined in order and unordered poses by their headings", () => {
     }),
   ).toEqual([0, 0, 0, 0.5, 0, 0, 5, 0, 0, 5, 0.5, 0]);
   expect(problems.at(-1)).toContain("1 pose left out");
+});
+
+it("outlines each box by its 12 edges, turned and sized as recorded", () => {
+  const stage = quietStage();
+  mocks.frame = {
+    time_ns: "1",
+    value: {
+      kind: "bbox3d",
+      frame_id: "map",
+      boxes: [{ pose: { position: [10, 0, 0], orientation: turn }, size: [4, 2, 1] }],
+      omitted: 2,
+    },
+  };
+  mocks.transforms = { time_ns: "1", frames: {} };
+  const rendered = render(
+    <>
+      <BoxesLayer series={seriesOf("bbox3d")} info={null} target="map" stage={stage} />
+      <ReportedProblems />
+    </>,
+  );
+  const lines = stage.scene.children[0] as THREE.LineSegments;
+  const points = lines.geometry.getAttribute("position");
+  expect(points.count).toBe(24);
+  const xs = Array.from({ length: points.count }, (_, i) => points.getX(i));
+  const ys = Array.from({ length: points.count }, (_, i) => points.getY(i));
+  // Turned a quarter: its 4 m length lies along y, its 2 m width along x.
+  expect(Math.min(...xs)).toBeCloseTo(9);
+  expect(Math.max(...xs)).toBeCloseTo(11);
+  expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(4);
+  expect(rendered.container.textContent).toContain("2 boxes left out");
+  rendered.unmount();
 });

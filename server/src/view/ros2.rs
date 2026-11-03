@@ -8,6 +8,7 @@ use super::convert::{
     location, pose_view, raw_image,
 };
 use super::value::{
+    Box3, BoxesView,
     ImageView, Kind, NumericType, PackedField, PathView, PointCloudView, PosesView, PositionView,
     View,
 };
@@ -26,6 +27,7 @@ pub(super) fn converters() -> Vec<Arc<dyn ViewConverter>> {
         Arc::new(PointStamped),
         Arc::new(PoseArray),
         Arc::new(Path),
+        Arc::new(Detection3DArray),
         Arc::new(NavSatFix),
     ]
 }
@@ -418,5 +420,73 @@ fn pose_of(pose: &Message) -> anyhow::Result<super::value::Pose> {
     Ok(super::value::Pose {
         position: pose.vector("position")?,
         orientation: pose.quaternion("orientation")?,
+    })
+}
+
+/// `vision_msgs/msg/Detection3DArray`: a box per detection, labeled by its most
+/// likely hypothesis. `vision_msgs` names the class `hypothesis.class_id` since its
+/// ROS 2 releases and `id` before; both are read.
+struct Detection3DArray;
+
+impl ViewConverter for Detection3DArray {
+    fn id(&self) -> &'static str {
+        "ros_boxes"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Bbox3d
+    }
+    fn name(&self) -> &'static str {
+        "Boxes"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "vision_msgs/msg/Detection3DArray"
+            && has(defs, "header", is_struct)
+            && has(defs, "detections", is_list)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let boxes = message
+            .children("detections")?
+            .iter()
+            .map(|detection| {
+                // One that cannot be read is left out by itself, and counted.
+                detection_box(detection).unwrap_or(Box3 {
+                    size: [f64::NAN; 3],
+                    ..Default::default()
+                })
+            })
+            .collect();
+        Ok(BoxesView {
+            frame_id: header_frame(message)?,
+            boxes,
+        }
+        .into())
+    }
+}
+
+fn detection_box(detection: &Message) -> anyhow::Result<Box3> {
+    let bbox = detection.child("bbox")?.context("Detection has no bbox")?;
+    let mut best: Option<(String, f64)> = None;
+    if detection.has("results") {
+        for result in detection.children("results")? {
+            let (class, score) = match result.child("hypothesis") {
+                Ok(Some(hypothesis)) => (hypothesis.string("class_id")?, hypothesis.number("score")?),
+                _ => (result.string("id")?, result.number("score")?),
+            };
+            if best.as_ref().is_none_or(|(_, top)| score > *top) {
+                best = Some((class.to_owned(), score));
+            }
+        }
+    }
+    let id = if detection.has("id") {
+        Some(detection.string("id")?.to_owned())
+    } else {
+        None
+    };
+    Ok(Box3 {
+        pose: bbox.pose("center")?,
+        size: bbox.vector("size")?,
+        label: best.as_ref().map(|(class, _)| class.clone()),
+        score: best.map(|(_, score)| score),
+        id,
     })
 }
