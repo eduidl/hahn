@@ -217,7 +217,11 @@ fn frame(
                 orientation,
             };
         }
-        let value = value::encode(view, &mut payload)?;
+        let stamp = converter.stamp(&message)?;
+        let mut value = value::encode(view, &mut payload)?;
+        if let (Some(stamp), Some(object)) = (stamp, value.as_object_mut()) {
+            object.insert("stamp_ns".into(), stamp.to_string().into());
+        }
         anyhow::ensure!(payload.fits(), "The message is too large for a frame");
         Ok(value)
     });

@@ -26,6 +26,19 @@ pub trait ViewConverter: Send + Sync {
     /// Converts one message. An error fails only this message, which the client shows
     /// in place of the value.
     fn convert(&self, message: &Message) -> anyhow::Result<View>;
+    /// When the value was measured, in nanoseconds on the recording's measurement
+    /// clock, or `None` when the message does not say. The default reads the
+    /// `header.stamp` of ROS messages or the `timestamp` of Foxglove schemas; override
+    /// it for a type that keeps its stamp elsewhere. Never substitute the recording
+    /// time: clients place values in space by this stamp.
+    fn stamp(&self, message: &Message) -> anyhow::Result<Option<u64>> {
+        if message.has("header")
+            && let Some(header) = message.child("header")?
+        {
+            return header.time("stamp");
+        }
+        message.time("timestamp")
+    }
 }
 
 pub(crate) fn converters() -> Vec<Arc<dyn ViewConverter>> {
@@ -186,6 +199,30 @@ impl<'a> Message<'a> {
             "" => None,
             id => Some(id.to_owned()),
         })
+    }
+
+    /// Nanoseconds from a nested time of `sec` and `nanosec` (ROS) or `nsec`
+    /// (Foxglove). `None` when it is left out, zero (what recorders write for "not
+    /// stamped") or not a valid time: a bad stamp must not cost the value itself.
+    pub fn time(&self, name: &str) -> anyhow::Result<Option<u64>> {
+        let Some(time) = self.child(name).ok().flatten() else {
+            return Ok(None);
+        };
+        let nanos = if time.has("nanosec") {
+            "nanosec"
+        } else {
+            "nsec"
+        };
+        let (Ok(sec), Ok(nanos)) = (time.number("sec"), time.number(nanos)) else {
+            return Ok(None);
+        };
+        if !(sec >= 0. && sec.fract() == 0. && nanos.fract() == 0. && (0. ..1e9).contains(&nanos)) {
+            return Ok(None);
+        }
+        let ns = (sec as u64)
+            .checked_mul(1_000_000_000)
+            .and_then(|ns| ns.checked_add(nanos as u64));
+        Ok(ns.filter(|&ns| ns > 0))
     }
 
     /// `[x, y, z]` from a nested struct, all zero when it is left out.

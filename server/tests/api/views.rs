@@ -553,3 +553,69 @@ async fn foxglove_calibration_is_read_under_either_spelling() {
         assert_eq!(events[0].0["value"]["intrinsics"][0], 400., "{topic}");
     }
 }
+
+#[tokio::test]
+async fn values_carry_the_measurement_time_their_message_records() {
+    use crate::memory::{Topic, structure};
+    use hahn::{DataTypeDef as T, Value as V};
+    let time = |nanos: &str| structure(vec![("sec", T::I32), (nanos, T::U32)]);
+    let ros = Topic::new(
+        "ros",
+        "test/Echo",
+        vec![
+            ("case", T::U32),
+            ("header", structure(vec![("stamp", time("nanosec"))])),
+        ],
+    );
+    let foxglove = Topic::new(
+        "foxglove",
+        "test/Echo",
+        vec![("case", T::U32), ("timestamp", time("nsec"))],
+    );
+    let stamp = |sec, nanos| V::Struct(vec![V::I32(sec), V::U32(nanos)]);
+    let ros = ros
+        .at(5, vec![V::U32(0), V::Struct(vec![stamp(1, 500)])])
+        .at(6, vec![V::U32(1), V::Struct(vec![stamp(0, 0)])])
+        .at(7, vec![V::U32(2), V::Struct(vec![stamp(-1, 0)])]);
+    let foxglove = foxglove.at(5, vec![V::U32(0), stamp(2, 7)]);
+    let (_dir, app) = crate::memory::app(vec![ros, foxglove], |builder| {
+        builder.view(Echo(hahn::Kind::Pose, |_| {
+            hahn::PoseView {
+                frame_id: Some("map".into()),
+                pose: hahn::Pose::default(),
+            }
+            .into()
+        }))
+    });
+    let stamps = |topic: &'static str| {
+        let app = app.clone();
+        async move {
+            let (_, events) = frames(&app, &view_url("views", topic, "echo", "")).await;
+            events
+                .iter()
+                .filter(|(header, _)| header["type"] == "frame")
+                .map(|(header, _)| {
+                    assert_eq!(header["value"]["kind"], "pose");
+                    (
+                        header["time_ns"].clone(),
+                        header["value"]["stamp_ns"].clone(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        }
+    };
+    // The stamp is the message's own, not its recording time. Zero and invalid stamps
+    // say nothing, and the value is still sent.
+    assert_eq!(
+        stamps("ros").await,
+        vec![
+            (json!("5"), json!("1000000500")),
+            (json!("6"), Value::Null),
+            (json!("7"), Value::Null),
+        ]
+    );
+    assert_eq!(
+        stamps("foxglove").await,
+        vec![(json!("5"), json!("2000000007"))]
+    );
+}
