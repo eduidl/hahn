@@ -268,7 +268,7 @@ export function StatePlot({
   const span = domain[1] - domain[0];
   const percent = (time: number) => ((time - domain[0]) / span) * 100;
   return (
-    <div className="state-plot" ref={plot} role="group" aria-label="State timeline">
+    <div className="state-plot" ref={plot}>
       {visible.map((s) => (
         <div className="state-row" key={s.key}>
           <div className="state-label">

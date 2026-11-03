@@ -202,7 +202,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
       </div>
       <label className="playback-speed">
         <select
-          title="Playback speed"
+          aria-label="Playback speed"
           value={speed}
           disabled={disabled}
           onChange={(event) => store.setSpeed(Number(event.target.value))}
