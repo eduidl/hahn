@@ -40,7 +40,14 @@ it("gives each operable widget its own list, and none to the rest", () => {
     "Drag: pan while zoomed",
     "Click: move playback position",
   ]);
-  expect(widgetSpecs.scene.controls).toEqual(["Drag: rotate", "Right-drag: pan", "Wheel: zoom"]);
+  expect(widgetSpecs.scene.controls).toEqual([
+    "Drag: rotate",
+    "Right-drag or Shift-drag: pan",
+    "Wheel: zoom",
+    "Middle-drag: look around",
+    "WASD: move",
+    "Shift+WASD: move faster",
+  ]);
   expect(widgetSpecs["tf-tree"].controls).toEqual(["Drag: pan", "Wheel: zoom"]);
   expect(widgetSpecs.map.controls).toEqual(["Drag: pan", "Wheel: zoom"]);
   expect(widgetSpecs.image.controls).toEqual(["Drag: pan", "Wheel: zoom"]);

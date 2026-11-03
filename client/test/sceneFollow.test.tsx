@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import * as THREE from "three";
-import { afterEach, expect, it, vi } from "vitest";
-import { gridOffset } from "../src/views/sceneCamera";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  gridOffset,
+  lookCamera,
+  minWalkSpeed,
+  walkCamera,
+  walkSpeedPerHeight,
+} from "../src/views/sceneCamera";
 import { FollowContext, useFramePlacement } from "../src/views/sceneLayers";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import { reviveWorkspace } from "../src/workspace/persistence";
@@ -94,3 +100,48 @@ it("places data relative to the followed frame, which sits where it is now", () 
   close(new THREE.Vector3().applyMatrix4(result.current.matrix!), [9, 0, 0]);
   expect(result.current.settled).toBe(true);
 });
+
+describe("walking the camera", () => {
+  const start = () => {
+    const camera = new THREE.PerspectiveCamera();
+    camera.up.set(0, 0, 1);
+    camera.position.set(0, -10, 10);
+    camera.lookAt(0, 0, 0);
+    return { camera, target: new THREE.Vector3() };
+  };
+  it("goes forward along the ground toward where the camera looks", () => {
+    const { camera, target } = start();
+    walkCamera(camera, target, 1, 0, 0.1, false);
+    // Ten meters up: for 0.1 s at the speed for that height, all along +y.
+    const step = 10 * walkSpeedPerHeight * 0.1;
+    close(target, [0, step, 0]);
+    close(camera.position, [0, -10 + step, 10]);
+  });
+  it("goes right across the view, faster with Shift, and not at all with opposite keys", () => {
+    const { camera, target } = start();
+    walkCamera(camera, target, 0, 1, 0.1, true);
+    close(target, [4 * 10 * walkSpeedPerHeight * 0.1, 0, 0]);
+    walkCamera(camera, target, 1, 0, 0, false);
+    walkCamera(camera, target, 0, 0, 0.1, false);
+    close(target, [4 * 10 * walkSpeedPerHeight * 0.1, 0, 0]);
+  });
+  it("takes the top of the screen as ahead when looking straight down", () => {
+    const camera = new THREE.PerspectiveCamera();
+    camera.up.set(0, 0, 1);
+    camera.position.set(0, 0, 10);
+    camera.lookAt(0, 0, 0);
+    const target = new THREE.Vector3();
+    walkCamera(camera, target, 1, 0, 0.1, false);
+    expect(target.z).toBeCloseTo(0);
+    expect(target.length()).toBeCloseTo(10 * walkSpeedPerHeight * 0.1);
+  });
+  it("still moves when the camera is down at the ground", () => {
+    const camera = new THREE.PerspectiveCamera();
+    camera.up.set(0, 0, 1);
+    camera.position.set(0, -10, 0);
+    const target = new THREE.Vector3();
+    walkCamera(camera, target, 1, 0, 0.1, false);
+    close(target, [0, minWalkSpeed * 0.1, 0]);
+  });
+});
+

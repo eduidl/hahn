@@ -118,6 +118,10 @@
 .view-scene canvas {
   display: block;
 }
+/* Focused by a click to take WASD; the view itself shows that it moves. */
+.view-scene canvas:focus {
+  outline: none;
+}
 .view-time,
 .view-status,
 .view-error {

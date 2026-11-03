@@ -118,7 +118,14 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
   scene: {
     label: "3D",
     description: "Show point clouds, cameras, poses and coordinate frames in 3D",
-    controls: ["Drag: rotate", "Right-drag: pan", "Wheel: zoom"],
+    controls: [
+      "Drag: rotate",
+      "Right-drag or Shift-drag: pan",
+      "Wheel: zoom",
+      "Middle-drag: look around",
+      "WASD: move",
+      "Shift+WASD: move faster",
+    ],
     emptyHint: "Drop a point cloud, image or pose topic",
     accepts: new Set(),
     sameKind: false,
