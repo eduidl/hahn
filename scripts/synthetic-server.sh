@@ -26,6 +26,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 server/target/debug/examples/generate_demo "$fixtures/demo.mcap" 2200
 server/target/debug/examples/generate_visual "$fixtures/visual.mcap"
+server/target/debug/examples/generate_ros2_scene "$fixtures/scene.mcap"
 server/target/debug/hahn --data-dir "$fixtures" --listen "127.0.0.1:$port" --timezone UTC \
   >"$fixtures/server.log" 2>&1 &
 server=$!

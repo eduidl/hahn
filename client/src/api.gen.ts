@@ -191,6 +191,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run}/groups/{group}/views/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Read up to 32 views of the same group and time range. Each binary event has a stream index corresponding to the request order. Each stream ends independently with complete or error. Messages retain recording order within each stream. */
+        post: operations["batchViews"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -770,6 +787,10 @@ export interface components {
             /** @description Annotations left out because a number in them was not finite or they could not be read. */
             omitted: components["schemas"]["Count"];
         };
+        /** @description A view event tagged with the zero-based request index. Each stream ends with complete or error. */
+        BatchViewEvent: components["schemas"]["ViewEvent"] & {
+            stream: number;
+        };
     };
     responses: {
         /** @description Binary frames; the schema is the header of one */
@@ -1152,6 +1173,44 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    batchViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run: components["parameters"]["Run"];
+                group: components["parameters"]["Group"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    start_ns?: components["schemas"]["TimeNs"];
+                    end_ns?: components["schemas"]["TimeNs"];
+                    views: {
+                        topic: string;
+                        view: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Binary view events, each tagged with a stream index. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.hahn.frames": components["schemas"]["BatchViewEvent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
             500: components["responses"]["InternalError"];
         };
     };

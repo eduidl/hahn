@@ -4,7 +4,14 @@ import { get, runUrl } from "./sources";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
 import { runTransforms } from "./runTransforms";
 import type { ResolvedFrames, ResolveOptions } from "./tfGraph";
-import { fetchLatestFrame, type ViewFrame } from "./viewFrames";
+import {
+  fetchLatestFrame,
+  fetchBatchedViewHistory,
+  fetchViewHistory,
+  frameIndexAt,
+  ViewWindowTooLarge,
+  type ViewFrame,
+} from "./viewFrames";
 
 type Loaded<T> = { identity: string; value?: T; error?: string };
 
@@ -70,23 +77,81 @@ export function usePlaybackNs(info: Info | null) {
 }
 
 /** The view's frame at the playback position: undefined until known, null when none. */
-export function useViewFrame(series: Selected | undefined, info: Info | null) {
+export function useViewFrame(series: Selected | undefined, info: Info | null, batch = false) {
   const ns = usePlaybackNs(info);
   const playback = usePlaybackStore();
   const token = useRef(Symbol("view-frame"));
+  const large = useRef<string | null>(null);
+  const previous = useRef<{ identity: string; frame: ViewFrame }>(undefined);
   const identity = series && info ? `${series.key}:${series.view}:${info.start_ns}` : null;
-  const loaded = useLatestOnly<ViewFrame | null>(
-    identity,
-    ns === null ? null : String(ns),
+  const windowNs = 1_000_000_000n;
+  const start = ns === null ? null : (ns / windowNs) * windowNs;
+  const loaded = useLatestOnly<{
+    start: bigint;
+    seed?: ViewFrame | null;
+    frames?: ViewFrame[];
+    tooLarge?: boolean;
+  }>(identity, start === null ? null : String(start), async (key, known, signal) => {
+    const start = BigInt(key);
+    if (large.current === identity) return { start, tooLarge: true };
+    try {
+      const [seed, frames] = await Promise.all([
+        known?.frames && known.start + windowNs === start
+          ? Promise.resolve(known.frames.at(-1) ?? known.seed ?? null)
+          : fetchLatestFrame(series!, key, undefined, signal),
+        batch
+          ? fetchBatchedViewHistory(series!, signal, {
+              start_ns: key,
+              end_ns: String(start + windowNs),
+            })
+          : fetchViewHistory(
+              series!,
+              signal,
+              { start_ns: key, end_ns: String(start + windowNs) },
+              8 * 1024 * 1024,
+            ),
+      ]);
+      return { start, seed, frames };
+    } catch (error) {
+      if (error instanceof ViewWindowTooLarge) {
+        if (!signal.aborted) large.current = identity;
+        return { start, tooLarge: true };
+      }
+      throw error;
+    }
+  });
+  const window = loaded?.value?.start === start ? loaded.value : undefined;
+  const fallback = useLatestOnly<ViewFrame | null>(
+    identity && (!window || window.tooLarge) ? `${identity}:${start}` : null,
+    (!window || window.tooLarge) && ns !== null ? String(ns) : null,
     (key, known, signal) => fetchLatestFrame(series!, key, known, signal),
   );
-  const buffering = identity !== null && !loaded;
+  const index = window?.frames && ns !== null ? frameIndexAt(window.frames, ns) : -1;
+  const frame =
+    !window || window.tooLarge
+      ? fallback?.value
+      : index >= 0
+        ? window!.frames![index]
+        : window?.seed;
+  const error = loaded?.error ?? fallback?.error ?? "";
+  const buffering = identity !== null && frame === undefined && !error;
+  useEffect(() => {
+    if (identity && frame) previous.current = { identity, frame };
+  }, [identity, frame]);
+  const displayed =
+    frame === undefined &&
+    identity &&
+    ns !== null &&
+    previous.current?.identity === identity &&
+    BigInt(previous.current.frame.time_ns) <= ns
+      ? previous.current.frame
+      : frame;
   useEffect(() => {
     const current = token.current;
     playback.setBuffering(current, buffering);
     return () => playback.setBuffering(current, false);
   }, [playback, buffering]);
-  return { frame: loaded?.value, error: loaded?.error ?? "" };
+  return { frame: displayed, error };
 }
 
 export type FrameInfo = Schemas["FrameInfo"];

@@ -62,6 +62,7 @@ impl From<u64> for MessageTimes {
 
 /// Visitor for [`Source::read`]; returning `Err` stops the read with that error.
 pub type Visit<'a> = dyn FnMut(MessageTimes, Value) -> anyhow::Result<()> + 'a;
+pub type BatchVisit<'a> = dyn FnMut(usize, MessageTimes, Value) -> anyhow::Result<()> + 'a;
 
 /// An opened, immutable recording. Calls block, so run them off the async runtime.
 ///
@@ -82,6 +83,30 @@ pub trait Source: Send + Sync {
     }
     /// Messages of `topic` within `range`, in the recording's order: not always by time.
     fn read(&self, topic: &str, range: TimeRange, visit: &mut Visit) -> anyhow::Result<()>;
+
+    /// Read several topics, keeping each topic's failure independent.
+    fn read_batch(
+        &self,
+        topics: &[String],
+        range: TimeRange,
+        visit: &mut BatchVisit,
+    ) -> anyhow::Result<Vec<anyhow::Result<()>>> {
+        let mut results = Vec::with_capacity(topics.len());
+        for (i, topic) in topics.iter().enumerate() {
+            let mut stopped = None;
+            let result = self.read(topic, range, &mut |times, value| {
+                visit(i, times, value).map_err(|error| {
+                    stopped = Some(error);
+                    anyhow::anyhow!("Batch visitor stopped")
+                })
+            });
+            if let Some(error) = stopped {
+                return Err(error);
+            }
+            results.push(result);
+        }
+        Ok(results)
+    }
 
     /// The latest message at or before `time`, searched backwards in growing windows.
     fn latest_at(&self, topic: &str, time: u64) -> anyhow::Result<Option<(MessageTimes, Value)>> {

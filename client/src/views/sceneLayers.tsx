@@ -341,7 +341,7 @@ export function PoseLayer({
   world: string | null;
   stage: Stage;
 }) {
-  const { frame, error } = useViewFrame(series, info);
+  const { frame, error } = useViewFrame(series, info, true);
   const value = locate(frame?.value);
   const isPosition = frame?.value?.kind === "position";
   const frameId = value?.frame_id;
@@ -441,7 +441,7 @@ export function PoseSetLayer({
   target: string | null;
   stage: Stage;
 }) {
-  const { frame, error } = useViewFrame(series, info);
+  const { frame, error } = useViewFrame(series, info, true);
   const value =
     frame?.value?.kind === "poses" || frame?.value?.kind === "path" ? frame.value : undefined;
   const frameId = value?.frame_id;
@@ -546,7 +546,7 @@ export function BoxesLayer({
   target: string | null;
   stage: Stage;
 }) {
-  const { frame, error } = useViewFrame(series, info);
+  const { frame, error } = useViewFrame(series, info, true);
   const value = frame?.value?.kind === "bbox3d" ? frame.value : undefined;
   const frameId = value?.frame_id;
   const {

@@ -111,6 +111,8 @@ Every frame therefore ends on an 8-byte boundary too.
 
 The header is a `ViewEvent`, with the same shape as the events of `/messages`. As with `/messages`, **a response that ends without `complete` or `error` has failed**.
 
+`POST /views/batch` reads up to 32 views of the same group and time range. Its JSON body contains `views` as an array of `{topic, view}`, and optional `start_ns` and exclusive `end_ns`. Every response event has a zero-based `stream` identifying its entry in that array. Each stream ends with its own `complete` or `error`; a failure in one does not stop the others. A missing terminal event means that stream failed. Frame order is recording order within each stream. The regular `/views` endpoint remains available.
+
 A value refers to binary data with a `BlobRef`, which holds no data itself. Only the fields a Hahn type defines as binary hold one: `data` in `image`, and `positions` and `fields[].data` in `pointcloud`. Anything else with the same shape is plain data, such as a `$blob` key in the free `properties` of `geo`, so a client finds references by field and does not scan values for `$blob`. What the bytes mean is defined by the Hahn type, and they are little endian.
 
 For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is laid out like this:

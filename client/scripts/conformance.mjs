@@ -249,6 +249,23 @@ const [
     views: [{ id: viewId }],
   },
 ] = viewed;
+const batchViewsPath = `${info}/views/batch`;
+const batchSelections = viewed.slice(0, 2).map((entry) => ({
+  topic: entry.id,
+  view: entry.views[0].id,
+}));
+const batchEvents = await check(batchViewsPath, `${visual}/views/batch`, 200, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ views: [...batchSelections, { topic: "/nope", view: "unknown" }] }),
+});
+for (let i = 0; i < batchSelections.length; i++) {
+  const events = batchEvents.filter((event) => event.stream === i);
+  if (!events.some((event) => event.type === "frame") || events.at(-1)?.type !== "complete")
+    failures.push(`${batchViewsPath}: stream ${i} did not complete`);
+}
+if (!batchEvents.some((event) => event.stream === batchSelections.length && event.type === "error"))
+  failures.push(`${batchViewsPath}: missing independent stream error`);
 await check(
   viewsPath,
   viewUrl("views", { topic: viewedTopic, view: viewId, start_ns: "2", end_ns: "1" }),
