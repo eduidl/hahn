@@ -671,3 +671,90 @@ async fn foxglove_image_annotations_keep_their_shapes() {
         ])
     );
 }
+
+#[tokio::test]
+async fn the_synthetic_scene_converts_without_errors() {
+    use support::ros2::*;
+    let dir = tempfile::tempdir().unwrap();
+    write_ros2_scene(&dir.path().join("scene.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    let topics = topics.as_array().unwrap().clone();
+    let middle = SCENE_ORIGIN + SCENE_SECONDS * 500_000_000;
+    let mut kinds = Vec::new();
+    for topic in &topics {
+        for view in topic["views"].as_array().unwrap() {
+            let id = topic["id"].as_str().unwrap();
+            let query = format!("&time_ns={middle}");
+            let (status, events) = frames(
+                &app,
+                &view_url(
+                    "views/latest",
+                    &encode(id),
+                    view["id"].as_str().unwrap(),
+                    &query,
+                ),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{id}");
+            let header = &events[0].0;
+            assert!(header["error"].is_null(), "{id}: {header}");
+            kinds.push(header["value"]["kind"].as_str().unwrap().to_owned());
+        }
+    }
+    kinds.sort();
+    assert_eq!(
+        kinds,
+        [
+            "bbox3d",
+            "camera_calibration",
+            "geo",
+            "geo_location",
+            "image",
+            "image_annotations",
+            "path",
+            "pointcloud",
+            "pose",
+            "poses",
+            "position",
+        ]
+    );
+    // The camera's calibration is suggested by the topic names.
+    let image = topics
+        .iter()
+        .find(|t| t["topic"] == "/camera/image_raw")
+        .unwrap();
+    assert_eq!(
+        image["views"][0]["calibration"]["topic"],
+        "/camera/camera_info"
+    );
+    assert_eq!(image["views"][0]["rectified"], false);
+    // Clouds and detections are recorded after they were measured.
+    let latest = |topic: &'static str, view: &'static str| {
+        let app = app.clone();
+        async move {
+            let query = format!("&time_ns={middle}");
+            frames(&app, &view_url("views/latest", topic, view, &query))
+                .await
+                .1[0]
+                .0
+                .clone()
+        }
+    };
+    let cloud = latest("/lidar", "ros_pointcloud").await;
+    let recorded: u64 = cloud["time_ns"].as_str().unwrap().parse().unwrap();
+    let measured: u64 = cloud["value"]["stamp_ns"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(recorded - measured, LIDAR_DELAY_NS);
+    let marks = latest("/camera/detections", "ros_annotations").await;
+    let recorded: u64 = marks["time_ns"].as_str().unwrap().parse().unwrap();
+    let measured: u64 = marks["value"]["stamp_ns"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(recorded - measured, DETECTION_DELAY_NS);
+}

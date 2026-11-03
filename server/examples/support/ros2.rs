@@ -617,3 +617,320 @@ pub fn write_acme_fixture(path: &Path, faults: bool) -> anyhow::Result<()> {
     }
     writer.finish()
 }
+
+const POINT2D: (&str, &str) = ("vision_msgs/Point2D", "float64 x\nfloat64 y\n");
+const POSE2D: (&str, &str) = ("vision_msgs/Pose2D", "Point2D position\nfloat64 theta\n");
+const BOUNDING_BOX2D: (&str, &str) = (
+    "vision_msgs/BoundingBox2D",
+    "Pose2D center\nfloat64 size_x\nfloat64 size_y\n",
+);
+const BOUNDING_BOX3D: (&str, &str) = (
+    "vision_msgs/BoundingBox3D",
+    "geometry_msgs/Pose center\ngeometry_msgs/Vector3 size\n",
+);
+const OBJECT_HYPOTHESIS: (&str, &str) = (
+    "vision_msgs/ObjectHypothesis",
+    "string class_id\nfloat64 score\n",
+);
+const OBJECT_HYPOTHESIS_WITH_POSE: (&str, &str) = (
+    "vision_msgs/ObjectHypothesisWithPose",
+    "ObjectHypothesis hypothesis\ngeometry_msgs/PoseWithCovariance pose\n",
+);
+const DETECTION2D: (&str, &str) = (
+    "vision_msgs/Detection2D",
+    "std_msgs/Header header\nObjectHypothesisWithPose[] results\nBoundingBox2D bbox\nstring id\n",
+);
+const DETECTION3D: (&str, &str) = (
+    "vision_msgs/Detection3D",
+    "std_msgs/Header header\nObjectHypothesisWithPose[] results\nBoundingBox3D bbox\nstring id\n",
+);
+
+pub const POINT_STAMPED: RosType = (
+    "geometry_msgs/msg/PointStamped",
+    "std_msgs/Header header\nPoint point\n",
+    &[HEADER, POINT],
+);
+pub const POSE_ARRAY: RosType = (
+    "geometry_msgs/msg/PoseArray",
+    "std_msgs/Header header\nPose[] poses\n",
+    &[HEADER, POSE, POINT, QUATERNION],
+);
+pub const PATH: RosType = (
+    "nav_msgs/msg/Path",
+    "std_msgs/Header header\ngeometry_msgs/PoseStamped[] poses\n",
+    &[
+        HEADER,
+        (
+            "geometry_msgs/PoseStamped",
+            "std_msgs/Header header\nPose pose\n",
+        ),
+        POSE,
+        POINT,
+        QUATERNION,
+    ],
+);
+pub const DETECTION3D_ARRAY: RosType = (
+    "vision_msgs/msg/Detection3DArray",
+    "std_msgs/Header header\nDetection3D[] detections\n",
+    &[
+        HEADER,
+        DETECTION3D,
+        OBJECT_HYPOTHESIS_WITH_POSE,
+        OBJECT_HYPOTHESIS,
+        POSE_WITH_COVARIANCE,
+        BOUNDING_BOX3D,
+        POSE,
+        POINT,
+        QUATERNION,
+        VECTOR3,
+    ],
+);
+pub const DETECTION2D_ARRAY: RosType = (
+    "vision_msgs/msg/Detection2DArray",
+    "std_msgs/Header header\nDetection2D[] detections\n",
+    &[
+        HEADER,
+        DETECTION2D,
+        OBJECT_HYPOTHESIS_WITH_POSE,
+        OBJECT_HYPOTHESIS,
+        POSE_WITH_COVARIANCE,
+        BOUNDING_BOX2D,
+        POSE2D,
+        POINT2D,
+        POSE,
+        POINT,
+        QUATERNION,
+    ],
+);
+pub const GEOJSON: RosType = ("foxglove_msgs/msg/GeoJSON", "string geojson\n", &[]);
+
+/// The start of the scene, in recording time.
+pub const SCENE_ORIGIN: u64 = 1_760_000_000_000_000_000;
+/// Seconds the vehicle takes to drive its circle.
+pub const SCENE_SECONDS: u64 = 20;
+const SCENE_RADIUS: f64 = 20.;
+const SCENE_STEP_NS: u64 = 100_000_000;
+/// How late each lidar cloud is recorded after it was measured.
+pub const LIDAR_DELAY_NS: u64 = 100_000_000;
+/// How late each detection is recorded after the image it was made from.
+pub const DETECTION_DELAY_NS: u64 = 50_000_000;
+const IMAGE_SIZE: [u32; 2] = [320, 240];
+
+fn yaw(angle: f64) -> [f64; 4] {
+    [0., 0., (angle / 2.).sin(), (angle / 2.).cos()]
+}
+
+/// Where the vehicle is at `seconds`, driving counterclockwise round the origin.
+fn vehicle(seconds: f64) -> ([f64; 3], f64) {
+    let angle = std::f64::consts::TAU * seconds / SCENE_SECONDS as f64;
+    let position = [SCENE_RADIUS * angle.cos(), SCENE_RADIUS * angle.sin(), 0.];
+    (position, angle + std::f64::consts::FRAC_PI_2)
+}
+
+/// The square drawn in the camera image at `seconds`: its center and side, in pixels.
+fn image_square(seconds: f64) -> ([f64; 2], f64) {
+    let x = 60. + 200. * (0.5 + 0.5 * (seconds * 1.5).sin());
+    ([x, 120.], 40.)
+}
+
+fn hypothesis(cdr: &mut Cdr, class: &str, score: f64) {
+    cdr.u32(1)
+        .string(class)
+        .f64(score)
+        .pose([0.; 3], [0., 0., 0., 1.])
+        .f64s(&[0.; 36]);
+}
+
+/// A scene to look at rather than to test edge cases with: a vehicle driving a circle
+/// for [`SCENE_SECONDS`] with a camera, a lidar recorded late, detections in 2D and
+/// 3D, a plan, particles, a tracked point, a GNSS fix and an area on the map.
+pub fn write_ros2_scene(path: &Path) -> anyhow::Result<()> {
+    let mut writer = RosWriter::create(path)?;
+    let optical = [-0.5, 0.5, -0.5, 0.5];
+    writer.write(
+        "/tf_static",
+        TF_MESSAGE,
+        SCENE_ORIGIN,
+        &tf_message(
+            &[
+                ("base_link", "camera", [1., 0., 1.5], optical),
+                ("base_link", "lidar", [0., 0., 2.], [0., 0., 0., 1.]),
+            ],
+            SCENE_ORIGIN,
+        ),
+    )?;
+    let area = serde_json::json!({
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "properties": {"name": "Track"},
+            "geometry": {"type": "Polygon", "coordinates": [[
+                [139.7597, 35.6798], [139.7603, 35.6798], [139.7603, 35.6802],
+                [139.7597, 35.6802], [139.7597, 35.6798],
+            ]]},
+        }],
+    });
+    let mut geojson = Cdr::new();
+    geojson.string(&area.to_string());
+    writer.write("/area", GEOJSON, SCENE_ORIGIN, &geojson)?;
+    let steps = SCENE_SECONDS * 1_000_000_000 / SCENE_STEP_NS;
+    for step in 0..=steps {
+        let time = SCENE_ORIGIN + step * SCENE_STEP_NS;
+        let seconds = (step * SCENE_STEP_NS) as f64 / 1e9;
+        let (position, heading) = vehicle(seconds);
+        writer.write(
+            "/tf",
+            TF_MESSAGE,
+            time,
+            &tf_message(&[("map", "base_link", position, yaw(heading))], time),
+        )?;
+        let mut odom = Cdr::new();
+        odom.header(time, "map").pose(position, yaw(heading));
+        writer.write("/pose", POSE_STAMPED, time, &odom)?;
+
+        // A ring of posts round the lidar, measured now and recorded late.
+        let mut data = Vec::new();
+        for i in 0..360 {
+            let angle = (i as f32).to_radians();
+            for z in [-1.5f32, -1., -0.5] {
+                for value in [8. * angle.cos(), 8. * angle.sin(), z] {
+                    data.extend_from_slice(&value.to_le_bytes());
+                }
+            }
+        }
+        let fields = [("x", 0, 7, 1), ("y", 4, 7, 1), ("z", 8, 7, 1)];
+        let cloud = Cloud {
+            frame: "lidar",
+            height: 1,
+            width: (data.len() / 12) as u32,
+            fields: &fields,
+            bigendian: false,
+            point_step: 12,
+            row_step: data.len() as u32,
+            data: &data,
+        };
+        writer.write(
+            "/lidar",
+            POINT_CLOUD2,
+            time + LIDAR_DELAY_NS,
+            &point_cloud2(&cloud, time),
+        )?;
+
+        // The camera sees a gray scene with a square moving across it.
+        let ([cx, cy], side) = image_square(seconds);
+        let [width, height] = IMAGE_SIZE;
+        let mut pixels = Vec::with_capacity((width * height * 3) as usize);
+        for y in 0..height {
+            for x in 0..width {
+                let inside = (x as f64 - cx).abs() < side / 2. && (y as f64 - cy).abs() < side / 2.;
+                let shade = if inside {
+                    [230, 80, 60]
+                } else {
+                    [70, (y / 2) as u8 + 40, 90]
+                };
+                pixels.extend_from_slice(&shade);
+            }
+        }
+        writer.write(
+            "/camera/image_raw",
+            IMAGE,
+            time,
+            &image(
+                "camera",
+                IMAGE_SIZE,
+                "rgb8",
+                false,
+                width * 3,
+                &pixels,
+                time,
+            ),
+        )?;
+        let k = [300., 0., 160., 0., 300., 120., 0., 0., 1.];
+        writer.write(
+            "/camera/camera_info",
+            CAMERA_INFO,
+            time,
+            &camera_info("camera", IMAGE_SIZE, "plumb_bob", &[0.; 5], k, time),
+        )?;
+        // A detector finds the square, stamped as the image and recorded after it.
+        let mut detections = Cdr::new();
+        detections.header(time, "camera").u32(1);
+        detections.header(time, "camera");
+        hypothesis(&mut detections, "square", 0.9);
+        detections
+            .f64(cx)
+            .f64(cy)
+            .f64(0.)
+            .f64(side)
+            .f64(side)
+            .string("1");
+        writer.write(
+            "/camera/detections",
+            DETECTION2D_ARRAY,
+            time + DETECTION_DELAY_NS,
+            &detections,
+        )?;
+
+        // Boxes round the track, a plan ahead and particles round the vehicle.
+        let mut boxes = Cdr::new();
+        boxes.header(time, "map").u32(4);
+        for (i, class) in ["car", "tree", "car", "tree"].into_iter().enumerate() {
+            let angle = std::f64::consts::FRAC_PI_2 * i as f64;
+            let center = [26. * angle.cos(), 26. * angle.sin(), 1.];
+            boxes.header(time, "map");
+            hypothesis(&mut boxes, class, 0.6 + 0.1 * i as f64);
+            boxes
+                .pose(center, yaw(angle))
+                .f64s(&[4., 2., 2.])
+                .string(&i.to_string());
+        }
+        writer.write("/objects", DETECTION3D_ARRAY, time, &boxes)?;
+        let mut plan = Cdr::new();
+        plan.header(time, "map").u32(20);
+        for i in 0..20 {
+            let (at, toward) = vehicle(seconds + i as f64 * 0.25);
+            plan.header(time, "map").pose(at, yaw(toward));
+        }
+        writer.write("/plan", PATH, time, &plan)?;
+        let mut particles = Cdr::new();
+        particles.header(time, "map").u32(30);
+        for i in 0..30 {
+            let spread = i as f64 * 2.4;
+            let offset = [
+                position[0] + spread.cos() * 1.5,
+                position[1] + spread.sin() * 1.5,
+                0.,
+            ];
+            particles.pose(offset, yaw(heading + (spread * 3.).sin() * 0.3));
+        }
+        writer.write("/particles", POSE_ARRAY, time, &particles)?;
+        let mut target = Cdr::new();
+        let orbit = seconds * 0.8;
+        target
+            .header(time, "map")
+            .f64(10. * orbit.cos())
+            .f64(10. * orbit.sin())
+            .f64(1. + orbit.sin());
+        writer.write("/target", POINT_STAMPED, time, &target)?;
+
+        // GNSS at a tenth of the rate, two meters accurate.
+        if step % 10 == 0 {
+            let latitude = 35.68 + position[1] / 111_000.;
+            let longitude = 139.76 + position[0] / (111_000. * 35.68f64.to_radians().cos());
+            writer.write(
+                "/gps",
+                NAV_SAT_FIX,
+                time,
+                &nav_sat_fix(
+                    "gps",
+                    0,
+                    [latitude, longitude, 40.],
+                    [4., 0., 0., 0., 4., 0., 0., 0., 9.],
+                    2,
+                    time,
+                ),
+            )?;
+        }
+    }
+    writer.finish()
+}
