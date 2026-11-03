@@ -1,3 +1,14 @@
+//! Helpers shared by the API tests: fixtures, requests and response parsing.
+
+pub(crate) use crate::support;
+pub(crate) use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
+pub(crate) use http_body_util::BodyExt;
+pub(crate) use serde_json::{Value, json};
+pub(crate) use tower::ServiceExt;
+
 pub(crate) fn fixture(count: usize, stats: bool) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     support::write_fixture(&dir.path().join("test.mcap"), count, stats).unwrap();

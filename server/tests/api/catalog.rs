@@ -1,3 +1,7 @@
+//! How the data directory becomes runs and groups, and requests about them.
+
+use crate::common::*;
+
 #[tokio::test]
 async fn malformed_recording_and_symlink_escape() {
     let dir = tempfile::tempdir().unwrap();

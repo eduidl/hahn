@@ -1,3 +1,7 @@
+//! Converters, transform readers and file formats added by an application.
+
+use crate::common::*;
+
 struct CustomImage;
 
 impl hahn::ViewConverter for CustomImage {

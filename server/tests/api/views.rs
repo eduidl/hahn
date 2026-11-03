@@ -1,3 +1,35 @@
+//! Views of the built-in Foxglove types: `/views` and `/views/latest`.
+
+use crate::common::*;
+
+#[tokio::test]
+async fn topics_declare_their_views_from_the_schema() {
+    let (_dir, app) = visual_app();
+    let (_, topics) = get(app, "/g/topics").await;
+    let views = |name: &str| {
+        topics
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["topic"] == name)
+            .unwrap()["views"]
+            .clone()
+    };
+    assert_eq!(views("/camera")[0]["kind"], "image");
+    assert_eq!(views("/lidar")[0]["kind"], "pointcloud");
+    assert_eq!(views("/gps")[0]["kind"], "geo");
+    // Transforms are the frame graph, not a view.
+    assert_eq!(views("/tf"), json!([]));
+
+    let (_dir, app) = {
+        let dir = fixture(1, true);
+        let app = hahn::router(dir.path()).unwrap();
+        (dir, app)
+    };
+    let (_, topics) = get(app, "/g/topics").await;
+    assert_eq!(topics[0]["views"], json!([]));
+}
+
 #[tokio::test]
 async fn image_frames_carry_the_recorded_bytes() {
     let (_dir, app) = visual_app();

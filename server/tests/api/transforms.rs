@@ -1,3 +1,7 @@
+//! The frame graph of a run: `/frames`, `/transforms` and poses in a target frame.
+
+use crate::common::*;
+
 #[tokio::test]
 async fn frames_are_merged_from_every_transform_topic() {
     let (_dir, app) = visual_app();
