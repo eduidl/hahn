@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { PlaybackBar } from "../src/workspace/PlaybackBar";
 import { DisplayTimeMode, type TimeDisplay } from "../src/timeDisplay";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
@@ -126,10 +126,10 @@ describe("PlaybackBar", () => {
     const token = Symbol();
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     act(() => store.setBuffering(token, true));
-    expect(status.textContent).toContain("Buffering…");
+    expect(status.title).toBe("Buffering…");
     expect([...bar.children]).toEqual(children);
     act(() => store.setBuffering(token, false));
-    expect(status.textContent).toContain("Ready");
+    expect(status.title).toBe("Ready");
     expect([...bar.children]).toEqual(children);
   });
 });

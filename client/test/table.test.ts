@@ -10,7 +10,7 @@ import {
   workspaceReducer,
 } from "../src/workspace/widgets";
 
-export const topic: Topic = {
+const topic: Topic = {
   source: "r/0",
   topic: "/t",
   schema_name: "T",
@@ -26,7 +26,7 @@ export const topic: Topic = {
     { path: ["mode"], data_type: "enum", enum_values: [{ name: "ON", value: "1" }] },
   ],
 };
-export const selected = (path: string[] = [], dataType = "struct"): Selected => ({
+const selected = (path: string[] = [], dataType = "struct"): Selected => ({
   key: keyOf("r/0", "/t", path),
   source: "r/0",
   topic: "/t",

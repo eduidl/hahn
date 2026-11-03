@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as THREE from "three";
-import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import type { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { afterEach, expect, it, vi } from "vitest";
 import { FrameAxes } from "../src/views/sceneLayers";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
