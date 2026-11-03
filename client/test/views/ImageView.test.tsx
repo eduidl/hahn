@@ -138,6 +138,121 @@ it("keeps the previous image and points visible while the next projection loads"
   expect(view.container.querySelector("canvas")).not.toBeNull();
 });
 
+it("projects a cloud of another frame with transforms resolved at the image's stamp", async () => {
+  vi.stubGlobal(
+    "Image",
+    class {
+      naturalWidth = 640;
+      naturalHeight = 480;
+      onload: (() => void) | null = null;
+      onerror = null;
+      set src(_: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    },
+  );
+  vi.stubGlobal("URL", { createObjectURL: () => "blob:1", revokeObjectURL: vi.fn() });
+  const fillRect = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    clearRect: vi.fn(),
+    fillRect,
+  } as any);
+  const requests: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      requests.push(url);
+      if (url.endsWith("/transforms/static")) return Response.json({ transforms: [] });
+      // The lidar sits 1 m from the camera at stamp 4, and nowhere by log time 5.
+      return Response.json({
+        samples: [3, 4].map((stamp) => ({
+          child: "lidar",
+          parent: "camera",
+          translation: [1, 0, 0],
+          rotation: [0, 0, 0, 1],
+          time_ns: String(stamp - 2),
+          stamp_ns: String(stamp),
+        })),
+      });
+    }),
+  );
+  const calibration = {
+    time_ns: "1",
+    value: {
+      kind: "camera_calibration",
+      frame_id: "camera",
+      width: 640,
+      height: 480,
+      intrinsics: [400, 0, 320, 0, 400, 240, 0, 0, 1],
+      distortion: [],
+      distortion_model: "",
+    },
+    blob: () => new Uint8Array(),
+  };
+  const cloud = {
+    time_ns: "5",
+    value: {
+      kind: "pointcloud",
+      frame_id: "lidar",
+      pose: { position: [0, 0, 0], orientation: [0, 0, 0, 1] },
+    },
+    blob: () => new Uint8Array(),
+  };
+  mocks.fetch.mockImplementation((target: { topic: string }) =>
+    Promise.resolve(target.topic === "/calibration" ? calibration : cloud),
+  );
+  const topic = (name: string, kind: string): Topic => ({
+    source: "stamped/0",
+    topic: name,
+    schema_name: "T",
+    schema_encoding: null,
+    views: [{ id: kind, kind, name: kind }],
+    message_count: 1,
+    error: null,
+    fields: [],
+  });
+  const index = buildFieldIndex([
+    topic("/image", "image"),
+    topic("/cloud", "pointcloud"),
+    topic("/calibration", "camera_calibration"),
+  ]);
+  const state = workspaceReducer(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "image",
+  });
+  const widget = state.widgets["widget-1"];
+  widget.series = ["image", "cloud"].map((name, i) => ({
+    key: name,
+    source: "stamped/0",
+    topic: `/${name}`,
+    path: [],
+    color: "red",
+    lineWidth: 1,
+    hidden: false,
+    view: i ? "pointcloud" : "image",
+  }));
+  mocks.frame = {
+    time_ns: "5",
+    value: {
+      kind: "image",
+      frame_id: "camera",
+      stamp_ns: "4",
+      format: "png",
+      data: { $blob: { offset: 0, length: 1 } },
+    },
+    blob: () => new Uint8Array([1]),
+  };
+  const info = { start_ns: "0", end_ns: "10", message_count: 1 };
+  const view = render(<ImageView widget={widget} info={info} index={index} />);
+  await waitFor(() => expect(view.container.querySelector("canvas")).not.toBeNull());
+  // Resolved from the run's samples; the server is not asked to resolve.
+  expect(requests).toContain("/api/runs/stamped/transforms/static");
+  expect(requests.some((url) => url.includes("/transforms?"))).toBe(false);
+  // The point, 2 m ahead in the lidar, is drawn: the transform was found.
+  await waitFor(() => expect(fillRect).toHaveBeenCalled());
+});
+
 it("displays raw images without encoding them as image files", async () => {
   const bitmap = { width: 2, height: 1, close: vi.fn() };
   vi.stubGlobal(

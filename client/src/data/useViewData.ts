@@ -131,23 +131,31 @@ export function useTransforms(
   ns: string | null,
   /** Keeps a frame at its last known place once it is gone, as frames end at different times. */
   hold = false,
-  options: ResolveOptions = {},
+  options: ResolveOptions & {
+    /**
+     * The recording time whose samples to load, when `ns` is a measurement time: the
+     * two clocks may differ entirely, as after replaying a recording.
+     */
+    near?: string | null;
+  } = {},
 ) {
   const { axis = "time", interpolate = true } = options;
+  const near = options.near ?? ns;
   const store = source ? runTransforms(runUrl(source)) : undefined;
   const version = useSyncExternalStore(
     store?.subscribe ?? noSubscription,
     store?.getVersion ?? noVersion,
   );
   useEffect(() => {
-    if (store && target && ns !== null) void store.ensure(BigInt(ns));
-  }, [store, target, ns]);
+    if (store && target && near !== null) void store.ensure(BigInt(near));
+  }, [store, target, near]);
   const identity = store && target ? JSON.stringify([store.run, target, axis, interpolate]) : null;
   const current = useMemo(() => {
-    if (!store || !target || ns === null || !store.covers(BigInt(ns))) return undefined;
+    if (!store || !target || ns === null || near === null || !store.covers(BigInt(near)))
+      return undefined;
     const frames = store.graph().resolve(target, BigInt(ns), { axis, interpolate });
     return { time_ns: ns, target, frames };
-  }, [store, target, ns, axis, interpolate, version]);
+  }, [store, target, ns, near, axis, interpolate, version]);
   const last = useRef<{ identity: string | null; value?: Schemas["Transforms"] }>({ identity });
   if (last.current.identity !== identity) last.current = { identity };
   if (current) last.current.value = current;

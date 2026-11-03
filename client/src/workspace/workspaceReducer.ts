@@ -494,7 +494,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
                     ? { ...current, tileUrl: action.value }
                     : action.type === "frame-axes"
                       ? { ...current, frameAxes: { ...current.frameAxes, ...action.value } }
-                      : { ...current, mode: action.mode };
+                      : action.type === "placement"
+                        ? { ...current, placement: { ...current.placement, ...action.value } }
+                        : { ...current, mode: action.mode };
       return { ...state, widgets: { ...state.widgets, [action.id]: updated } };
     }
   }

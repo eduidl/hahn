@@ -5,6 +5,7 @@ import {
   widget,
   widgetSpecs,
   type FrameAxesSettings,
+  type PlacementSettings,
   type Widget,
   type WorkspaceState,
 } from "./widgets";
@@ -53,6 +54,17 @@ function reviveFrameAxes(saved: unknown, defaults: FrameAxesSettings): FrameAxes
   };
 }
 
+function revivePlacement(saved: unknown, defaults: PlacementSettings): PlacementSettings {
+  if (!isRecord(saved)) return defaults;
+  return {
+    alignment:
+      saved.alignment === "stamp" || saved.alignment === "time"
+        ? saved.alignment
+        : defaults.alignment,
+    interpolate: typeof saved.interpolate === "boolean" ? saved.interpolate : defaults.interpolate,
+  };
+}
+
 /**
  * Fills fields added since the widget was saved, keeping what was saved. The
  * title is not editable, so it follows the current name of the widget type.
@@ -66,6 +78,7 @@ function reviveWidget(id: string, saved: unknown): Widget | null {
   if (!Array.isArray(revived.series)) return null;
   // Display settings are not worth rejecting the workspace over: bad ones go back to defaults.
   revived.frameAxes = reviveFrameAxes(saved.frameAxes, fresh.frameAxes);
+  revived.placement = revivePlacement(saved.placement, fresh.placement);
   if (typeof revived.followFrame !== "string") revived.followFrame = null;
   // Replaced by followFrame: the scene is now always in the graph's root.
   delete (revived as { fixedFrame?: unknown }).fixedFrame;

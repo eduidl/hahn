@@ -34,7 +34,24 @@ export type WidgetBase = {
   tileUrl: string;
   /** How a 3D widget draws the axes of coordinate frames. */
   frameAxes: FrameAxesSettings;
+  /** How a 3D widget places values with the transforms of their time. */
+  placement: PlacementSettings;
 };
+
+/**
+ * Which time places values in space (ADR 0002): `stamp`, their measurement time, or
+ * `time`, their recording time. Values without a stamp are placed by recording time.
+ */
+export type PlacementSettings = {
+  alignment: "stamp" | "time";
+  /** Off, transforms hold their earlier sample instead of blending into the next. */
+  interpolate: boolean;
+};
+
+export const defaultPlacement = (): PlacementSettings => ({
+  alignment: "stamp",
+  interpolate: true,
+});
 
 export type FrameAxesSettings = {
   /** Frames whose axes are not drawn. Frames seen later are drawn until hidden. */
@@ -127,6 +144,7 @@ export type WorkspaceAction =
   | { type: "follow-frame"; id: string; value: string | null }
   | { type: "tile-url"; id: string; value: string }
   | { type: "frame-axes"; id: string; value: Partial<FrameAxesSettings> }
+  | { type: "placement"; id: string; value: Partial<PlacementSettings> }
   | { type: "table-column"; id: string; path: string[]; visible: boolean }
   | { type: "table-columns"; id: string; paths: string[][]; visible: boolean }
   | { type: "table-column-width"; id: string; path: string[] | null; width: number }

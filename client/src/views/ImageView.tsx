@@ -2,7 +2,8 @@ import "./ImageView.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { secondsFrom } from "../data/data";
-import { get, runUrl } from "../data/sources";
+import { runUrl } from "../data/sources";
+import { runTransforms } from "../data/runTransforms";
 import { ReportSeriesProblem } from "./seriesViewProblem";
 import { decodeImage } from "../data/imagePixels";
 import { useLatestOnly, useViewFrame } from "../data/useViewData";
@@ -150,11 +151,18 @@ export function ImageView({
           const cloud = await fetchLatestFrame(series, time, previous, signal);
           const frameId = cloud?.value?.kind === "pointcloud" ? cloud.value.frame_id : null;
           if (!frameId || frameId === image.frame_id) return { series, frame: cloud };
-          const transforms = await get<Schemas["Transforms"]>(
-            `${runUrl(series.source)}/transforms?${new URLSearchParams({ target: image.frame_id!, time_ns: time })}`,
-            signal,
-          );
-          const placement = transforms.frames[frameId];
+          // At the image's measurement time when it has one, else its log time (ADR 0002).
+          const transforms = runTransforms(runUrl(series.source));
+          await transforms.ensure(BigInt(time));
+          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+          const failure = transforms.error();
+          if (failure) throw new Error(failure);
+          const stamp = image.stamp_ns;
+          const placement = transforms
+            .graph()
+            .resolve(image.frame_id!, BigInt(stamp ?? time), { axis: stamp ? "stamp" : "time" })[
+            frameId
+          ];
           return {
             series,
             frame: cloud,

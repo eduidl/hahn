@@ -3,6 +3,7 @@ import {
   osmTiles,
   defaultTabTitle,
   defaultFrameAxes,
+  defaultPlacement,
   type Widget,
   type WorkspaceState,
   type WorkspaceAction,
@@ -109,6 +110,7 @@ export const widget = (number: number, type: Widget["type"] = "plot"): Widget =>
   followFrame: null,
   tileUrl: osmTiles,
   frameAxes: defaultFrameAxes(),
+  placement: defaultPlacement(),
 });
 
 export function initialWorkspace(): WorkspaceState {

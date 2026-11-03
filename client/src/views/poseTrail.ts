@@ -1,4 +1,51 @@
+import { compose, type ResolveOptions, type TfGraph } from "../data/tfGraph";
 import { frameIndexAt, type ViewFrame } from "../data/viewFrames";
+
+/**
+ * Poses expressed in `world`, each by the transform at its own time: its measurement
+ * time when `axis` is `stamp` and it has one, else its log time (ADR 0002). A pose
+ * that cannot be placed becomes an error, which leaves a gap in the trail.
+ */
+export function placePoses(
+  frames: ViewFrame[],
+  graph: TfGraph,
+  world: string,
+  { axis = "stamp", interpolate = true }: ResolveOptions = {},
+): ViewFrame[] {
+  return frames.map((frame) => {
+    const value = frame.value?.kind === "pose" ? frame.value : undefined;
+    if (!value?.frame_id) return frame;
+    const byStamp = axis === "stamp" && value.stamp_ns !== undefined;
+    const at = BigInt(byStamp ? value.stamp_ns! : frame.time_ns);
+    const placement =
+      value.frame_id === world
+        ? undefined
+        : graph.between(world, value.frame_id, at, {
+            axis: byStamp ? "stamp" : "time",
+            interpolate,
+          });
+    if (value.frame_id !== world && !placement)
+      return {
+        ...frame,
+        value: undefined,
+        error: `No transform from ${value.frame_id} to ${world}`,
+      };
+    const pose = placement
+      ? compose(placement, {
+          translation: value.pose.position,
+          rotation: value.pose.orientation,
+        })
+      : { translation: value.pose.position, rotation: value.pose.orientation };
+    return {
+      ...frame,
+      value: {
+        ...value,
+        frame_id: world,
+        pose: { position: pose.translation, orientation: pose.rotation },
+      },
+    };
+  });
+}
 
 /** Build separate line segments so conversion failures never bridge gaps. */
 export function poseTrail(frames: ViewFrame[]) {

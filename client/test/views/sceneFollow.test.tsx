@@ -9,19 +9,33 @@ import {
   walkCamera,
   walkSpeedPerHeight,
 } from "../../src/views/sceneCamera";
-import { FollowContext, useFramePlacement } from "../../src/views/sceneLayers";
+import { FollowContext, PlacementContext, useFramePlacement } from "../../src/views/sceneLayers";
 import { buildFieldIndex } from "../../src/workspace/fieldIndex";
 import { reviveWorkspace } from "../../src/workspace/persistence";
 import { WidgetSettings } from "../../src/workspace/WidgetSettings";
 import { initialWorkspace, widget } from "../../src/workspace/widgets";
+import { defaultPlacement } from "../../src/workspace/widgetModel";
 
 const mocks = vi.hoisted(() => ({ frames: [] as any[] }));
-const transformMocks = vi.hoisted(() => ({ frames: {} as any, lastTarget: null as string | null }));
+const transformMocks = vi.hoisted(() => ({
+  frames: {} as any,
+  lastTarget: null as string | null,
+  lastAt: null as string | null,
+  lastOptions: undefined as any,
+}));
 vi.mock("../../src/data/useViewData", async (original) => ({
   ...(await original<typeof import("../../src/data/useViewData")>()),
   useFrames: () => ({ frames: mocks.frames, error: "" }),
-  useTransforms: (_source: string, target: string | null, ns: string | null) => {
+  useTransforms: (
+    _source: string,
+    target: string | null,
+    ns: string | null,
+    _hold: boolean,
+    options: any,
+  ) => {
     transformMocks.lastTarget = target;
+    transformMocks.lastAt = ns;
+    transformMocks.lastOptions = options;
     return {
       transforms: target ? { target, time_ns: ns, frames: transformMocks.frames } : undefined,
       error: "",
@@ -85,7 +99,7 @@ it("places data relative to the followed frame, which sits where it is now", () 
   };
   const { result } = renderHook(
     () => {
-      const placement = useFramePlacement("r/0", "camera", "map", "5");
+      const placement = useFramePlacement("r/0", "camera", "map", frameAt("5"));
       seen.push(transformMocks.lastTarget);
       return placement;
     },
@@ -100,6 +114,44 @@ it("places data relative to the followed frame, which sits where it is now", () 
   // One meter along lidar's y, which now points along -x of the map.
   close(new THREE.Vector3().applyMatrix4(result.current.matrix!), [9, 0, 0]);
   expect(result.current.settled).toBe(true);
+});
+
+/** A frame recorded at `time`, measured at `stamp` when given. */
+const frameAt = (time: string, stamp?: string) =>
+  ({
+    time_ns: time,
+    value: { kind: "pose", frame_id: "camera", ...(stamp ? { stamp_ns: stamp } : {}) },
+    blob: () => new Uint8Array(),
+  }) as any;
+
+describe("placing by time", () => {
+  const place = (frame: any, settings?: { alignment: "stamp" | "time"; interpolate: boolean }) =>
+    renderHook(() => useFramePlacement("r/0", "camera", "map", frame), {
+      wrapper: ({ children }) => (
+        <PlacementContext.Provider value={settings ?? defaultPlacement()}>
+          {children}
+        </PlacementContext.Provider>
+      ),
+    }).result.current;
+  it("uses the measurement time by default, loading samples near the recording time", () => {
+    transformMocks.frames = { camera: { translation: [0, 0, 0], rotation: [0, 0, 0, 1] } };
+    const placement = place(frameAt("50", "40"));
+    expect(transformMocks.lastAt).toBe("40");
+    expect(transformMocks.lastOptions).toMatchObject({ axis: "stamp", near: "50" });
+    expect(placement.estimated).toBe(false);
+  });
+  it("falls back to the recording time without a stamp, and says so", () => {
+    const placement = place(frameAt("50"));
+    expect(transformMocks.lastAt).toBe("50");
+    expect(transformMocks.lastOptions).toMatchObject({ axis: "time" });
+    expect(placement.estimated).toBe(true);
+  });
+  it("follows the widget's choice of recording time and interpolation", () => {
+    const placement = place(frameAt("50", "40"), { alignment: "time", interpolate: false });
+    expect(transformMocks.lastAt).toBe("50");
+    expect(transformMocks.lastOptions).toMatchObject({ axis: "time", interpolate: false });
+    expect(placement.estimated).toBe(false);
+  });
 });
 
 describe("walking the camera", () => {
