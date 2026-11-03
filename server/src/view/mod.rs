@@ -35,9 +35,9 @@ use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 pub use value::{
-    Box3, BoxesView, CameraCalibrationView, GeoFeature, GeoLocationView, GeoView, ImageView, Kind,
-    NumericType, PackedField, PathView, PointCloudView, PointField, Pose, PoseView, PosesView,
-    PositionView, RawImageView, View,
+    Annotation, AnnotationsView, Box3, BoxesView, CameraCalibrationView, GeoFeature,
+    GeoLocationView, GeoView, ImageView, Kind, NumericType, PackedField, PathView, PointCloudView,
+    PointField, Pose, PoseView, PosesView, PositionView, RawImageView, Shape, View,
 };
 
 /// The built-in converters followed by `extra`, whose IDs must be new.

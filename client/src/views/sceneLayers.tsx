@@ -515,8 +515,8 @@ const cubeEdges = (() => {
     [-0.5, 0.5].flatMap((y) => [-0.5, 0.5].map((z) => [x, y, z])),
   );
   const edges: number[] = [];
+  // Corners one axis apart share an edge.
   for (const [i, a] of corners.entries())
-    // Corners one axis apart share an edge.
     for (const b of corners.slice(i + 1))
       if (a.filter((v, k) => v !== b[k]).length === 1) edges.push(...a, ...b);
   return edges;

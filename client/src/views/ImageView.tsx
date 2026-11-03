@@ -7,9 +7,20 @@ import { runTransforms } from "../data/runTransforms";
 import { ReportSeriesProblem } from "./seriesViewProblem";
 import { decodeImage } from "../data/imagePixels";
 import { useLatestOnly, useViewFrame } from "../data/useViewData";
-import { fetchLatestFrame, pointBuffers, type ViewFrame } from "../data/viewFrames";
+import {
+  fetchLatestFrame,
+  fetchViewHistory,
+  pointBuffers,
+  type ViewFrame,
+} from "../data/viewFrames";
+import {
+  annotationWindowNs,
+  drawAnnotations,
+  matchAnnotations,
+  type MatchedAnnotations,
+} from "./annotations";
 import { useTimeFormatter } from "../timeDisplay";
-import { topicKey, type Info, type Schemas, type Selected } from "../types";
+import { errorMessage, topicKey, type Info, type Schemas, type Selected } from "../types";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 import { cameraDistortionError, cloudToCameraMatrix, projectCameraPoint } from "./camera";
@@ -29,7 +40,39 @@ type Cloud = {
   placement?: Schemas["Transform"];
   error?: string;
 };
-type Bundle = { frame: ViewFrame; calibration?: Calibration; clouds: Cloud[]; error?: string };
+type Marks = { series: Selected; matched?: MatchedAnnotations; error?: string };
+type Bundle = {
+  frame: ViewFrame;
+  calibration?: Calibration;
+  clouds: Cloud[];
+  marks: Marks[];
+  error?: string;
+};
+
+/** The marks of one topic over the shown image, and why there are none or few. */
+function Overlay({ marks, width, height }: { marks: Marks; width: number; height: number }) {
+  const { series, matched } = marks;
+  const omitted = matched?.value.omitted ?? 0;
+  const problem =
+    marks.error ||
+    matched?.frame.error ||
+    (omitted
+      ? `${omitted.toLocaleString()} ${omitted === 1 ? "mark" : "marks"} left out: not finite or of no known type`
+      : "") ||
+    (matched?.estimated ? "No measurement time: matched to the image by log time" : "");
+  const canvas = (element: HTMLCanvasElement | null) => {
+    const context = element?.getContext("2d");
+    if (!context || !matched) return;
+    context.clearRect(0, 0, width, height);
+    drawAnnotations(context, matched.value.annotations, series.color);
+  };
+  return (
+    <>
+      {matched && !series.hidden && <canvas ref={canvas} width={width} height={height} />}
+      <ReportSeriesProblem series={series} problem={problem} />
+    </>
+  );
+}
 
 /** Magnification and offset, the offset as a fraction of the view so that it survives resizing. */
 export type ImageZoom = { zoom: number; x: number; y: number };
@@ -112,12 +155,21 @@ export function ImageView({
       ?.views.find((view) => view.id === series.view)?.kind;
   const series = widget.series.find((item) => kind(item) === "image");
   const clouds = widget.series.filter((item) => kind(item) === "pointcloud" && !item.hidden);
+  const overlays = widget.series.filter(
+    (item) => kind(item) === "image_annotations" && !item.hidden,
+  );
   const { frame, error } = useViewFrame(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null);
   const candidates = useMemo(() => cameraCandidates(index, series), [index, series?.source]);
   const identity =
     series && info
-      ? JSON.stringify([series.key, info.start_ns, candidates, clouds.map((c) => [c.key, c.view])])
+      ? JSON.stringify([
+          series.key,
+          info.start_ns,
+          candidates,
+          clouds.map((c) => [c.key, c.view]),
+          overlays.map((o) => [o.key, o.view]),
+        ])
       : null;
   const loaded = useLatestOnly<Bundle>(
     identity,
@@ -126,8 +178,26 @@ export function ImageView({
       const imageFrame = frame!;
       const image = imageFrame.value;
       if (image?.kind !== "image") throw new Error("Image is unavailable");
-      if (!clouds.length) return { frame: imageFrame, clouds: [] };
-      if (!image.frame_id) return { frame: imageFrame, clouds: [], error: "Image has no frame ID" };
+      // Marks are recorded after their image, so they are sought on both sides of it.
+      const at = BigInt(time);
+      const range = {
+        start_ns: String(at > annotationWindowNs ? at - annotationWindowNs : 0n),
+        end_ns: String(at + annotationWindowNs),
+      };
+      const marks = await Promise.all(
+        overlays.map(async (overlay): Promise<Marks> => {
+          try {
+            const frames = await fetchViewHistory(overlay, signal, range);
+            return { series: overlay, matched: matchAnnotations(frames, imageFrame) };
+          } catch (error) {
+            if (signal.aborted) throw error;
+            return { series: overlay, error: errorMessage(error) };
+          }
+        }),
+      );
+      if (!clouds.length) return { frame: imageFrame, clouds: [], marks };
+      if (!image.frame_id)
+        return { frame: imageFrame, clouds: [], marks, error: "Image has no frame ID" };
       const calibrations = await Promise.all(
         candidates.map((candidate) => fetchLatestFrame(candidate, time, null, signal)),
       );
@@ -140,6 +210,7 @@ export function ImageView({
         return {
           frame: imageFrame,
           clouds: [],
+          marks,
           error: matches.length
             ? "Multiple camera calibrations match this frame"
             : calibrations.find((item) => item?.error)?.error ||
@@ -173,7 +244,7 @@ export function ImageView({
           };
         }),
       );
-      return { frame: imageFrame, calibration: matches[0], clouds: resolved };
+      return { frame: imageFrame, calibration: matches[0], clouds: resolved, marks };
     },
   );
   const [view, setView] = useState(fullImage);
@@ -329,6 +400,16 @@ export function ImageView({
           !projectionProblem &&
           shown.bundle.clouds.map((cloud) => (
             <Projection key={cloud.series.key} cloud={cloud} calibration={calibration} />
+          ))}
+        {shown &&
+          !problem &&
+          shown.bundle.marks.map((marks) => (
+            <Overlay
+              key={marks.series.key}
+              marks={marks}
+              width={shown.width}
+              height={shown.height}
+            />
           ))}
       </div>
       {/* A problem with the projection as a whole applies to each topic to project. */}

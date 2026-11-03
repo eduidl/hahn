@@ -5,12 +5,11 @@
 
 use super::convert::{
     Message, ViewConverter, calibration, has, is_bytes, is_list, is_number, is_string, is_struct,
-    location, pose_view, raw_image,
+    location, point2, pose_view, raw_image, unreadable_annotation,
 };
 use super::value::{
-    Box3, BoxesView,
-    ImageView, Kind, NumericType, PackedField, PathView, PointCloudView, PosesView, PositionView,
-    View,
+    Annotation, AnnotationsView, Box3, BoxesView, ImageView, Kind, NumericType, PackedField,
+    PathView, PointCloudView, PosesView, PositionView, Shape, View,
 };
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::FieldDefs;
@@ -28,6 +27,7 @@ pub(super) fn converters() -> Vec<Arc<dyn ViewConverter>> {
         Arc::new(PoseArray),
         Arc::new(Path),
         Arc::new(Detection3DArray),
+        Arc::new(Detection2DArray),
         Arc::new(NavSatFix),
     ]
 }
@@ -465,18 +465,7 @@ impl ViewConverter for Detection3DArray {
 
 fn detection_box(detection: &Message) -> anyhow::Result<Box3> {
     let bbox = detection.child("bbox")?.context("Detection has no bbox")?;
-    let mut best: Option<(String, f64)> = None;
-    if detection.has("results") {
-        for result in detection.children("results")? {
-            let (class, score) = match result.child("hypothesis") {
-                Ok(Some(hypothesis)) => (hypothesis.string("class_id")?, hypothesis.number("score")?),
-                _ => (result.string("id")?, result.number("score")?),
-            };
-            if best.as_ref().is_none_or(|(_, top)| score > *top) {
-                best = Some((class.to_owned(), score));
-            }
-        }
-    }
+    let (label, score) = best_hypothesis(detection)?;
     let id = if detection.has("id") {
         Some(detection.string("id")?.to_owned())
     } else {
@@ -485,8 +474,95 @@ fn detection_box(detection: &Message) -> anyhow::Result<Box3> {
     Ok(Box3 {
         pose: bbox.pose("center")?,
         size: bbox.vector("size")?,
-        label: best.as_ref().map(|(class, _)| class.clone()),
-        score: best.map(|(_, score)| score),
+        label,
+        score,
         id,
+    })
+}
+
+/// The class and score of a detection's most likely hypothesis, if it has any.
+fn best_hypothesis(detection: &Message) -> anyhow::Result<(Option<String>, Option<f64>)> {
+    let mut best: Option<(String, f64)> = None;
+    if detection.has("results") {
+        for result in detection.children("results")? {
+            let (class, score) = match result.child("hypothesis") {
+                Ok(Some(hypothesis)) => {
+                    (hypothesis.string("class_id")?, hypothesis.number("score")?)
+                }
+                _ => (result.string("id")?, result.number("score")?),
+            };
+            if best.as_ref().is_none_or(|(_, top)| score > *top) {
+                best = Some((class.to_owned(), score));
+            }
+        }
+    }
+    Ok(match best {
+        Some((class, score)) => (Some(class), Some(score)),
+        None => (None, None),
+    })
+}
+
+/// `vision_msgs/msg/Detection2DArray`: a box per detection, in pixels, drawn as a
+/// closed outline turned by its angle. `vision_msgs` keeps the box center as
+/// `center.position` and `center.theta` since its ROS 2 releases, and as `center.x`,
+/// `center.y` and `center.theta` before; both are read.
+struct Detection2DArray;
+
+impl ViewConverter for Detection2DArray {
+    fn id(&self) -> &'static str {
+        "ros_annotations"
+    }
+    fn kind(&self) -> Kind {
+        Kind::ImageAnnotations
+    }
+    fn name(&self) -> &'static str {
+        "Annotations"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "vision_msgs/msg/Detection2DArray"
+            && has(defs, "header", is_struct)
+            && has(defs, "detections", is_list)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let annotations = message
+            .children("detections")?
+            .iter()
+            .map(|detection| outline(detection).unwrap_or_else(|_| unreadable_annotation()))
+            .collect();
+        Ok(AnnotationsView {
+            frame_id: header_frame(message)?,
+            annotations,
+        }
+        .into())
+    }
+}
+
+fn outline(detection: &Message) -> anyhow::Result<Annotation> {
+    let bbox = detection.child("bbox")?.context("Detection has no bbox")?;
+    let center = bbox.child("center")?.context("Box has no center")?;
+    let [x, y] = if center.has("position") {
+        point2(&center, "position")
+    } else {
+        [center.number("x")?, center.number("y")?]
+    };
+    let theta = center.number("theta").unwrap_or(0.);
+    let (half_x, half_y) = (bbox.number("size_x")? / 2., bbox.number("size_y")? / 2.);
+    let (sin, cos) = theta.sin_cos();
+    let corner = |dx: f64, dy: f64| [x + dx * cos - dy * sin, y + dx * sin + dy * cos];
+    let (label, score) = best_hypothesis(detection)?;
+    Ok(Annotation {
+        shape: Shape::LineLoop(vec![
+            corner(-half_x, -half_y),
+            corner(half_x, -half_y),
+            corner(half_x, half_y),
+            corner(-half_x, half_y),
+        ]),
+        label,
+        score,
+        id: if detection.has("id") {
+            Some(detection.string("id")?.to_owned())
+        } else {
+            None
+        },
     })
 }

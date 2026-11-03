@@ -22,6 +22,7 @@ pub enum Kind {
     GeoLocation,
     Geo,
     Bbox3d,
+    ImageAnnotations,
 }
 
 impl Kind {
@@ -37,6 +38,7 @@ impl Kind {
             Kind::Path => "path",
             Kind::GeoLocation => "geo_location",
             Kind::Bbox3d => "bbox3d",
+            Kind::ImageAnnotations => "image_annotations",
             Kind::Geo => "geo",
         }
     }
@@ -56,6 +58,7 @@ pub enum View {
     GeoLocation(GeoLocationView),
     Geo(GeoView),
     Boxes(BoxesView),
+    Annotations(AnnotationsView),
 }
 
 impl View {
@@ -71,6 +74,7 @@ impl View {
             View::GeoLocation(_) => Kind::GeoLocation,
             View::Geo(_) => Kind::Geo,
             View::Boxes(_) => Kind::Bbox3d,
+            View::Annotations(_) => Kind::ImageAnnotations,
         }
     }
 }
@@ -95,7 +99,8 @@ into_view!(
     Path(PathView),
     GeoLocation(GeoLocationView),
     Geo(GeoView),
-    Boxes(BoxesView)
+    Boxes(BoxesView),
+    Annotations(AnnotationsView)
 );
 
 /// An encoded image file: `jpeg` (or `jpg`), `png`, `webp` or `avif`, in any case.
@@ -364,6 +369,55 @@ pub struct Box3 {
     pub id: Option<String>,
 }
 
+/// Marks drawn over one image, in its pixels: `[x, y]` from the top left. Which image
+/// is for the client to choose (ADR 0005). Each mark stands alone: one with a number
+/// that is not finite is left out and counted (ADR 0007).
+#[derive(Clone, Debug, Default)]
+pub struct AnnotationsView {
+    pub frame_id: Option<String>,
+    pub annotations: Vec<Annotation>,
+}
+
+/// One mark over an image, with what it marks when known.
+#[derive(Clone, Debug)]
+pub struct Annotation {
+    pub shape: Shape,
+    pub label: Option<String>,
+    pub score: Option<f64>,
+    pub id: Option<String>,
+}
+
+impl From<Shape> for Annotation {
+    fn from(shape: Shape) -> Self {
+        Self {
+            shape,
+            label: None,
+            score: None,
+            id: None,
+        }
+    }
+}
+
+/// The shapes of [`Annotation`], in pixels.
+#[derive(Clone, Debug)]
+pub enum Shape {
+    Points(Vec<[f64; 2]>),
+    /// Joined in order.
+    LineStrip(Vec<[f64; 2]>),
+    /// Joined in order, and the last to the first: a box, for one.
+    LineLoop(Vec<[f64; 2]>),
+    /// Pairs of points, each a separate line.
+    LineList(Vec<[f64; 2]>),
+    Circle {
+        center: [f64; 2],
+        diameter: f64,
+    },
+    Text {
+        position: [f64; 2],
+        text: String,
+    },
+}
+
 /// One location on the earth, WGS 84, such as a GNSS fix. A single value: clients
 /// may draw a topic's history of them as a trail (ADR 0005).
 #[derive(Clone, Debug, Default)]
@@ -425,6 +479,39 @@ pub(super) fn checked(pose: Pose) -> anyhow::Result<Pose> {
         position: pose.position,
         orientation,
     })
+}
+
+/// One annotation as sent, or `None` when a number in it is not finite.
+fn annotation_json(annotation: Annotation) -> Option<serde_json::Value> {
+    let points = |points: &[[f64; 2]]| points.iter().all(|p| finite(p)).then(|| json!(points));
+    let mut value = match &annotation.shape {
+        Shape::Points(p) => json!({ "type": "points", "points": points(p)? }),
+        Shape::LineStrip(p) => json!({ "type": "line_strip", "points": points(p)? }),
+        Shape::LineLoop(p) => json!({ "type": "line_loop", "points": points(p)? }),
+        Shape::LineList(p) => json!({ "type": "line_list", "points": points(p)? }),
+        Shape::Circle { center, diameter } => {
+            if !finite(center) || !diameter.is_finite() || *diameter < 0. {
+                return None;
+            }
+            json!({ "type": "circle", "position": center, "diameter": diameter })
+        }
+        Shape::Text { position, text } => {
+            if !finite(position) {
+                return None;
+            }
+            json!({ "type": "text", "position": position, "text": text })
+        }
+    };
+    if let Some(label) = annotation.label.filter(|l| !l.is_empty()) {
+        value["label"] = label.into();
+    }
+    if let Some(score) = annotation.score.filter(|s| s.is_finite()) {
+        value["score"] = score.into();
+    }
+    if let Some(id) = annotation.id.filter(|id| !id.is_empty()) {
+        value["id"] = id.into();
+    }
+    Some(value)
 }
 
 fn pose_json(pose: Pose) -> serde_json::Value {
@@ -644,6 +731,21 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
                 .collect();
             let omitted = total - kept.len();
             json!({ "kind": "bbox3d", "frame_id": boxes.frame_id, "boxes": kept, "omitted": omitted })
+        }
+        View::Annotations(annotations) => {
+            let total = annotations.annotations.len();
+            let kept: Vec<_> = annotations
+                .annotations
+                .into_iter()
+                .filter_map(annotation_json)
+                .collect();
+            let omitted = total - kept.len();
+            json!({
+                "kind": "image_annotations",
+                "frame_id": annotations.frame_id,
+                "annotations": kept,
+                "omitted": omitted,
+            })
         }
         View::GeoLocation(location) => {
             let GeoLocationView {

@@ -6,7 +6,7 @@ import { buildFieldIndex } from "../../src/workspace/fieldIndex";
 import { initialWorkspace, workspaceReducer } from "../../src/workspace/widgets";
 import type { Topic } from "../../src/types";
 
-const mocks = vi.hoisted(() => ({ frame: null as any, fetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ frame: null as any, fetch: vi.fn(), history: vi.fn() }));
 vi.mock("../../src/data/useViewData", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/data/useViewData")>()),
   useViewFrame: () => ({ frame: mocks.frame, error: "" }),
@@ -14,6 +14,7 @@ vi.mock("../../src/data/useViewData", async (importOriginal) => ({
 vi.mock("../../src/data/viewFrames", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/data/viewFrames")>()),
   fetchLatestFrame: mocks.fetch,
+  fetchViewHistory: mocks.history,
   pointBuffers: () => ({ positions: new Float32Array([0, 0, 2]), intensities: null }),
 }));
 afterEach(() => {
@@ -251,6 +252,102 @@ it("projects a cloud of another frame with transforms resolved at the image's st
   expect(requests.some((url) => url.includes("/transforms?"))).toBe(false);
   // The point, 2 m ahead in the lidar, is drawn: the transform was found.
   await waitFor(() => expect(fillRect).toHaveBeenCalled());
+});
+
+it("overlays the marks of the image's stamp, sought around its time", async () => {
+  vi.stubGlobal(
+    "Image",
+    class {
+      naturalWidth = 640;
+      naturalHeight = 480;
+      onload: (() => void) | null = null;
+      onerror = null;
+      set src(_: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    },
+  );
+  vi.stubGlobal("URL", { createObjectURL: () => "blob:1", revokeObjectURL: vi.fn() });
+  const stroke = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+    stroke,
+    fillText: vi.fn(),
+  } as any);
+  const marks = (time: string, stamp: string) => ({
+    time_ns: time,
+    value: {
+      kind: "image_annotations",
+      stamp_ns: stamp,
+      annotations: [
+        {
+          type: "line_loop",
+          points: [
+            [1, 1],
+            [2, 1],
+            [2, 2],
+          ],
+        },
+      ],
+      omitted: 0,
+    },
+    blob: () => new Uint8Array(),
+  });
+  mocks.history.mockResolvedValue([marks("4000000000", "3"), marks("6000000000", "5")]);
+  const topic = (name: string, kind: string): Topic => ({
+    source: "r/0",
+    topic: name,
+    schema_name: "T",
+    schema_encoding: null,
+    views: [{ id: kind, kind, name: kind }],
+    message_count: 1,
+    error: null,
+    fields: [],
+  });
+  const index = buildFieldIndex([topic("/image", "image"), topic("/marks", "image_annotations")]);
+  const state = workspaceReducer(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: "image",
+  });
+  const widget = state.widgets["widget-1"];
+  widget.series = [
+    ["image", "image"],
+    ["marks", "image_annotations"],
+  ].map(([name, view]) => ({
+    key: name,
+    source: "r/0",
+    topic: `/${name}`,
+    path: [],
+    color: "red",
+    lineWidth: 1,
+    hidden: false,
+    view,
+  }));
+  mocks.frame = {
+    time_ns: "5000000000",
+    value: {
+      kind: "image",
+      frame_id: "camera",
+      stamp_ns: "5",
+      format: "png",
+      data: { $blob: { offset: 0, length: 1 } },
+    },
+    blob: () => new Uint8Array([1]),
+  };
+  const info = { start_ns: "0", end_ns: "10000000000", message_count: 1 };
+  render(<ImageView widget={widget} info={info} index={index} />);
+  // The marks recorded a second after the image, with its stamp, are drawn.
+  await waitFor(() => expect(stroke).toHaveBeenCalled());
+  expect(mocks.history).toHaveBeenCalledWith(
+    expect.objectContaining({ topic: "/marks" }),
+    expect.anything(),
+    { start_ns: "3000000000", end_ns: "7000000000" },
+  );
 });
 
 it("displays raw images without encoding them as image files", async () => {

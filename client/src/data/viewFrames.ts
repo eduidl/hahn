@@ -83,8 +83,13 @@ export async function fetchLatestFrame(
 }
 
 /** Every frame of a view, ordered by time: recordings need not be. */
-export async function fetchViewHistory(target: ViewTarget, signal?: AbortSignal) {
-  const params = new URLSearchParams({ topic: target.topic, view: target.view ?? "" });
+export async function fetchViewHistory(
+  target: ViewTarget,
+  signal?: AbortSignal,
+  /** Recording time, the end excluded; the whole recording when left out. */
+  range?: { start_ns: string; end_ns: string },
+) {
+  const params = new URLSearchParams({ topic: target.topic, view: target.view ?? "", ...range });
   const { frames } = parseFrames(
     await fetchBuffer(`${sourceUrl(target.source)}/views?${params}`, signal),
   );
