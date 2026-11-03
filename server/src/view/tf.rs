@@ -3,8 +3,8 @@
 use super::convert::{Message, has, is_foxglove, is_string, is_struct, quaternion, vector};
 use crate::{
     AppState, blocking,
-    error::{ApiError, Code},
-    message::{parse_range, parse_time},
+    error::ApiError,
+    message::parse_range,
     source::{Source, TimeRange},
 };
 use axum::{
@@ -14,7 +14,7 @@ use axum::{
 use mcapdecode::core::{DataTypeDef, FieldDefs};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     sync::Arc,
 };
 
@@ -24,97 +24,6 @@ struct Transform {
     translation: [f64; 3],
     /// `[x, y, z, w]`
     rotation: [f64; 4],
-}
-
-const IDENTITY: Transform = Transform {
-    translation: [0.; 3],
-    rotation: [0., 0., 0., 1.],
-};
-
-fn multiply(a: [f64; 4], b: [f64; 4]) -> [f64; 4] {
-    let [ax, ay, az, aw] = a;
-    let [bx, by, bz, bw] = b;
-    [
-        aw * bx + ax * bw + ay * bz - az * by,
-        aw * by - ax * bz + ay * bw + az * bx,
-        aw * bz + ax * by - ay * bx + az * bw,
-        aw * bw - ax * bx - ay * by - az * bz,
-    ]
-}
-
-fn rotate(q: [f64; 4], v: [f64; 3]) -> [f64; 3] {
-    let [x, y, z, w] = q;
-    let [vx, vy, vz] = v;
-    // v + 2w(u × v) + 2u × (u × v), with t = 2(u × v).
-    let t = [
-        2. * (y * vz - z * vy),
-        2. * (z * vx - x * vz),
-        2. * (x * vy - y * vx),
-    ];
-    [
-        vx + w * t[0] + y * t[2] - z * t[1],
-        vy + w * t[1] + z * t[0] - x * t[2],
-        vz + w * t[2] + x * t[1] - y * t[0],
-    ]
-}
-
-impl Transform {
-    /// The transform applying `other` first and then `self`.
-    fn then(self, other: Transform) -> Transform {
-        let moved = rotate(self.rotation, other.translation);
-        Transform {
-            translation: [
-                self.translation[0] + moved[0],
-                self.translation[1] + moved[1],
-                self.translation[2] + moved[2],
-            ],
-            rotation: multiply(self.rotation, other.rotation),
-        }
-    }
-
-    fn inverse(self) -> Transform {
-        let [x, y, z, w] = self.rotation;
-        let rotation = [-x, -y, -z, w];
-        let [tx, ty, tz] = rotate(rotation, self.translation);
-        Transform {
-            translation: [-tx, -ty, -tz],
-            rotation,
-        }
-    }
-
-    fn interpolate(self, other: Transform, ratio: f64) -> Transform {
-        let mut translation = [0.; 3];
-        for (i, value) in translation.iter_mut().enumerate() {
-            *value = self.translation[i] + (other.translation[i] - self.translation[i]) * ratio;
-        }
-        Transform {
-            translation,
-            rotation: slerp(self.rotation, other.rotation, ratio),
-        }
-    }
-}
-
-fn slerp(a: [f64; 4], b: [f64; 4], ratio: f64) -> [f64; 4] {
-    let mut dot: f64 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
-    // Take the short way round: q and -q are the same rotation.
-    let sign = if dot < 0. { -1. } else { 1. };
-    dot *= sign;
-    let (from, to) = if dot > 0.9995 {
-        // Nearly parallel: the sine below would lose precision.
-        (1. - ratio, ratio)
-    } else {
-        let angle = dot.acos();
-        (
-            ((1. - ratio) * angle).sin() / angle.sin(),
-            (ratio * angle).sin() / angle.sin(),
-        )
-    };
-    let mut q = [0.; 4];
-    for (i, value) in q.iter_mut().enumerate() {
-        *value = from * a[i] + to * sign * b[i];
-    }
-    let length = q.iter().map(|v| v * v).sum::<f64>().sqrt();
-    q.map(|v| v / length)
 }
 
 /// Types read as transforms, chosen like the converters of views.
@@ -338,29 +247,6 @@ impl Edge {
     fn is_static(&self) -> bool {
         (self.on_static_topic && !self.on_dynamic_topic) || self.samples.len() == 1
     }
-
-    /// The parent and transform at `time`. Never extrapolates a dynamic edge.
-    fn at(&self, time: u64) -> Option<(&Arc<str>, Transform)> {
-        if self.is_static() {
-            let last = self.samples.last()?;
-            return Some((&last.parent, last.transform));
-        }
-        let after = self.samples.partition_point(|s| s.time <= time);
-        let before = self.samples.get(after.checked_sub(1)?)?;
-        if before.time == time {
-            return Some((&before.parent, before.transform));
-        }
-        let next = self.samples.get(after)?;
-        // A change of parent cannot be interpolated across.
-        if next.parent != before.parent {
-            return Some((&before.parent, before.transform));
-        }
-        let ratio = (time - before.time) as f64 / (next.time - before.time) as f64;
-        Some((
-            &before.parent,
-            before.transform.interpolate(next.transform, ratio),
-        ))
-    }
 }
 
 /// A sample read from a group, kept apart until the whole group has been read.
@@ -440,27 +326,6 @@ impl TfIndex {
         name
     }
 
-    /// Resolve one pose at its recording time, without changing the pose's local frame.
-    pub(super) fn pose_in_target(
-        &self,
-        target: &str,
-        source: &str,
-        time: u64,
-        position: [f64; 3],
-        orientation: [f64; 4],
-    ) -> Option<([f64; 3], [f64; 4])> {
-        let placement = if source == target {
-            IDENTITY
-        } else {
-            *self.resolve(target, time).get(source)?
-        };
-        let pose = placement.then(Transform {
-            translation: position,
-            rotation: orientation,
-        });
-        Some((pose.translation, pose.rotation))
-    }
-
     fn frames(&self) -> Vec<FrameInfo<'_>> {
         let mut frames: Vec<_> = self
             .names
@@ -524,38 +389,6 @@ impl TfIndex {
             .map(|(child, sample)| TransformRow::of(child, sample, true))
             .collect()
     }
-
-    /// Every frame connected to `target` at `time`, with the transform into `target`.
-    fn resolve(&self, target: &str, time: u64) -> BTreeMap<Arc<str>, Transform> {
-        // Each frame's edge as it stands at `time`, walkable in both directions.
-        let mut neighbours: HashMap<&str, Vec<(&Arc<str>, Transform)>> = HashMap::new();
-        for (child, edge) in &self.edges {
-            if let Some((parent, transform)) = edge.at(time) {
-                // parent <- child, and child <- parent.
-                neighbours
-                    .entry(parent)
-                    .or_default()
-                    .push((child, transform));
-                neighbours
-                    .entry(child)
-                    .or_default()
-                    .push((parent, transform.inverse()));
-            }
-        }
-        let target: Arc<str> = target.into();
-        let mut resolved = BTreeMap::from([(target.clone(), IDENTITY)]);
-        let mut queue = VecDeque::from([target]);
-        while let Some(frame) = queue.pop_front() {
-            let to_target = resolved[&frame];
-            for (next, transform) in neighbours.get(&*frame).into_iter().flatten() {
-                if !resolved.contains_key(*next) {
-                    resolved.insert((*next).clone(), to_target.then(*transform));
-                    queue.push_back((*next).clone());
-                }
-            }
-        }
-        resolved
-    }
 }
 
 /// Reads one group's transforms, collecting the children of samples left out.
@@ -602,7 +435,7 @@ fn read_group(
 #[derive(Serialize)]
 struct FrameInfo<'a> {
     id: &'a str,
-    /// The last parent recorded. Superseded by `parents`.
+    /// The last parent recorded; `parents` lists every one.
     parent: Option<&'a str>,
     /// `None` for a frame that is only ever a parent.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -699,37 +532,4 @@ pub(crate) async fn dynamic_transforms(
     let (start, end) = (range.start.unwrap_or(0), range.end.unwrap_or(u64::MAX));
     let index = run_index(&state, &run).await?;
     Ok(Json(serde_json::json!({ "samples": index.dynamic_samples(start, end) })).into_response())
-}
-
-#[derive(Deserialize)]
-pub(crate) struct TransformsQuery {
-    target: String,
-    time_ns: String,
-}
-
-#[derive(Serialize)]
-pub(crate) struct Transforms {
-    time_ns: String,
-    target: String,
-    frames: BTreeMap<Arc<str>, Transform>,
-}
-
-pub(crate) async fn transforms(
-    State(state): State<AppState>,
-    Path(run): Path<String>,
-    Query(query): Query<TransformsQuery>,
-) -> Result<Json<Transforms>, ApiError> {
-    let time = parse_time(&query.time_ns)?;
-    let index = run_index(&state, &run).await?;
-    if !index.names.contains(query.target.as_str()) {
-        return Err(ApiError::new(
-            Code::UnknownFrame,
-            format!("Unknown frame: {}", query.target),
-        ));
-    }
-    Ok(Json(Transforms {
-        frames: index.resolve(&query.target, time),
-        time_ns: query.time_ns,
-        target: query.target,
-    }))
 }

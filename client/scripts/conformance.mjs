@@ -289,31 +289,11 @@ await check(
 );
 
 const framesPath = "/api/runs/{run}/frames";
-const transformsPath = "/api/runs/{run}/transforms";
 const visualRun = visual.slice(0, visual.indexOf("/groups/"));
 await check(framesPath, `${unknown}/frames`, 404, { code: "run_not_found" });
 const [{ frames: graph }] = await check(framesPath, `${visualRun}/frames`, 200);
 if (!graph.length) failures.push(`${framesPath}: expected frames`);
-const transformsUrl = (params, at = visualRun) => `${at}/transforms?${new URLSearchParams(params)}`;
 const [{ start_ns: visualStart }] = await check(info, visual, 200);
-const [{ id: targetFrame }] = graph;
-const [resolved] = await check(
-  transformsPath,
-  transformsUrl({ target: targetFrame, time_ns: visualStart }),
-  200,
-);
-if (!resolved.frames[targetFrame])
-  failures.push(`${transformsPath}: the target must resolve to itself`);
-await check(transformsPath, transformsUrl({ target: "no-such-frame", time_ns: "1" }), 422);
-await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "x" }), 400, {
-  code: "invalid_request",
-});
-await check(transformsPath, transformsUrl({ target: targetFrame }), 400, {
-  code: "invalid_request",
-});
-await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "1" }, unknown), 404, {
-  code: "run_not_found",
-});
 
 const staticPath = "/api/runs/{run}/transforms/static";
 const dynamicPath = "/api/runs/{run}/transforms/dynamic";

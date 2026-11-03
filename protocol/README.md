@@ -2,7 +2,7 @@
 
 This is the current implemented contract of the Hahn client and Rust server, including the binary format of view frames. It is a development baseline, not a stable compatibility promise. Update it together with implementation, callers and synthetic-data tests.
 
-Unimplemented ideas are preserved in [drafts/README.md](drafts/README.md) and its OpenAPI file. They do not block changes to the current implementation or participate in client generation and conformance checks.
+The decisions behind it, and the options not taken, are recorded in [../docs/adr/](../docs/adr/).
 
 [`openapi.json`](openapi.json) holds the operations and every field: their types, whether they are required, their meaning, their units and examples. Its schemas follow the order of the operations rather than the alphabet. Each fact is written in only one of the two documents.
 
@@ -33,7 +33,7 @@ Every `time_ns` of a message is its **primary time**.
 - `start_ns`, `end_ns`, the `time_ns` query parameter and the time range in `RecordingInfo` are all in primary time.
 - The playback position and time axis are based on primary time too. `publish_time` and times inside messages (such as `header.stamp`) are not primary time. The former can be read as a `meta_fields` entry, and the latter as an ordinary field.
 - `timezone` can declare the run's timezone, and the client decides which one to display. Recording times may be relative; a timestamp alone does not establish a wall-clock epoch.
-- The current API has no measurement-clock mapping or reset-interval queries. Transform samples and lookups use recording time as well.
+- A value's measurement time, such as its `header.stamp`, is a field like any other, except that view values and transform samples also carry it as `stamp_ns`. The protocol defines no mapping between recording and measurement time and no clock resets.
 
 ## Streams
 
@@ -86,7 +86,7 @@ The current views are encoded or raw images, camera calibration, point clouds, p
 
 The API is the same for these types: `/views` and `/views/latest`, with the views of a topic listed in `/topics`. An encoded image supports `jpeg`, `png`, `webp` and `avif`; `jpg` is normalized to `jpeg`. A ROS 2 compressed image names its format as `<pixel format>; <format> compressed <pixel format>` or as the format alone; `compressedDepth` images are not supported. Raw images retain their recorded pixels and row stride. Their supported encodings and required dimensions are in the schema.
 
-**In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example. For pose views, its optional `target_frame` converts each pose into that frame at its own recording time; missing transforms produce per-frame errors so clients can leave gaps.
+**In every Hahn type, the latest value replaces everything shown before.** Clients keep no state between values. Use `/views` when past values are needed, for a trajectory for example.
 
 ### Wire format
 
@@ -122,32 +122,30 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 
 A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. The odometry view exposes its current pose in `frame_id`; velocities and covariances remain available as message fields. Point clouds omit points with non-finite positions. Missing poses use identity; zero-length quaternions also mean identity. ROS 2 messages with multi-byte big-endian pixels or points, and `NavSatFix` messages without a fix, are conversion failures. A `PointCloud2` field holding several values per point is left out, as is padding named `_`. These are current converter behaviors, not a general validation policy for future kinds.
 
-The client selects views by supported `kind`. Images in an unsupported format show an error. View values carry their measurement time as `stamp_ns` when the message records one (`header.stamp`, or `timestamp` in Foxglove schemas); the client does not use it yet. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image recording time. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
+The client selects views by supported `kind`. Images in an unsupported format show an error. View values carry their measurement time as `stamp_ns` when the message records one (`header.stamp`, or `timestamp` in Foxglove schemas); a zero or invalid stamp is left out, never replaced by recording time. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image's measurement time, or its recording time without one. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
 
 ## Coordinate frames
 
-Transforms are not a Hahn type. They are not something to show but the context for reading other values, they have to be merged across topics (`/tf`, `/tf_static`), and a single message may hold only some of the frames. So a run has one graph of frames, merged from all of its groups whether open or not, and the server resolves it. A view of any group refers to the same graph, since how a run divides into groups is up to the server. A group that cannot be read is left out. Which topics feed it is up to the server. Those topics are still readable through `/messages`.
+Transforms are not a Hahn type. They are not something to show but the context for reading other values, they have to be merged across topics (`/tf`, `/tf_static`), and a single message may hold only some of the frames. So a run has one graph of frames, merged from all of its groups whether open or not. The server delivers it as samples and the client resolves it, so that the time and interpolation used can change without a request. A view of any group refers to the same graph, since how a run divides into groups is up to the server. Which topics feed it is up to the server. Those topics are still readable through `/messages`.
 
 The Rust server reads `foxglove.FrameTransform`, arrays in `foxglove.FrameTransforms`, and `tf2_msgs/msg/TFMessage`. It treats topics whose final path segment is `tf_static` or `tf-static` as static. It reads each channel and segment separately and combines their transforms in the run's graph.
 
 Coordinates are right-handed, in meters and radians. The server converts recordings on other conventions.
 
-The graph is also delivered as samples, for the client to resolve (the current client does not yet):
+### What the server delivers
 
-- Each frame with a parent is either `static` or `dynamic` in `/frames`. A frame recorded on both static and dynamic topics is dynamic. `/frames` also lists every parent of a frame, the samples left out of it, and the groups that could not be read.
+- Each frame with a parent is either `static` or `dynamic` in `/frames`. A frame recorded on both static and dynamic topics is dynamic; one with a single sample, which is all there is to know about it, is static. `/frames` also lists every parent of a frame, the samples left out of it, and the groups that could not be read and are left out of the graph.
 - `/transforms/static` gives each static frame's last transform, without times.
-- `/transforms/dynamic` gives the samples of dynamic frames recorded in a range of recording time, in recording order, each with its recording time and, when its message has one, its measurement `stamp_ns`. Equal times stay separate rows.
+- `/transforms/dynamic` gives the samples of dynamic frames recorded in a range of recording time, in recording order, each with its recording time and, when its message has one, its measurement `stamp_ns`. Equal times stay separate rows. Request a margin around what is shown: stamps lag recording time.
+- A sample with a non-finite number, or without both of its frames, is left out and counted.
 
-`/transforms` resolves the graph by these rules:
+### How the client resolves
 
-- Dynamic transforms are interpolated between the samples around `time_ns`: linearly for translation, by slerp for rotation. Static ones hold at all times, and what counts as static is up to the server.
-- Between samples with different parents, nothing is interpolated: the earlier sample holds unchanged until the later one, so the frame stays under its earlier parent. With several samples at the same time, the last in source order applies: recording order within a channel, then topic order within a group, then the order of the run's groups.
-- Rotations are interpolated the short way round, since `q` and `-q` are the same rotation.
-- A sample with a non-finite number, or without both of its frames, is ignored.
-- A cycle of frames is invalid data. The response is still valid, but which way round the frames on it were resolved is unspecified.
-- Nothing is extrapolated. A frame not connected to `target`, or reached through a dynamic transform outside its samples, is left out of `frames`.
-- Samples are indexed by recording time (MCAP `log_time`), not by measurement stamps. The current 3D client also places point clouds using their message recording time. Recording delay can therefore cause spatial misalignment; accurate measurement-time placement remains in the draft.
-- `/transforms` uses the graph as it was at `time_ns`, while `/frames` gives each frame the parent last recorded.
+- The client resolves at a value's measurement time on the stamps of samples, or at its recording time on their recording times, as the user chooses. A value without a stamp is placed by recording time, and the client says so. Frames with no value of their own, such as their axes, are shown at the playback position by recording time.
+- Between the samples around a time, translation is interpolated linearly and rotation by slerp, the short way round. The user can turn interpolation off, and the earlier sample then holds until the next.
+- Between samples with different parents, nothing is interpolated: the earlier sample holds unchanged until the later one. With several samples at the same time, the last in recording order applies.
+- Nothing is extrapolated. A frame not connected to the target, or reached through a dynamic frame outside its samples, has no transform then.
+- A cycle of frames is invalid data. Which way round the frames on it are resolved is unspecified.
 
 ## Errors
 
@@ -164,7 +162,6 @@ An empty latest message is `null`; an empty history or latest view ends with `co
 | 422 | `unknown_field` | The field path is well-formed but not in the schema |
 | 422 | `unknown_meta_field` | The meta field does not exist |
 | 422 | `unknown_view` | The topic has no view with this ID |
-| 422 | `unknown_frame` | The transform target frame does not exist |
 | 422 | `invalid_selection` | The field exists but cannot be used for the request, such as a non-scalar field with `preview=false` |
 | 422 | `recording_unreadable` | The recording cannot be opened, read or decoded |
 | 500 | `internal_error` | An unexpected server failure |
@@ -180,5 +177,5 @@ Not compressing is faster locally, and compressing wins on slow links. When comp
 - Relative times (starting at 0) cannot be told apart from epoch times
 - `/messages` transfers a lot (rows of JSON)
 - `known_time_ns` saves the transfer but not the server's work of reading the message
-- Clients do not yet place values by their measurement time, and clock resets are not modeled
-- Transform and point-cloud placement use recording time, so recording delay can cause spatial errors
+- Measurement time that goes backwards within a recording, after a simulation restart for example, is not modeled: a lookup by stamp may match samples from another stretch of it
+- Values whose stamps are on another clock than the transforms, as after replaying a recording, are not detected; aligning by recording time works around it

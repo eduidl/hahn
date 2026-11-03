@@ -10,7 +10,7 @@ mod ros2;
 mod tf;
 mod value;
 
-pub(crate) use tf::{TfIndex, dynamic_transforms, frames, readers, static_transforms, transforms};
+pub(crate) use tf::{TfIndex, dynamic_transforms, frames, readers, static_transforms};
 pub use tf::{TransformReader, TransformSample};
 
 use crate::{
@@ -178,11 +178,10 @@ fn frame(
     defs: &FieldDefs,
     times: MessageTimes,
     value: &Value,
-    target: Option<(&str, &TfIndex)>,
 ) -> anyhow::Result<Vec<Bytes>> {
     let mut payload = Payload::default();
     let converted = Message::new(defs, value).and_then(|message| {
-        let mut view = converter.convert(&message)?;
+        let view = converter.convert(&message)?;
         anyhow::ensure!(
             view.kind() == converter.kind(),
             "Converter {} returned {} instead of {}",
@@ -190,33 +189,6 @@ fn frame(
             view.kind().as_str(),
             converter.kind().as_str()
         );
-        if let Some((target, tf)) = target {
-            let View::Pose(pose) = &mut view else {
-                anyhow::bail!("Target frame is only supported for pose views");
-            };
-            pose.pose = value::checked(pose.pose)?;
-            let source = pose
-                .frame_id
-                .as_deref()
-                .filter(|id| !id.is_empty())
-                .ok_or_else(|| anyhow::anyhow!("Pose has no frame ID"))?;
-            let (position, orientation) = tf
-                .pose_in_target(
-                    target,
-                    source,
-                    times.log_time,
-                    pose.pose.position,
-                    pose.pose.orientation,
-                )
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No transform from {source} to {target} at this time")
-                })?;
-            pose.frame_id = Some(target.to_owned());
-            pose.pose = Pose {
-                position,
-                orientation,
-            };
-        }
         let stamp = converter.stamp(&message)?;
         let mut value = value::encode(view, &mut payload)?;
         if let (Some(stamp), Some(object)) = (stamp, value.as_object_mut()) {
@@ -262,7 +234,6 @@ pub(crate) struct ViewsQuery {
     start_ns: Option<String>,
     /// Exclusive upper bound. Omit to include the last timestamp of a recording.
     end_ns: Option<String>,
-    target_frame: Option<String>,
 }
 
 /// Converted messages in a time range, one frame per message.
@@ -273,34 +244,12 @@ pub(crate) async fn views(
 ) -> Result<Response, ApiError> {
     let group = state.group(&run, &group)?;
     let range = parse_range(&query.start_ns, &query.end_ns)?;
-    let (topic, view, target) = (query.topic, query.view, query.target_frame);
-    let (source, topic, defs, converter, target) = blocking(move || {
+    let (topic, view) = (query.topic, query.view);
+    let (source, topic, defs, converter) = blocking(move || {
         let source = group.source()?;
         group.require_topic(&topic)?;
         let (defs, converter) = group.views(&state.converters)?.get(&topic, &view)?;
-        if target.is_some() && converter.kind() != Kind::Pose {
-            return Err(coded(
-                Code::InvalidRequest,
-                "Target frame is only supported for pose views",
-            ));
-        }
-        let target = target
-            .map(|target| {
-                if target.is_empty() {
-                    return Err(coded(
-                        Code::InvalidRequest,
-                        "Target frame must not be empty",
-                    ));
-                }
-                let run = state
-                    .runs
-                    .iter()
-                    .find(|item| item.id == run)
-                    .expect("run checked by group");
-                Ok::<_, anyhow::Error>((target, run.tf(&state.transforms)?))
-            })
-            .transpose()?;
-        Ok((source, topic, defs, converter, target))
+        Ok((source, topic, defs, converter))
     })
     .await?;
     let (tx, rx) = mpsc::channel(4);
@@ -318,15 +267,7 @@ pub(crate) async fn views(
                 return Err(disconnected().into());
             }
             scanned += 1;
-            send(frame(
-                &*converter,
-                &defs,
-                times,
-                &value,
-                target
-                    .as_ref()
-                    .map(|(name, tf)| (name.as_str(), tf.as_ref())),
-            )?)?;
+            send(frame(&*converter, &defs, times, &value)?)?;
             Ok(())
         });
         if tx.is_closed() {
@@ -378,7 +319,7 @@ pub(crate) async fn latest(
             if known == Some(times.log_time) {
                 chunks.extend(control(&Header::Unchanged)?);
             } else {
-                chunks.extend(frame(&*converter, &defs, *times, value, None)?);
+                chunks.extend(frame(&*converter, &defs, *times, value)?);
             }
         }
         chunks.extend(control(&Header::Complete {

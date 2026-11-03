@@ -6,7 +6,7 @@
 
 - 実装・利用側・テスト・現行仕様を同じ変更で更新します。APIの変更後は `npm --prefix client run gen:api` で型を生成します。
 - `protocol/openapi.json` と `protocol/README.md` が現行契約です。安定版の互換性保証はまだ設けません。
-- `protocol/drafts/` は未実装案の保存場所です。案の完成を現在の変更の条件にせず、必要になった部分だけ実装と合成データのテストを伴って取り込みます。
+- 設計の判断は `docs/adr/` に記録します。契約の考え方を変えるときは、先に ADR を書くか直し、実装・現行仕様・テストをそれに合わせます。
 - サーバのテストは `server/tests/` に置き、HTTP API と `hahn` クレートの公開 API だけを通して確かめます。`server/src/` にはテストを書きません（`server/tests/sources.rs` が検査します）。任意のスキーマと値は、`server/tests/api/memory.rs` のメモリ上の録画で用意できます。
 
 ## データと確認

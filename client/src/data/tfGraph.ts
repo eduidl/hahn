@@ -5,6 +5,13 @@ export type Transform = Schemas["Transform"];
 export type StaticTransform = Schemas["StaticTransform"];
 export type DynamicTransform = Schemas["DynamicTransform"];
 
+/** Every frame resolved into `target` at `time_ns`, each by its transform into it. */
+export type ResolvedFrames = {
+  time_ns: string;
+  target: string;
+  frames: Record<string, Transform>;
+};
+
 /**
  * Which time to resolve the graph at (ADR 0002): the recording time of messages, or
  * the measurement time of their stamps. Samples without a stamp have no place on the

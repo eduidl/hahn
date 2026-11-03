@@ -157,23 +157,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run}/transforms": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description For every frame that can be resolved, the transform into `target` at a given time. */
-        get: operations["transforms"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/runs/{run}/transforms/static": {
         parameters: {
             query?: never;
@@ -222,7 +205,7 @@ export interface components {
          * @description Identifies the failure; clients branch on it and never parse the description. Treat a code you do not know as a failure of unknown kind, never as an empty result. The README lists what each code means.
          * @enum {string}
          */
-        ErrorCode: "invalid_request" | "run_not_found" | "group_not_found" | "unknown_topic" | "unknown_field" | "unknown_meta_field" | "unknown_view" | "unknown_frame" | "invalid_selection" | "recording_unreadable" | "internal_error";
+        ErrorCode: "invalid_request" | "run_not_found" | "group_not_found" | "unknown_topic" | "unknown_field" | "unknown_meta_field" | "unknown_view" | "invalid_selection" | "recording_unreadable" | "internal_error";
         /**
          * @description The body of every error.
          * @example {
@@ -456,7 +439,7 @@ export interface components {
         };
         FrameInfo: {
             id: string;
-            /** @description The parent last recorded. Superseded by `parents`. */
+            /** @description The parent last recorded, or `null` for a frame that is only ever a parent. `parents` lists every one. */
             parent: string | null;
             /**
              * @description Whether the frame's transform to its parent holds at all times or changes with time. Omitted for a frame that is only ever a parent. A frame on both static and dynamic topics is dynamic.
@@ -467,49 +450,6 @@ export interface components {
             parents: string[];
             /** @description Samples of this frame left out because they hold a number that is not finite or no parent. */
             dropped_samples: components["schemas"]["Count"];
-        };
-        /**
-         * @description Transforms into `target` at one time.
-         * @example {
-         *       "time_ns": "1760000000123456789",
-         *       "target": "map",
-         *       "frames": {
-         *         "map": {
-         *           "translation": [
-         *             0,
-         *             0,
-         *             0
-         *           ],
-         *           "rotation": [
-         *             0,
-         *             0,
-         *             0,
-         *             1
-         *           ]
-         *         },
-         *         "base_link": {
-         *           "translation": [
-         *             1,
-         *             2,
-         *             0
-         *           ],
-         *           "rotation": [
-         *             0,
-         *             0,
-         *             0,
-         *             1
-         *           ]
-         *         }
-         *       }
-         *     }
-         */
-        Transforms: {
-            time_ns: components["schemas"]["TimeNs"];
-            target: string;
-            /** @description Includes `target`. A frame that cannot be resolved is left out. */
-            frames: {
-                [key: string]: components["schemas"]["Transform"];
-            };
         };
         /** @description A transform that holds at all times: `p_parent = rotation * p_child + translation`. */
         StaticTransform: {
@@ -985,8 +925,6 @@ export interface operations {
                 start_ns?: components["parameters"]["StartNs"];
                 /** @description The end of the range in primary time, excluded. To read through the last time, omit it. */
                 end_ns?: components["parameters"]["EndNs"];
-                /** @description For pose views only, transform each pose into this frame at its recording time. A missing transform is a frame conversion error. */
-                target_frame?: string;
             };
             header?: never;
             path: {
@@ -1052,37 +990,6 @@ export interface operations {
                     "application/json": components["schemas"]["FrameList"];
                 };
             };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    transforms: {
-        parameters: {
-            query: {
-                /** @description An `id` from `/frames`. An unknown one is 422. */
-                target: string;
-                /** @description Recording time at which to resolve the graph. The current client uses the point-cloud message time for placement, or the playback position to inspect frames. Measurement-time lookup is not implemented. */
-                time_ns: components["schemas"]["TimeNs"];
-            };
-            header?: never;
-            path: {
-                run: components["parameters"]["Run"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The resolved transforms */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Transforms"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
             500: components["responses"]["InternalError"];

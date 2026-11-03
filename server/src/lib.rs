@@ -163,7 +163,6 @@ impl Builder {
                 get(view::latest),
             )
             .route("/api/runs/{run}/frames", get(view::frames))
-            .route("/api/runs/{run}/transforms", get(view::transforms))
             .route(
                 "/api/runs/{run}/transforms/static",
                 get(view::static_transforms),

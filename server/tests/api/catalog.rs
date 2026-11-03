@@ -337,6 +337,9 @@ async fn a_group_without_messages_has_no_time_range() {
         assert_eq!((status, latest), (StatusCode::OK, Value::Null));
         let (status, events) = stream(app, "/g/messages", json!({"topic": topic})).await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(events, vec![json!({"type":"complete","scanned_messages":0})]);
+        assert_eq!(
+            events,
+            vec![json!({"type":"complete","scanned_messages":0})]
+        );
     }
 }

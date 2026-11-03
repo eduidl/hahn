@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "description": "Current implemented HTTP contract of the Hahn client and Rust server. Change it together with implementation and synthetic-data tests. Unimplemented proposals in protocol/drafts/ are not part of this contract; no stable compatibility guarantee is made yet.",
+    "description": "Current implemented HTTP contract of the Hahn client and Rust server. Change it together with implementation and synthetic-data tests. The decisions behind it are in docs/adr/; no stable compatibility guarantee is made yet.",
     "title": "Hahn API",
     "version": "0.1.0"
   },
@@ -294,16 +294,6 @@
           },
           {
             "$ref": "#/components/parameters/EndNs"
-          },
-          {
-            "name": "target_frame",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "description": "For pose views only, transform each pose into this frame at its recording time. A missing transform is a frame conversion error."
           }
         ],
         "responses": {
@@ -393,59 +383,6 @@
                 }
               }
             }
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "422": {
-            "$ref": "#/components/responses/Unprocessable"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/runs/{run}/transforms": {
-      "get": {
-        "operationId": "transforms",
-        "description": "For every frame that can be resolved, the transform into `target` at a given time.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Run"
-          },
-          {
-            "name": "target",
-            "in": "query",
-            "required": true,
-            "description": "An `id` from `/frames`. An unknown one is 422.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "time_ns",
-            "in": "query",
-            "required": true,
-            "description": "Recording time at which to resolve the graph. The current client uses the point-cloud message time for placement, or the playback position to inspect frames. Measurement-time lookup is not implemented.",
-            "schema": {
-              "$ref": "#/components/schemas/TimeNs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The resolved transforms",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Transforms"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -568,7 +505,6 @@
           "unknown_field",
           "unknown_meta_field",
           "unknown_view",
-          "unknown_frame",
           "invalid_selection",
           "recording_unreadable",
           "internal_error"
@@ -1259,7 +1195,7 @@
             "type": "string"
           },
           "parent": {
-            "description": "The parent last recorded. Superseded by `parents`.",
+            "description": "The parent last recorded, or `null` for a frame that is only ever a parent. `parents` lists every one.",
             "type": [
               "string",
               "null"
@@ -1285,64 +1221,6 @@
             "$ref": "#/components/schemas/Count"
           }
         }
-      },
-      "Transforms": {
-        "description": "Transforms into `target` at one time.",
-        "type": "object",
-        "required": [
-          "time_ns",
-          "target",
-          "frames"
-        ],
-        "properties": {
-          "time_ns": {
-            "$ref": "#/components/schemas/TimeNs"
-          },
-          "target": {
-            "type": "string"
-          },
-          "frames": {
-            "description": "Includes `target`. A frame that cannot be resolved is left out.",
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/Transform"
-            }
-          }
-        },
-        "examples": [
-          {
-            "time_ns": "1760000000123456789",
-            "target": "map",
-            "frames": {
-              "map": {
-                "translation": [
-                  0,
-                  0,
-                  0
-                ],
-                "rotation": [
-                  0,
-                  0,
-                  0,
-                  1
-                ]
-              },
-              "base_link": {
-                "translation": [
-                  1,
-                  2,
-                  0
-                ],
-                "rotation": [
-                  0,
-                  0,
-                  0,
-                  1
-                ]
-              }
-            }
-          }
-        ]
       },
       "StaticTransform": {
         "description": "A transform that holds at all times: `p_parent = rotation * p_child + translation`.",
