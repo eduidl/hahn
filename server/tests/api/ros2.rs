@@ -228,3 +228,177 @@ async fn ros2_compressed_image_format_names_the_encoded_part() {
     let error = events[2].0["error"].as_str().unwrap();
     assert!(error.contains("no name"), "{error}");
 }
+
+/// Shapes of the standard messages, as an in-memory recording holds them.
+mod shapes {
+    use crate::memory::{list, structure};
+    use hahn::{DataTypeDef as D, Value as V};
+
+    pub fn vector() -> D {
+        structure(vec![("x", D::F64), ("y", D::F64), ("z", D::F64)])
+    }
+    pub fn quaternion() -> D {
+        structure(vec![
+            ("x", D::F64),
+            ("y", D::F64),
+            ("z", D::F64),
+            ("w", D::F64),
+        ])
+    }
+    pub fn pose() -> D {
+        structure(vec![("position", vector()), ("orientation", quaternion())])
+    }
+    pub fn header() -> D {
+        let time = structure(vec![("sec", D::I32), ("nanosec", D::U32)]);
+        structure(vec![("stamp", time), ("frame_id", D::String)])
+    }
+    pub fn poses() -> D {
+        list(pose())
+    }
+    pub fn stamped_poses() -> D {
+        list(structure(vec![("header", header()), ("pose", pose())]))
+    }
+    pub fn header_value(sec: i32, frame: &str) -> V {
+        V::Struct(vec![
+            V::Struct(vec![V::I32(sec), V::U32(0)]),
+            V::string(frame),
+        ])
+    }
+    pub fn vector_value(x: f64) -> V {
+        V::Struct(vec![V::F64(x), V::F64(0.), V::F64(0.)])
+    }
+    pub fn pose_value(x: f64) -> V {
+        let still = V::Struct(vec![V::F64(0.), V::F64(0.), V::F64(0.), V::F64(1.)]);
+        V::Struct(vec![vector_value(x), still])
+    }
+}
+
+#[tokio::test]
+async fn ros2_points_pose_arrays_and_paths_are_views() {
+    use crate::memory::Topic;
+    use hahn::Value as V;
+    use shapes::*;
+    let point = Topic::new(
+        "point",
+        "geometry_msgs/msg/PointStamped",
+        vec![("header", header()), ("point", vector())],
+    )
+    .at(1, vec![header_value(3, "map"), vector_value(2.)]);
+    let particles = Topic::new(
+        "particles",
+        "geometry_msgs/msg/PoseArray",
+        vec![("header", header()), ("poses", poses())],
+    )
+    .at(
+        1,
+        vec![
+            header_value(3, "map"),
+            V::List(vec![pose_value(1.), pose_value(f64::NAN), pose_value(2.)]),
+        ],
+    );
+    let stamped = |x: f64| V::Struct(vec![header_value(0, "map"), pose_value(x)]);
+    let route = Topic::new(
+        "route",
+        "nav_msgs/msg/Path",
+        vec![("header", header()), ("poses", stamped_poses())],
+    )
+    .at(
+        1,
+        vec![
+            header_value(3, "map"),
+            V::List(vec![stamped(1.), stamped(2.)]),
+        ],
+    )
+    .at(
+        2,
+        vec![
+            header_value(3, "map"),
+            V::List(vec![stamped(1.), stamped(f64::NAN)]),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![point, particles, route], |builder| builder);
+    let values = |topic: &'static str, view: &'static str| {
+        let app = app.clone();
+        async move {
+            let (status, events) = frames(&app, &view_url("views", topic, view, "")).await;
+            assert_eq!(status, StatusCode::OK);
+            events
+                .into_iter()
+                .map(|(header, _)| header)
+                .collect::<Vec<_>>()
+        }
+    };
+    let point = values("point", "ros_position").await;
+    assert_eq!(
+        point[0]["value"],
+        json!({"kind": "position", "frame_id": "map", "position": [2., 0., 0.], "stamp_ns": "3000000000"})
+    );
+    // A pose that is not finite is left out of an unordered set alone, and counted.
+    let particles = values("particles", "ros_poses").await;
+    let value = &particles[0]["value"];
+    assert!(particles[0]["error"].is_null(), "{}", particles[0]);
+    assert_eq!(value["kind"], "poses");
+    assert_eq!(value["omitted"], 1);
+    let xs: Vec<_> = value["poses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|pose| pose["position"][0].clone())
+        .collect();
+    assert_eq!(xs, vec![json!(1.), json!(2.)]);
+    // In a path it would reshape the route, so the whole message fails.
+    let route = values("route", "ros_path").await;
+    assert_eq!(route[0]["value"]["kind"], "path");
+    assert_eq!(
+        route[0]["value"]["poses"][1]["position"],
+        json!([2., 0., 0.])
+    );
+    assert!(route[1]["error"].is_string());
+}
+
+#[tokio::test]
+async fn foxglove_poses_in_frame_are_paths_and_a_pose_in_frame_a_pose() {
+    use crate::memory::Topic;
+    use hahn::{DataTypeDef as D, Value as V};
+    use shapes::*;
+    let time = crate::memory::structure(vec![("sec", D::U32), ("nsec", D::U32)]);
+    let stamp = V::Struct(vec![V::U32(5), V::U32(0)]);
+    let pose = Topic::new(
+        "pose",
+        "foxglove.PoseInFrame",
+        vec![
+            ("timestamp", time.clone()),
+            ("frame_id", D::String),
+            ("pose", shapes::pose()),
+        ],
+    )
+    .at(1, vec![stamp.clone(), V::string("map"), pose_value(4.)]);
+    let route = Topic::new(
+        "route",
+        "foxglove.PosesInFrame",
+        vec![
+            ("timestamp", time),
+            ("frame_id", D::String),
+            ("poses", poses()),
+        ],
+    )
+    .at(
+        1,
+        vec![
+            stamp,
+            V::string("map"),
+            V::List(vec![pose_value(1.), pose_value(2.)]),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![pose, route], |builder| builder);
+    let (_, events) = frames(&app, &view_url("views", "pose", "pose_in_frame", "")).await;
+    assert_eq!(events[0].0["value"]["kind"], "pose");
+    assert_eq!(
+        events[0].0["value"]["pose"]["position"],
+        json!([4., 0., 0.])
+    );
+    assert_eq!(events[0].0["value"]["stamp_ns"], "5000000000");
+    let (_, events) = frames(&app, &view_url("views", "route", "path", "")).await;
+    assert_eq!(events[0].0["value"]["kind"], "path");
+    assert_eq!(events[0].0["value"]["poses"].as_array().unwrap().len(), 2);
+}

@@ -36,7 +36,8 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 pub use value::{
     CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, NumericType, PackedField,
-    PointCloudView, PointField, Pose, PoseView, RawImageView, View,
+    PathView, PointCloudView, PointField, Pose, PoseView, PosesView, PositionView, RawImageView,
+    View,
 };
 
 /// The built-in converters followed by `extra`, whose IDs must be new.

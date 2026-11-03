@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import * as THREE from "three";
 import { expect, it, vi } from "vitest";
 import { TfGraph } from "../../src/data/tfGraph";
-import { PoseLayer, PoseTrail } from "../../src/views/sceneLayers";
+import { PoseLayer, PoseSetLayer, PoseTrail } from "../../src/views/sceneLayers";
 import { useSeriesViewProblems } from "../../src/views/seriesViewProblem";
 
 function ReportedProblems() {
@@ -273,4 +273,76 @@ it("keeps a pose rigid to the fixed frame still, using the transform at its own 
   view.rerender(layer());
   expect(new THREE.Vector3().applyMatrix4(arrow.matrix).x).toBeCloseTo(0);
   view.unmount();
+});
+
+const quietStage = () => ({
+  scene: new THREE.Scene(),
+  invalidate: vi.fn(),
+  fit: vi.fn(),
+  reframe: vi.fn(),
+  resetView: vi.fn(),
+  setOrigin: vi.fn(),
+});
+const seriesOf = (view: string) => ({
+  key: view,
+  source: "r/0",
+  topic: `/${view}`,
+  path: [],
+  color: "red",
+  lineWidth: 1,
+  hidden: false,
+  view,
+});
+const still = [0, 0, 0, 1];
+/** A quarter turn about z: x points along y. */
+const turn = [0, 0, Math.SQRT1_2, Math.SQRT1_2];
+
+it("shows a position as a dot, without a heading", () => {
+  const stage = quietStage();
+  mocks.frame = { time_ns: "1", value: { kind: "position", frame_id: "map", position: [1, 2, 3] } };
+  mocks.transforms = { time_ns: "1", frames: {} };
+  const view = render(
+    <PoseLayer world="map" series={seriesOf("position")} info={null} target="map" stage={stage} />,
+  );
+  const [arrow, dot] = stage.scene.children;
+  expect(arrow.visible).toBe(false);
+  expect(dot.visible).toBe(true);
+  expect(new THREE.Vector3().applyMatrix4(dot.matrix).toArray()).toEqual([1, 2, 3]);
+  view.unmount();
+});
+
+it("draws a path joined in order and unordered poses by their headings", () => {
+  const problems: string[] = [];
+  const segments = (view: string, value: object) => {
+    const stage = quietStage();
+    mocks.frame = { time_ns: "1", value };
+    mocks.transforms = { time_ns: "1", frames: {} };
+    const rendered = render(
+      <>
+        <PoseSetLayer series={seriesOf(view)} info={null} target="map" stage={stage} />
+        <ReportedProblems />
+      </>,
+    );
+    const lines = stage.scene.children[0] as THREE.LineSegments;
+    expect(lines.visible).toBe(true);
+    const points = [...(lines.geometry.getAttribute("position").array as Float32Array)];
+    problems.push(rendered.container.textContent ?? "");
+    rendered.unmount();
+    return points.map((v) => Math.round(v * 100) / 100);
+  };
+  const pose = (x: number, orientation = still) => ({ position: [x, 0, 0], orientation });
+  // Three poses in order make two segments.
+  expect(
+    segments("path", { kind: "path", frame_id: "map", poses: [pose(0), pose(1), pose(2)] }),
+  ).toEqual([0, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0]);
+  // Unordered, each is a short heading of its own; nothing joins them.
+  expect(
+    segments("poses", {
+      kind: "poses",
+      frame_id: "map",
+      poses: [pose(0), pose(5, turn)],
+      omitted: 1,
+    }),
+  ).toEqual([0, 0, 0, 0.5, 0, 0, 5, 0, 0, 5, 0.5, 0]);
+  expect(problems.at(-1)).toContain("1 pose left out");
 });

@@ -1,6 +1,7 @@
 import {
   type Stage,
   PointsLayer,
+  PoseSetLayer,
   PoseLayer,
   CameraLayer,
   FrameAxes,
@@ -412,7 +413,7 @@ export default function Scene3D({
                     stage={stage}
                     index={index}
                   />
-                ) : kind === "pose" ? (
+                ) : kind === "pose" || kind === "position" ? (
                   <PoseLayer
                     key={series.key}
                     series={series}
@@ -421,7 +422,15 @@ export default function Scene3D({
                     world={world}
                     stage={stage}
                   />
-                ) : (
+                ) : kind === "poses" || kind === "path" ? (
+                  <PoseSetLayer
+                    key={series.key}
+                    series={series}
+                    info={info}
+                    target={target}
+                    stage={stage}
+                  />
+                ) : kind === "pointcloud" ? (
                   <PointsLayer
                     key={series.key}
                     series={series}
@@ -429,7 +438,8 @@ export default function Scene3D({
                     target={target}
                     stage={stage}
                   />
-                );
+                ) : // A kind this client does not know is not drawn (ADR 0007).
+                null;
               })}
           </div>
         </FollowContext.Provider>

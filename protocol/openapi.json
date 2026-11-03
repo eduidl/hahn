@@ -1416,6 +1416,15 @@
           },
           {
             "$ref": "#/components/schemas/PoseValue"
+          },
+          {
+            "$ref": "#/components/schemas/PositionValue"
+          },
+          {
+            "$ref": "#/components/schemas/PosesValue"
+          },
+          {
+            "$ref": "#/components/schemas/PathValue"
           }
         ]
       },
@@ -1823,6 +1832,95 @@
               },
               "pose": {
                 "$ref": "#/components/schemas/Pose"
+              }
+            }
+          }
+        ]
+      },
+      "PositionValue": {
+        "description": "One position in frame_id, without an orientation. A single value: its history may be drawn as a trail.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "position"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "position"
+                ]
+              },
+              "position": {
+                "$ref": "#/components/schemas/Vec3"
+              }
+            }
+          }
+        ]
+      },
+      "PosesValue": {
+        "description": "Poses in frame_id without an order, such as particles. One message holds them all and replaces the last; they are never joined to each other or across messages.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "poses",
+              "omitted"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "poses"
+                ]
+              },
+              "poses": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Pose"
+                }
+              },
+              "omitted": {
+                "description": "Poses left out because they were not finite or could not be read.",
+                "$ref": "#/components/schemas/Count"
+              }
+            }
+          }
+        ]
+      },
+      "PathValue": {
+        "description": "Poses in frame_id in order, such as a planned route, drawn joined. One message holds the whole path and replaces the last. A pose that is not finite fails the message.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FramedValue"
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "poses"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "path"
+                ]
+              },
+              "poses": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Pose"
+                }
               }
             }
           }
