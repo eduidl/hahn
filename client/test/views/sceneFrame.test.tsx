@@ -10,9 +10,11 @@ vi.mock("../../src/data/sources", async (original) => ({
   get: mocks.get,
 }));
 
-it("keeps the old frame until the requested transform arrives and ignores stale responses", async () => {
-  const pending: ((value: unknown) => void)[] = [];
-  mocks.get.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+it("keeps the old frame until the transforms arrive and ignores a superseded change", async () => {
+  const pending: [string, (value: unknown) => void][] = [];
+  mocks.get.mockImplementation(
+    (url: string) => new Promise((resolve) => pending.push([url, resolve])),
+  );
   const stage = { reframe: vi.fn(), resetView: vi.fn() } as any;
   const info = { start_ns: "0", end_ns: "10", message_count: 1 };
   const store = createPlaybackStore();
@@ -25,26 +27,26 @@ it("keeps the old frame until the requested transform arrives and ignores stale 
   });
   await waitFor(() => expect(result.current.target).toBe("a"));
   rerender({ frame: "b" });
-  await waitFor(() => expect(pending.length).toBe(1));
+  // The static transforms and the samples around the playback position.
+  await waitFor(() => expect(pending.length).toBe(3));
   expect(result.current.target).toBe("a");
   rerender({ frame: "c" });
-  await waitFor(() => expect(pending.length).toBe(2));
   const transform = { translation: [1, 2, 3], rotation: [0, 0, 0, 1] };
   await act(async () => {
-    pending[0]({ frames: { a: transform } });
+    for (const [url, resolve] of pending)
+      resolve(
+        url.endsWith("/static")
+          ? { transforms: [{ child: "a", parent: "c", ...transform }] }
+          : { samples: [] },
+      );
   });
-  expect(stage.reframe).not.toHaveBeenCalled();
-  await act(async () => {
-    pending[1]({ frames: { a: transform } });
-  });
+  // Only the latest change carries the view over, and nothing more was requested.
+  expect(pending.length).toBe(3);
+  expect(stage.reframe).toHaveBeenCalledTimes(1);
   expect(stage.reframe).toHaveBeenCalledWith(transform);
   expect(result.current.target).toBe("c");
   rerender({ frame: "d" });
-  await waitFor(() => expect(pending.length).toBe(3));
-  await act(async () => {
-    pending[2]({ frames: {} });
-  });
-  // No sample at this time to carry the view over with: the frame still changes.
+  // No transform at this time to carry the view over with: the frame still changes.
   await waitFor(() => expect(result.current.target).toBe("d"));
   expect(result.current.error).toBe("");
   expect(stage.reframe).toHaveBeenCalledTimes(1);
