@@ -74,7 +74,7 @@ Time Series and Table can show a topic from its schema alone, since a number is 
 
 So Hahn defines common types for images, point clouds and the like (Hahn types), and the server converts messages of user types to them. This conversion is called a view. The client deals only in Hahn types and does not need to know user types.
 
-The current views are encoded or raw images, camera calibration, point clouds, positions, poses, unordered sets of poses, paths, locations on the earth and GeoJSON shapes (`image`, `camera_calibration`, `pointcloud`, `position`, `pose`, `poses`, `path`, `geo_location`, `geo`). A single value (`position`, `pose`, `geo_location`) may be drawn with its history as a trail; a set (`poses`, `path`, `pointcloud`, `geo`) replaces the last and is never joined across messages. The Rust server converts these types, including the same Foxglove schemas from the `foxglove_msgs` ROS 2 package:
+The current views are encoded or raw images, camera calibration, point clouds, positions, poses, unordered sets of poses, paths, 3D boxes, locations on the earth and GeoJSON shapes (`image`, `camera_calibration`, `pointcloud`, `position`, `pose`, `poses`, `path`, `bbox3d`, `geo_location`, `geo`). A single value (`position`, `pose`, `geo_location`) may be drawn with its history as a trail; a set (`poses`, `path`, `bbox3d`, `pointcloud`, `geo`) replaces the last and is never joined across messages. The Rust server converts these types, including the same Foxglove schemas from the `foxglove_msgs` ROS 2 package:
 
 | Hahn type | Foxglove | ROS 2 |
 |---|---|---|
@@ -85,6 +85,7 @@ The current views are encoded or raw images, camera calibration, point clouds, p
 | `pose` | `foxglove.Odometry`, `foxglove.PoseInFrame` | `nav_msgs/msg/Odometry`, `geometry_msgs/msg/PoseStamped`, `geometry_msgs/msg/PoseWithCovarianceStamped` |
 | `poses` | | `geometry_msgs/msg/PoseArray` |
 | `path` | `foxglove.PosesInFrame` | `nav_msgs/msg/Path` |
+| `bbox3d` | | `vision_msgs/msg/Detection3DArray`, labeled by each detection's most likely hypothesis |
 | `geo_location` | `foxglove.LocationFix` | `sensor_msgs/msg/NavSatFix` |
 | `geo` | `foxglove.GeoJSON` | |
 
@@ -124,7 +125,7 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 
 ### Rules common to Hahn types
 
-A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. The odometry view exposes its current pose in `frame_id`; velocities and covariances remain available as message fields. Point clouds omit points with non-finite positions, `poses` omits poses that are not finite or cannot be read and `geo` features without a valid geometry, counting them; a `path` with such a pose fails, since leaving it out would reshape the route. Missing poses use identity; zero-length quaternions also mean identity. ROS 2 messages with multi-byte big-endian pixels or points, and `NavSatFix` messages without a fix, are conversion failures. A `PointCloud2` field holding several values per point is left out, as is padding named `_`. These are current converter behaviors, not a general validation policy for future kinds.
+A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. The odometry view exposes its current pose in `frame_id`; velocities and covariances remain available as message fields. Point clouds omit points with non-finite positions, `poses` omits poses that are not finite or cannot be read `bbox3d` boxes that are not finite or have a negative size, and `geo` features without a valid geometry, counting them; a `path` with such a pose fails, since leaving it out would reshape the route. Missing poses use identity; zero-length quaternions also mean identity. ROS 2 messages with multi-byte big-endian pixels or points, and `NavSatFix` messages without a fix, are conversion failures. A `PointCloud2` field holding several values per point is left out, as is padding named `_`. These are current converter behaviors, not a general validation policy for future kinds.
 
 The client selects views by supported `kind`. Images in an unsupported format show an error. View values carry their measurement time as `stamp_ns` when the message records one (`header.stamp`, or `timestamp` in Foxglove schemas); a zero or invalid stamp is left out, never replaced by recording time. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image's measurement time, or its recording time without one. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
 

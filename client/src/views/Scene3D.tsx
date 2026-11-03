@@ -1,5 +1,6 @@
 import {
   type Stage,
+  BoxesLayer,
   PointsLayer,
   PoseSetLayer,
   PoseLayer,
@@ -424,6 +425,14 @@ export default function Scene3D({
                   />
                 ) : kind === "poses" || kind === "path" ? (
                   <PoseSetLayer
+                    key={series.key}
+                    series={series}
+                    info={info}
+                    target={target}
+                    stage={stage}
+                  />
+                ) : kind === "bbox3d" ? (
+                  <BoxesLayer
                     key={series.key}
                     series={series}
                     info={info}

@@ -405,3 +405,113 @@ async fn foxglove_poses_in_frame_are_paths_and_a_pose_in_frame_a_pose() {
     assert_eq!(events[0].0["value"]["kind"], "path");
     assert_eq!(events[0].0["value"]["poses"].as_array().unwrap().len(), 2);
 }
+
+#[tokio::test]
+async fn ros2_3d_detections_are_boxes_labeled_by_their_best_hypothesis() {
+    use crate::memory::{Topic, list, structure};
+    use hahn::{DataTypeDef as D, Value as V};
+    use shapes::*;
+    let bbox = structure(vec![("center", shapes::pose()), ("size", vector())]);
+    let covariant = structure(vec![("pose", shapes::pose()), ("covariance", list(D::F64))]);
+    // Since ROS 2: the class in `hypothesis.class_id`.
+    let hypothesis = structure(vec![("class_id", D::String), ("score", D::F64)]);
+    let result = structure(vec![
+        ("hypothesis", hypothesis),
+        ("pose", covariant.clone()),
+    ]);
+    let detection = |result: D| {
+        structure(vec![
+            ("header", header()),
+            ("results", list(result)),
+            ("bbox", bbox.clone()),
+            ("id", D::String),
+        ])
+    };
+    let size = |x: f64| V::Struct(vec![V::F64(x), V::F64(1.), V::F64(1.)]);
+    let covariance = V::Struct(vec![pose_value(0.), V::List(vec![])]);
+    let scored = |class: &str, score: f64| {
+        V::Struct(vec![
+            V::Struct(vec![V::string(class), V::F64(score)]),
+            covariance.clone(),
+        ])
+    };
+    let boxed = |results: Vec<V>, length: f64, id: &str| {
+        V::Struct(vec![
+            header_value(0, "base"),
+            V::List(results),
+            V::Struct(vec![pose_value(2.), size(length)]),
+            V::string(id),
+        ])
+    };
+    let current = Topic::new(
+        "objects",
+        "vision_msgs/msg/Detection3DArray",
+        vec![
+            ("header", header()),
+            ("detections", list(detection(result))),
+        ],
+    )
+    .at(
+        1,
+        vec![
+            header_value(4, "base"),
+            V::List(vec![
+                boxed(vec![scored("car", 0.4), scored("truck", 0.9)], 4., "7"),
+                boxed(vec![], f64::NAN, ""),
+            ]),
+        ],
+    );
+    // Before: the class in `id`.
+    let old_result = structure(vec![
+        ("id", D::String),
+        ("score", D::F64),
+        ("pose", covariant),
+    ]);
+    let old = Topic::new(
+        "old",
+        "vision_msgs/msg/Detection3DArray",
+        vec![
+            ("header", header()),
+            ("detections", list(detection(old_result))),
+        ],
+    )
+    .at(
+        1,
+        vec![
+            header_value(4, "base"),
+            V::List(vec![boxed(
+                vec![V::Struct(vec![
+                    V::string("person"),
+                    V::F64(0.7),
+                    covariance.clone(),
+                ])],
+                0.5,
+                "",
+            )]),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![current, old], |builder| builder);
+    let (_, events) = frames(&app, &view_url("views", "objects", "ros_boxes", "")).await;
+    let value = &events[0].0["value"];
+    assert_eq!(value["kind"], "bbox3d");
+    assert_eq!(value["frame_id"], "base");
+    assert_eq!(value["omitted"], 1);
+    assert_eq!(
+        value["boxes"],
+        json!([{
+            "pose": {"position": [2., 0., 0.], "orientation": [0., 0., 0., 1.]},
+            "size": [4., 1., 1.],
+            "label": "truck",
+            "score": 0.9,
+            "id": "7",
+        }])
+    );
+    let (_, events) = frames(&app, &view_url("views", "old", "ros_boxes", "")).await;
+    let only = &events[0].0["value"]["boxes"][0];
+    assert_eq!(
+        (only["label"].clone(), only["score"].clone()),
+        (json!("person"), json!(0.7))
+    );
+    // An empty tracking id says nothing.
+    assert!(only.get("id").is_none());
+}

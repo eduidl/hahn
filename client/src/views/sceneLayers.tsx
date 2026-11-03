@@ -509,6 +509,97 @@ export function PoseSetLayer({
   return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
+/** The 12 edges of a unit cube centered on the origin, as segment end points. */
+const cubeEdges = (() => {
+  const corners = [-0.5, 0.5].flatMap((x) =>
+    [-0.5, 0.5].flatMap((y) => [-0.5, 0.5].map((z) => [x, y, z])),
+  );
+  const edges: number[] = [];
+  for (const [i, a] of corners.entries())
+    // Corners one axis apart share an edge.
+    for (const b of corners.slice(i + 1))
+      if (a.filter((v, k) => v !== b[k]).length === 1) edges.push(...a, ...b);
+  return edges;
+})();
+
+/**
+ * The latest boxes, such as detected objects, as outlines. A new message replaces
+ * them all; boxes are never joined across messages, even by their id (ADR 0005).
+ */
+export function BoxesLayer({
+  series,
+  info,
+  target,
+  stage,
+}: {
+  series: Selected;
+  info: Info | null;
+  target: string | null;
+  stage: Stage;
+}) {
+  const { frame, error } = useViewFrame(series, info);
+  const value = frame?.value?.kind === "bbox3d" ? frame.value : undefined;
+  const frameId = value?.frame_id;
+  const {
+    matrix: placement,
+    missing,
+    error: transformError,
+    settled,
+    estimated,
+  } = useFramePlacement(series.source, frameId, target, frame);
+  const lines = useMemo(() => {
+    const lines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    lines.matrixAutoUpdate = false;
+    return lines;
+  }, []);
+  useEffect(() => {
+    stage.scene.add(lines);
+    return () => {
+      stage.scene.remove(lines);
+      lines.geometry.dispose();
+      lines.material.dispose();
+      stage.invalidate();
+    };
+  }, [lines, stage]);
+  useEffect(() => {
+    if (!value) return;
+    const points: number[] = [];
+    const corner = new THREE.Vector3();
+    for (const box of value.boxes) {
+      const matrix = matrixOf({ translation: box.pose.position, rotation: box.pose.orientation });
+      matrix.scale(new THREE.Vector3(...(box.size as [number, number, number])));
+      for (let i = 0; i < cubeEdges.length; i += 3) {
+        corner.set(cubeEdges[i], cubeEdges[i + 1], cubeEdges[i + 2]).applyMatrix4(matrix);
+        points.push(corner.x, corner.y, corner.z);
+      }
+    }
+    lines.geometry.dispose();
+    lines.geometry = new THREE.BufferGeometry();
+    lines.geometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+    stage.invalidate();
+  }, [lines, value, stage]);
+  useEffect(() => {
+    if (!settled) return;
+    lines.visible = !series.hidden && !!value && !!frameId && (!target || !!placement);
+    lines.material.color.set(series.color);
+    lines.matrix.copy(placement ?? new THREE.Matrix4());
+    lines.matrixWorldNeedsUpdate = true;
+    stage.invalidate();
+  }, [lines, value, frameId, target, placement, series.hidden, series.color, stage, settled]);
+  const omitted = value?.omitted ?? 0;
+  const problem =
+    error ||
+    frame?.error ||
+    transformError ||
+    (value && !frameId ? "Boxes have no frame ID" : "") ||
+    (missing ? `No transform from ${frameId} to ${target} at this time` : "") ||
+    (omitted
+      ? `${omitted.toLocaleString()} ${omitted === 1 ? "box" : "boxes"} left out: not finite or unreadable`
+      : "") ||
+    (estimated ? estimatedPlacement : "");
+  return <ReportSeriesProblem series={series} problem={problem} />;
+}
+
 /** An image on its camera's pinhole image plane, one meter from the origin. */
 export function CameraLayer({
   series,

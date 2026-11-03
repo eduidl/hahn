@@ -492,7 +492,7 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"] | components["schemas"]["GeoLocationValue"];
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"] | components["schemas"]["GeoLocationValue"] | components["schemas"]["Bbox3dValue"];
         /** @description Coordinate frame and measurement time of a spatial value. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
@@ -711,6 +711,25 @@ export interface components {
             /** @enum {string} */
             kind: "path";
             poses: components["schemas"]["Pose"][];
+        };
+        /** @description Boxes in frame_id, such as detected objects, all held by one message, which replaces the last. Boxes are never joined across messages, even by `id`. */
+        Bbox3dValue: components["schemas"]["FramedValue"] & {
+            /** @enum {string} */
+            kind: "bbox3d";
+            boxes: {
+                /** @description The box's center and orientation. */
+                pose: components["schemas"]["Pose"];
+                /** @description Full size in meters along the box's own x, y and z. */
+                size: components["schemas"]["Vec3"];
+                /** @description What it is, such as a class name. */
+                label?: string;
+                /** @description How sure the detector is, usually 0 to 1. */
+                score?: number;
+                /** @description Which object it is, as a tracker names it. */
+                id?: string;
+            }[];
+            /** @description Boxes left out because they were not finite, had a negative size or could not be read. */
+            omitted: components["schemas"]["Count"];
         };
     };
     responses: {
