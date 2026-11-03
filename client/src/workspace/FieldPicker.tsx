@@ -24,7 +24,10 @@ export function FieldPicker({
   dispatch,
   index,
   kind,
-}: WidgetSettingsProps & { kind?: "image" | "pointcloud" }) {
+}: WidgetSettingsProps & {
+  /** Only images, or only what is drawn over one: point clouds and annotations. */
+  kind?: "image" | "overlay";
+}) {
   const singleTarget = widgetSpecs[widget.type].maxSeries === 1 || kind === "image";
   // Widgets fed by converted views take whole topics, never individual fields.
   const takesTopics = Boolean(widgetSpecs[widget.type].viewKinds);
@@ -43,8 +46,11 @@ export function FieldPicker({
   const results = useRef<HTMLDivElement>(null);
   const popover = useRef<HTMLDivElement>(null);
   const { candidates, unavailable } = useMemo(() => {
-    const fits = (entry: IndexedField) =>
-      !kind || viewFor(widgetSpecs[widget.type], entry.topic)?.kind === kind;
+    const fits = (entry: IndexedField) => {
+      const found = viewFor(widgetSpecs[widget.type], entry.topic)?.kind;
+      if (kind === "overlay") return found === "pointcloud" || found === "image_annotations";
+      return !kind || found === kind;
+    };
     const { addable, unavailable } = pickableFields(index, widget);
     return {
       candidates: addable.filter(fits),

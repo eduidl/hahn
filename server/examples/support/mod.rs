@@ -723,7 +723,7 @@ pub fn write_camera_calibration(path: &Path) -> anyhow::Result<()> {
         "protobuf",
         &descriptor.encode_to_vec(),
     )?;
-    let channel = writer.add_channel(schema, "/calibration", "protobuf", &Default::default())?;
+    let channel = writer.add_channel(schema, "/camera/calibration", "protobuf", &Default::default())?;
     for (time, k) in [
         (1, vec![400., 0., 320., 0., 400., 240., 0., 0., 1.]),
         (2, vec![0.; 9]),

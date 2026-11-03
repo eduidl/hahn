@@ -92,6 +92,11 @@ async fn ros2_camera_info_uses_lower_case_fields() {
     );
     assert_eq!(value["distortion"], json!([0.1]));
     assert_eq!(value["distortion_model"], "plumb_bob");
+    // The projection for rectified images, row-major 3 by 4.
+    assert_eq!(
+        value["projection"],
+        json!([400., 0., 320., 0., 0., 400., 240., 0., 0., 0., 1., 0.])
+    );
     assert!(
         events[1].0["error"]
             .as_str()

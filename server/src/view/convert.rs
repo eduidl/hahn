@@ -404,6 +404,11 @@ pub(super) fn calibration(
         .try_into()
         .ok()
         .context("Invalid camera matrix")?;
+    // Protobuf capitalizes it, ROS 2 and `foxglove_msgs` do not.
+    let projection = ["P", "p"]
+        .into_iter()
+        .find(|name| message.has(name))
+        .and_then(|name| message.numbers(name).ok()?.try_into().ok());
     Ok(CameraCalibrationView {
         frame_id,
         width: message.number("width")?,
@@ -411,6 +416,7 @@ pub(super) fn calibration(
         intrinsics,
         distortion: message.numbers(distortion)?,
         distortion_model: message.string("distortion_model")?.to_owned(),
+        projection,
     }
     .into())
 }
