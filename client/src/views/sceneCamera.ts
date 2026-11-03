@@ -58,3 +58,32 @@ export function walkCamera(
   target.add(step);
 }
 
+/**
+ * Turns where the camera looks without moving it: `yaw` to the left about up, `pitch` upward,
+ * in radians, stopping short of straight up or down. The target lands where the new line of
+ * sight meets the ground (z = 0), so the point the view turns around stays on the grid,
+ * unless that is beyond `farther` times the old distance or the camera looks above the
+ * horizon; then it stays at the old distance.
+ */
+export function lookCamera(
+  camera: THREE.Camera,
+  target: THREE.Vector3,
+  yaw: number,
+  pitch: number,
+  farther = 20,
+) {
+  const view = target.clone().sub(camera.position);
+  const distance = view.length();
+  if (distance === 0) return;
+  const limit = 0.01;
+  const theta = Math.atan2(view.y, view.x) + yaw;
+  const phi = THREE.MathUtils.clamp(Math.acos(view.z / distance) - pitch, limit, Math.PI - limit);
+  const direction = new THREE.Vector3(
+    Math.sin(phi) * Math.cos(theta),
+    Math.sin(phi) * Math.sin(theta),
+    Math.cos(phi),
+  );
+  const toGround = direction.z < 0 ? -camera.position.z / direction.z : Infinity;
+  const reach = toGround > 0 && toGround <= distance * farther ? toGround : distance;
+  target.copy(camera.position).addScaledVector(direction, reach);
+}

@@ -145,3 +145,32 @@ describe("walking the camera", () => {
   });
 });
 
+describe("looking around", () => {
+  const start = () => {
+    const camera = new THREE.PerspectiveCamera();
+    camera.up.set(0, 0, 1);
+    camera.position.set(0, -10, 10);
+    return { camera, target: new THREE.Vector3() };
+  };
+  it("keeps the camera in place and the target on the ground", () => {
+    const { camera, target } = start();
+    // A quarter turn to the left: from looking along +y to looking along -x.
+    lookCamera(camera, target, Math.PI / 2, 0);
+    close(camera.position, [0, -10, 10]);
+    close(target, [-10, -10, 0]);
+  });
+  it("keeps the old distance once the line of sight misses the ground", () => {
+    const { camera, target } = start();
+    // From 45 degrees down to 15 degrees up.
+    lookCamera(camera, target, 0, Math.PI / 3);
+    expect(target.distanceTo(camera.position)).toBeCloseTo(10 * Math.SQRT2);
+    expect(target.z).toBeGreaterThan(10);
+  });
+  it("stops short of looking straight down", () => {
+    const { camera, target } = start();
+    lookCamera(camera, target, 0, -Math.PI);
+    expect(target.z).toBeCloseTo(0);
+    expect(Math.hypot(target.x, target.y + 10)).toBeGreaterThan(0);
+    expect(Math.hypot(target.x, target.y + 10)).toBeLessThan(0.2);
+  });
+});
