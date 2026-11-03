@@ -221,6 +221,16 @@ async fn duplicate_topic_images_have_independent_views() {
             format!("camera-{}", 50 + i)
         );
     }
+    let streams = batch_frames(
+        &app,
+        json!({"views":[
+            {"topic":topics[0]["id"], "view":"image"},
+            {"topic":topics[1]["id"], "view":"image"}
+        ]}),
+    )
+    .await;
+    assert_eq!(streams[0][0]["value"]["frame_id"], "camera-50");
+    assert_eq!(streams[1][0]["value"]["frame_id"], "camera-51");
 }
 
 #[tokio::test]
@@ -738,4 +748,31 @@ async fn images_suggest_the_calibration_their_names_share() {
     // Two candidates, or none, suggest nothing.
     assert!(view("/twin").get("calibration").is_none());
     assert!(view("/lonely/image").get("calibration").is_none());
+}
+
+#[tokio::test]
+async fn batch_views_keeps_streams_independent_and_preserves_values() {
+    let (_dir, app) = visual_app();
+    let streams = batch_frames(
+        &app,
+        json!({"views":[
+            {"topic":"/gps","view":"geo"},
+            {"topic":"/missing","view":"geo"},
+            {"topic":"/camera","view":"image"},
+            {"topic":"/gps","view":"geo"}
+        ]}),
+    )
+    .await;
+    assert_eq!(streams[1][0]["type"], "error");
+    assert_eq!(streams[1][0]["code"], "unknown_topic");
+    assert_eq!(streams[0].last().unwrap()["type"], "complete");
+    assert_eq!(streams[2].last().unwrap()["type"], "complete");
+    assert_eq!(streams[3].last().unwrap()["type"], "complete");
+    assert_eq!(streams[0][0]["value"]["kind"], "geo_location");
+    assert_eq!(streams[2][0]["value"]["kind"], "image");
+    assert_eq!(streams[0].len(), streams[3].len());
+    for (a, b) in streams[0].iter().zip(&streams[3]) {
+        assert_eq!(a["time_ns"], b["time_ns"]);
+        assert_eq!(a["value"], b["value"]);
+    }
 }

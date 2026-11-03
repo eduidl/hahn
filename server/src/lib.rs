@@ -18,7 +18,9 @@ mod view;
 pub use mcapdecode::core::{
     DataTypeDef, ElementDef, EnumDef, EnumVariant, FieldDef, FieldDefs, Value,
 };
-pub use source::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit};
+pub use source::{
+    BatchVisit, Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit,
+};
 pub use view::{
     Annotation, AnnotationsView, Box3, BoxesView, CameraCalibrationView, GeoFeature,
     GeoLocationView, GeoView, ImageView, Kind, Message, NumericType, PackedField, PathView,
@@ -159,6 +161,10 @@ impl Builder {
                 get(message::latest),
             )
             .route("/api/runs/{run}/groups/{group}/views", get(view::views))
+            .route(
+                "/api/runs/{run}/groups/{group}/views/batch",
+                axum::routing::post(view::batch_views),
+            )
             .route(
                 "/api/runs/{run}/groups/{group}/views/latest",
                 get(view::latest),

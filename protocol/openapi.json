@@ -474,6 +474,85 @@
           }
         }
       }
+    },
+    "/api/runs/{run}/groups/{group}/views/batch": {
+      "post": {
+        "operationId": "batchViews",
+        "description": "Read up to 32 views of the same group and time range. Each binary event has a stream index corresponding to the request order. Each stream ends independently with complete or error. Messages retain recording order within each stream.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Run"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "views"
+                ],
+                "properties": {
+                  "start_ns": {
+                    "$ref": "#/components/schemas/TimeNs"
+                  },
+                  "end_ns": {
+                    "$ref": "#/components/schemas/TimeNs"
+                  },
+                  "views": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "topic",
+                        "view"
+                      ],
+                      "properties": {
+                        "topic": {
+                          "type": "string"
+                        },
+                        "view": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Binary view events, each tagged with a stream index.",
+            "content": {
+              "application/vnd.hahn.frames": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchViewEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2172,6 +2251,27 @@
             "$ref": "#/components/schemas/Count"
           }
         }
+      },
+      "BatchViewEvent": {
+        "description": "A view event tagged with the zero-based request index. Each stream ends with complete or error.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ViewEvent"
+          },
+          {
+            "type": "object",
+            "required": [
+              "stream"
+            ],
+            "properties": {
+              "stream": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              }
+            }
+          }
+        ]
       }
     },
     "parameters": {

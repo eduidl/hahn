@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  fetchViewHistory,
+  fetchBatchedViewHistory,
   frameIndexAt,
   parseFrames,
   pointBuffers,
+  ViewWindowTooLarge,
   type PointCloudValue,
 } from "../../src/data/viewFrames";
 
@@ -27,6 +30,86 @@ const concat = (...parts: Uint8Array[]) => {
   return out.buffer;
 };
 const complete = frame({ type: "complete", scanned_messages: 1 });
+
+afterEach(() => vi.unstubAllGlobals());
+
+it("cancels an oversized window without buffering the rest", async () => {
+  const cancel = vi.fn();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array(9));
+    },
+    cancel,
+  });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
+  await expect(
+    fetchViewHistory({ source: "r/0", topic: "/t", view: "pose" }, undefined, undefined, 8),
+  ).rejects.toBeInstanceOf(ViewWindowTooLarge);
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
+it("batches views for one group and reports each stream independently", async () => {
+  const body = concat(
+    frame({ type: "frame", stream: 0, time_ns: "20", error: "bad value" }),
+    frame({ type: "error", stream: 1, code: "unknown_view", message: "bad view" }),
+    frame({ type: "frame", stream: 0, time_ns: "10", error: "earlier" }),
+    frame({ type: "complete", stream: 0, scanned_messages: 2 }),
+  );
+  const fetch = vi.fn().mockResolvedValue(new Response(body));
+  vi.stubGlobal("fetch", fetch);
+  const signal = new AbortController().signal;
+  const range = { start_ns: "0", end_ns: "30" };
+  const first = fetchBatchedViewHistory(
+    { source: "r/0", topic: "/a", view: "pose" },
+    signal,
+    range,
+  );
+  const second = fetchBatchedViewHistory(
+    { source: "r/0", topic: "/b", view: "pose" },
+    signal,
+    range,
+  );
+  const [ok, error] = await Promise.allSettled([first, second]);
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(ok.status).toBe("fulfilled");
+  if (ok.status === "fulfilled") expect(ok.value.map((item) => item.time_ns)).toEqual(["10", "20"]);
+  expect(error.status).toBe("rejected");
+  if (error.status === "rejected") expect(error.reason.message).toBe("bad view");
+});
+
+it("keeps a batch running when only one consumer cancels", async () => {
+  let complete: ((response: Response) => void) | undefined;
+  let requestSignal: AbortSignal | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((_url: string, options: RequestInit) => {
+      requestSignal = options.signal as AbortSignal;
+      return new Promise<Response>((resolve) => {
+        complete = resolve;
+      });
+    }),
+  );
+  const first = new AbortController();
+  const second = new AbortController();
+  const range = { start_ns: "0", end_ns: "30" };
+  const a = fetchBatchedViewHistory(
+    { source: "r/0", topic: "/a", view: "pose" },
+    first.signal,
+    range,
+  );
+  const b = fetchBatchedViewHistory(
+    { source: "r/0", topic: "/b", view: "pose" },
+    second.signal,
+    range,
+  );
+  const cancelled = expect(a).rejects.toMatchObject({ name: "AbortError" });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  first.abort();
+  expect(requestSignal?.aborted).toBe(false);
+  complete!(new Response(concat(frame({ type: "complete", stream: 1, scanned_messages: 0 }))));
+  await cancelled;
+  await expect(b).resolves.toEqual([]);
+});
 
 describe("parseFrames", () => {
   it("resolves blobs per frame and keeps them aligned", () => {

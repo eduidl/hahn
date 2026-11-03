@@ -27,7 +27,7 @@ const lengths = 8;
  * Frames are padded to 8 bytes, so typed views of a whole response stay aligned.
  * A response without `complete` or `error` was cut off, which is a failure.
  */
-export function parseFrames(buffer: ArrayBuffer): ViewResponse {
+export function parseFrames(buffer: ArrayBuffer, stream?: number): ViewResponse {
   const view = new DataView(buffer);
   const decoder = new TextDecoder();
   const frames: ViewFrame[] = [];
@@ -42,7 +42,11 @@ export function parseFrames(buffer: ArrayBuffer): ViewResponse {
       throw new Error("The response ended prematurely");
     const header = JSON.parse(
       decoder.decode(new Uint8Array(buffer, at + lengths, headerLength)),
-    ) as Header;
+    ) as Header & { stream?: number };
+    if (header.stream !== stream) {
+      at = payload + payloadLength;
+      continue;
+    }
     if (header.type === "error") throw new ServerError(header.message, header.code);
     if (header.type === "complete") ended = true;
     if (header.type === "unchanged") unchanged = true;
@@ -59,9 +63,39 @@ export function parseFrames(buffer: ArrayBuffer): ViewResponse {
   return { frames, unchanged };
 }
 
-async function fetchBuffer(url: string, signal?: AbortSignal) {
-  const response = await fetch(url, { signal });
+export class ViewWindowTooLarge extends Error {}
+
+async function fetchBuffer(
+  url: string,
+  signal?: AbortSignal,
+  maxBytes?: number,
+  init?: RequestInit,
+) {
+  const response = await fetch(url, { ...init, signal });
   if (!response.ok) throw await responseError(response);
+  if (maxBytes !== undefined && response.body) {
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > maxBytes) throw new ViewWindowTooLarge();
+        chunks.push(value);
+      }
+    } finally {
+      await reader.cancel();
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return bytes.buffer;
+  }
   return response.arrayBuffer();
 }
 
@@ -88,10 +122,11 @@ export async function fetchViewHistory(
   signal?: AbortSignal,
   /** Recording time, the end excluded; the whole recording when left out. */
   range?: { start_ns: string; end_ns: string },
+  maxBytes?: number,
 ) {
   const params = new URLSearchParams({ topic: target.topic, view: target.view ?? "", ...range });
   const { frames } = parseFrames(
-    await fetchBuffer(`${sourceUrl(target.source)}/views?${params}`, signal),
+    await fetchBuffer(`${sourceUrl(target.source)}/views?${params}`, signal, maxBytes),
   );
   const time = (frame: ViewFrame) => BigInt(frame.time_ns);
   return frames.sort((a, b) => (time(a) < time(b) ? -1 : time(a) > time(b) ? 1 : 0));
@@ -152,4 +187,118 @@ export function pointBuffers(value: PointCloudValue, blob: ViewFrame["blob"]): P
   }
   const span = max - min || 1;
   return { positions, intensities: Float32Array.from(raw, (v) => (v - min) / span) };
+}
+
+type BatchPending = {
+  target: ViewTarget;
+  signal: AbortSignal;
+  resolve: (frames: ViewFrame[]) => void;
+  reject: (error: unknown) => void;
+  active: boolean;
+  abort: () => void;
+};
+const batches = new Map<string, BatchPending[]>();
+
+/** Coalesce small views requested together for the same group and time range. */
+export function fetchBatchedViewHistory(
+  target: ViewTarget,
+  signal: AbortSignal,
+  range: { start_ns: string; end_ns: string },
+): Promise<ViewFrame[]> {
+  const key = JSON.stringify([target.source, range.start_ns, range.end_ns]);
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const entry: BatchPending = {
+      target,
+      signal,
+      active: true,
+      resolve: (frames) => {
+        entry.active = false;
+        signal.removeEventListener("abort", entry.abort);
+        resolve(frames);
+      },
+      reject: (error) => {
+        entry.active = false;
+        signal.removeEventListener("abort", entry.abort);
+        reject(error);
+      },
+      abort: () => entry.reject(new DOMException("Aborted", "AbortError")),
+    };
+    let pending = batches.get(key);
+    if (!pending) {
+      pending = [];
+      batches.set(key, pending);
+      setTimeout(() => {
+        batches.delete(key);
+        const active = pending!.filter((item) => item.active);
+        for (let i = 0; i < active.length; i += 32) {
+          void sendBatch(active.slice(i, i + 32), range);
+        }
+      }, 0);
+    }
+    pending.push(entry);
+    signal.addEventListener("abort", entry.abort, { once: true });
+  });
+}
+
+async function sendBatch(entries: BatchPending[], range: { start_ns: string; end_ns: string }) {
+  if (!entries.length) return;
+  if (entries.length === 1) {
+    const item = entries[0];
+    try {
+      item.resolve(await fetchViewHistory(item.target, item.signal, range, 8 * 1024 * 1024));
+    } catch (error) {
+      item.reject(error);
+    }
+    return;
+  }
+  const controller = new AbortController();
+  const cancel = () => {
+    if (entries.every((item) => !item.active)) controller.abort();
+  };
+  for (const item of entries) item.signal.addEventListener("abort", cancel, { once: true });
+  try {
+    const buffer = await fetchBuffer(
+      `${sourceUrl(entries[0].target.source)}/views/batch`,
+      controller.signal,
+      8 * 1024 * 1024,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...range,
+          views: entries.map(({ target }) => ({ topic: target.topic, view: target.view ?? "" })),
+        }),
+      },
+    );
+    for (let i = 0; i < entries.length; i++) {
+      if (!entries[i].active) continue;
+      try {
+        const { frames } = parseFrames(buffer, i);
+        frames.sort((a, b) =>
+          BigInt(a.time_ns) < BigInt(b.time_ns)
+            ? -1
+            : BigInt(a.time_ns) > BigInt(b.time_ns)
+              ? 1
+              : 0,
+        );
+        entries[i].resolve(frames);
+      } catch (error) {
+        entries[i].reject(error);
+      }
+    }
+  } catch (error) {
+    for (const item of entries) {
+      if (!item.active) continue;
+      if (error instanceof ViewWindowTooLarge) {
+        try {
+          item.resolve(await fetchViewHistory(item.target, item.signal, range, 8 * 1024 * 1024));
+        } catch (individualError) {
+          item.reject(individualError);
+        }
+      } else item.reject(error);
+    }
+  } finally {
+    for (const item of entries) item.signal.removeEventListener("abort", cancel);
+  }
 }

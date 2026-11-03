@@ -13,7 +13,7 @@ export const test = base.extend({
 export { expect };
 
 /** Opens a synthetic recording from the run dialog shown on first load. */
-export async function openRun(page: Page, name: "demo.mcap" | "visual.mcap") {
+export async function openRun(page: Page, name: "demo.mcap" | "visual.mcap" | "scene.mcap") {
   await page.goto("/");
   await page.getByRole("option", { name }).click();
   await expect(page.getByRole("button", { name: `Select run: ${name}` })).toBeVisible();

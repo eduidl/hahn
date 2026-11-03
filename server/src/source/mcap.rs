@@ -1,6 +1,9 @@
 //! Indexed, chunked MCAP recordings decoded by `mcapdecode`.
 
-use super::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit, has_extension};
+use super::{
+    BatchVisit, Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit,
+    has_extension,
+};
 use anyhow::{Context, bail};
 use mcapdecode::{McapReader, ReadOptions, core::FieldDefs};
 use std::{
@@ -37,6 +40,72 @@ struct McapSource {
 }
 
 impl Source for McapSource {
+    fn read_batch(
+        &self,
+        topics: &[String],
+        range: TimeRange,
+        visit: &mut BatchVisit,
+    ) -> anyhow::Result<Vec<anyhow::Result<()>>> {
+        let mut counts = vec![0usize; topics.len()];
+        let mut stopped = None;
+        if topics.len() > 1 && topics.iter().all(|topic| !topic.starts_with("@mcap:")) {
+            let names: Vec<_> = topics.iter().map(String::as_str).collect();
+            let options = ReadOptions {
+                time_range: Some(mcapdecode::TimeRange {
+                    start: range.start,
+                    end: range.end,
+                }),
+                parallel: Some(false),
+                ..Default::default()
+            };
+            let result = self.reader.for_each_topic_decoded_message_with_options(
+                &self.path,
+                &names,
+                &options,
+                |topic, message| {
+                    let i = names.iter().position(|name| *name == topic).unwrap();
+                    let times = MessageTimes {
+                        log_time: message.log_time,
+                        publish_time: Some(message.publish_time),
+                    };
+                    visit(i, times, message.value).map_err(|error| {
+                        stopped = Some(error);
+                        Box::<dyn std::error::Error + Send + Sync>::from(std::io::Error::other(
+                            "Batch visitor stopped",
+                        ))
+                    })?;
+                    counts[i] += 1;
+                    Ok(())
+                },
+            );
+            if let Some(error) = stopped {
+                return Err(error);
+            }
+            if result.is_ok() {
+                return Ok(topics.iter().map(|_| Ok(())).collect());
+            }
+        }
+        let mut results = Vec::with_capacity(topics.len());
+        for (i, topic) in topics.iter().enumerate() {
+            let mut skipped = 0;
+            let result = self.read(topic, range, &mut |times, value| {
+                if skipped < counts[i] {
+                    skipped += 1;
+                    return Ok(());
+                }
+                visit(i, times, value).map_err(|error| {
+                    stopped = Some(error);
+                    anyhow::anyhow!("Batch visitor stopped")
+                })
+            });
+            if let Some(error) = stopped.take() {
+                return Err(error);
+            }
+            results.push(result);
+        }
+        Ok(results)
+    }
+
     fn info(&self) -> anyhow::Result<SourceInfo> {
         Ok(self.info.clone())
     }

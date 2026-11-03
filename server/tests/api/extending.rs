@@ -383,3 +383,75 @@ fn messages_read_rotations_as_unit_quaternions() {
         );
     }
 }
+
+struct BatchProbe;
+impl hahn::ViewConverter for BatchProbe {
+    fn id(&self) -> &'static str {
+        "batch-probe"
+    }
+    fn kind(&self) -> hahn::Kind {
+        hahn::Kind::Position
+    }
+    fn name(&self) -> &'static str {
+        "Batch probe"
+    }
+    fn accepts(&self, name: &str, _: &hahn::FieldDefs) -> bool {
+        name == "example/msg/Probe"
+    }
+    fn convert(&self, message: &hahn::Message<'_>) -> anyhow::Result<hahn::View> {
+        Ok(hahn::PositionView {
+            frame_id: None,
+            position: [message.number("value")?, 0., 0.],
+        }
+        .into())
+    }
+}
+
+#[tokio::test]
+async fn batch_decode_failure_preserves_other_stream_and_does_not_repeat_frames() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut writer =
+        mcap::Writer::new(std::fs::File::create(dir.path().join("batch.mcap")).unwrap()).unwrap();
+    let schema = writer
+        .add_schema("example/msg/Probe", "ros2msg", b"int32 value\n")
+        .unwrap();
+    let good = writer
+        .add_channel(schema, "/good", "cdr", &Default::default())
+        .unwrap();
+    let bad = writer
+        .add_channel(schema, "/bad", "cdr", &Default::default())
+        .unwrap();
+    for (channel, time, payload) in [
+        (good, 1, vec![0, 1, 0, 0, 1, 0, 0, 0]),
+        (bad, 2, vec![0, 1, 0, 0]),
+        (good, 3, vec![0, 1, 0, 0, 3, 0, 0, 0]),
+    ] {
+        writer
+            .write_to_known_channel(
+                &mcap::records::MessageHeader {
+                    channel_id: channel,
+                    sequence: 0,
+                    log_time: time,
+                    publish_time: time,
+                },
+                &payload,
+            )
+            .unwrap();
+    }
+    writer.finish().unwrap();
+    let app = hahn::Builder::new(dir.path())
+        .view(BatchProbe)
+        .router()
+        .unwrap();
+    let streams = batch_frames(&app, json!({"views":[{"topic":"/good","view":"batch-probe"},{"topic":"/bad","view":"batch-probe"}]})).await;
+    assert_eq!(
+        streams[0]
+            .iter()
+            .filter(|event| event["type"] == "frame")
+            .map(|event| event["time_ns"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["1", "3"]
+    );
+    assert_eq!(streams[0].last().unwrap()["type"], "complete");
+    assert_eq!(streams[1].last().unwrap()["type"], "error");
+}

@@ -21,6 +21,7 @@ use crate::{
     stream::disconnected,
 };
 use axum::{
+    Json,
     body::{Body, Bytes},
     extract::{Path, Query, State},
     http::header,
@@ -224,6 +225,8 @@ impl ViewIndex {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Header {
     Frame {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stream: Option<usize>,
         time_ns: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<serde_json::Value>,
@@ -232,9 +235,13 @@ enum Header {
     },
     Unchanged,
     Complete {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stream: Option<usize>,
         scanned_messages: usize,
     },
     Error {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stream: Option<usize>,
         code: &'static str,
         message: String,
     },
@@ -251,6 +258,7 @@ fn frame(
     defs: &FieldDefs,
     times: MessageTimes,
     value: &Value,
+    stream: Option<usize>,
 ) -> anyhow::Result<Vec<Bytes>> {
     let mut payload = Payload::default();
     let converted = Message::new(defs, value).and_then(|message| {
@@ -274,6 +282,7 @@ fn frame(
     match converted {
         Ok(value) => encode(
             &Header::Frame {
+                stream,
                 time_ns,
                 value: Some(value),
                 error: None,
@@ -281,6 +290,7 @@ fn frame(
             payload,
         ),
         Err(error) => control(&Header::Frame {
+            stream,
             time_ns,
             value: None,
             error: Some(format!("{error:#}")),
@@ -340,7 +350,7 @@ pub(crate) async fn views(
                 return Err(disconnected().into());
             }
             scanned += 1;
-            send(frame(&*converter, &defs, times, &value)?)?;
+            send(frame(&*converter, &defs, times, &value, None)?)?;
             Ok(())
         });
         if tx.is_closed() {
@@ -348,15 +358,154 @@ pub(crate) async fn views(
         }
         let end = match result {
             Ok(()) => Header::Complete {
+                stream: None,
                 scanned_messages: scanned,
             },
             Err(error) => Header::Error {
+                stream: None,
                 code: Code::of(&error).as_str(),
                 message: error.to_string(),
             },
         };
         if let Ok(chunks) = control(&end) {
             let _ = send(chunks);
+        }
+    });
+    Ok(frames_response(Body::from_stream(ReceiverStream::new(rx))))
+}
+
+#[derive(Deserialize)]
+pub(crate) struct BatchViewsQuery {
+    start_ns: Option<String>,
+    end_ns: Option<String>,
+    views: Vec<BatchView>,
+}
+
+#[derive(Deserialize)]
+struct BatchView {
+    topic: String,
+    view: String,
+}
+
+pub(crate) async fn batch_views(
+    State(state): State<AppState>,
+    Path((run, group)): Path<(String, String)>,
+    Json(query): Json<BatchViewsQuery>,
+) -> Result<Response, ApiError> {
+    if query.views.is_empty() || query.views.len() > 32 {
+        return Err(ApiError::new(
+            Code::InvalidRequest,
+            "Choose between 1 and 32 views",
+        ));
+    }
+    let range = parse_range(&query.start_ns, &query.end_ns)?;
+    let group = state.group(&run, &group)?;
+    let (source, prepared) = blocking(move || {
+        let source = group.source()?;
+        let views = group.views(&state.converters)?;
+        let prepared = query
+            .views
+            .into_iter()
+            .map(|item| {
+                group.require_topic(&item.topic)?;
+                let (defs, converter) = views.get(&item.topic, &item.view)?;
+                Ok((item.topic, defs, converter))
+            })
+            .collect::<Vec<anyhow::Result<_>>>();
+        Ok((source, prepared))
+    })
+    .await?;
+    let (tx, rx) = mpsc::channel(4);
+    tokio::task::spawn_blocking(move || {
+        let send = |chunks: Vec<Bytes>| -> std::io::Result<()> {
+            for chunk in chunks {
+                tx.blocking_send(Ok::<_, Infallible>(chunk))
+                    .map_err(|_| disconnected())?;
+            }
+            Ok(())
+        };
+        let mut topics = Vec::<String>::new();
+        let mut members = Vec::<Vec<usize>>::new();
+        for (i, entry) in prepared.iter().enumerate() {
+            match entry {
+                Ok((topic, _, _)) => {
+                    let index = topics
+                        .iter()
+                        .position(|name| name == topic)
+                        .unwrap_or_else(|| {
+                            topics.push(topic.clone());
+                            members.push(Vec::new());
+                            topics.len() - 1
+                        });
+                    members[index].push(i);
+                }
+                Err(error) => {
+                    if control(&Header::Error {
+                        stream: Some(i),
+                        code: Code::of(error).as_str(),
+                        message: error.to_string(),
+                    })
+                    .and_then(|chunks| Ok(send(chunks)?))
+                    .is_err()
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+        let mut counts = vec![0; prepared.len()];
+        let result = source.read_batch(&topics, range, &mut |topic, times, value| {
+            for &i in &members[topic] {
+                let (_, defs, converter) = prepared[i].as_ref().unwrap();
+                send(frame(&**converter, defs, times, &value, Some(i))?)?;
+                counts[i] += 1;
+            }
+            Ok(())
+        });
+        if tx.is_closed() {
+            return;
+        }
+        match result {
+            Ok(results) => {
+                for (topic, result) in results.into_iter().enumerate() {
+                    for &i in &members[topic] {
+                        let header = match &result {
+                            Ok(()) => Header::Complete {
+                                stream: Some(i),
+                                scanned_messages: counts[i],
+                            },
+                            Err(error) => Header::Error {
+                                stream: Some(i),
+                                code: Code::of(error).as_str(),
+                                message: error.to_string(),
+                            },
+                        };
+                        if control(&header)
+                            .and_then(|chunks| Ok(send(chunks)?))
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                for (i, entry) in prepared.iter().enumerate() {
+                    if entry.is_ok() {
+                        let header = Header::Error {
+                            stream: Some(i),
+                            code: Code::of(&error).as_str(),
+                            message: error.to_string(),
+                        };
+                        if control(&header)
+                            .and_then(|chunks| Ok(send(chunks)?))
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
         }
     });
     Ok(frames_response(Body::from_stream(ReceiverStream::new(rx))))
@@ -392,10 +541,11 @@ pub(crate) async fn latest(
             if known == Some(times.log_time) {
                 chunks.extend(control(&Header::Unchanged)?);
             } else {
-                chunks.extend(frame(&*converter, &defs, *times, value)?);
+                chunks.extend(frame(&*converter, &defs, *times, value, None)?);
             }
         }
         chunks.extend(control(&Header::Complete {
+            stream: None,
             scanned_messages: latest.iter().len(),
         })?);
         Ok(chunks)

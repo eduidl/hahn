@@ -177,6 +177,33 @@ pub(crate) async fn frames(app: &axum::Router, url: &str) -> (StatusCode, Vec<(V
     (status, out)
 }
 
+pub(crate) async fn batch_frames(app: &axum::Router, body: Value) -> Vec<Vec<Value>> {
+    let count = body["views"].as_array().unwrap().len();
+    let url = resolve(app, "/g/views/batch").await;
+    let response = app
+        .clone()
+        .oneshot(
+            Request::post(url)
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let mut rest = &bytes[..];
+    let mut streams = vec![Vec::new(); count];
+    while !rest.is_empty() {
+        let header_len = u32::from_le_bytes(rest[..4].try_into().unwrap()) as usize;
+        let payload_len = u32::from_le_bytes(rest[4..8].try_into().unwrap()) as usize;
+        let header: Value = serde_json::from_slice(&rest[8..8 + header_len]).unwrap();
+        streams[header["stream"].as_u64().unwrap() as usize].push(header);
+        rest = &rest[(8 + header_len).next_multiple_of(8) + payload_len..];
+    }
+    streams
+}
+
 pub(crate) fn view_url(path: &str, topic: &str, view: &str, query: &str) -> String {
     format!("/g/{path}?topic={topic}&view={view}{query}")
 }
