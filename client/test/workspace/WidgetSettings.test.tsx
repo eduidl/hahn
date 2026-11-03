@@ -29,11 +29,16 @@ describe("widget settings", () => {
   it("separates display settings from series", () => {
     show("plot");
     expect(screen.getByRole("region", { name: "Display" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Series" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Fields" })).toBeTruthy();
   });
   it("counts series once, in the series section", () => {
     const { container } = show("plot");
     expect(container.querySelector(".settings-title")?.textContent).toBe("Plot");
-    expect(screen.getAllByText(/0 series/)).toHaveLength(1);
+    expect(screen.getAllByText(/0 fields/)).toHaveLength(1);
+  });
+  it.each(["scene", "map"] as const)("labels the %s topic add button consistently", (type) => {
+    show(type);
+    const section = screen.getByRole("region", { name: "Topics" });
+    expect(section.querySelector("button[aria-label='Add topic']")?.textContent).toBe("+ Topic");
   });
 });

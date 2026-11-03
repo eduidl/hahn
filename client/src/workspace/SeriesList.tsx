@@ -7,6 +7,7 @@ import { SeriesName } from "../SeriesName";
 import { useSeriesViewProblem } from "../views/seriesViewProblem";
 import type { CachedSeries } from "../data/useSeries";
 import type { PointMarkers, Selected } from "../types";
+import { widgetSpecs } from "./widgetSpecs";
 
 export function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefined) {
   if (!record) return "Waiting";
@@ -59,12 +60,28 @@ export function SettingsSection({
 /** Series section shared by all settings; each widget type supplies the per-series row. */
 export function SeriesList({
   row,
+  series: selected,
+  title,
+  kind,
+  children,
   ...props
-}: WidgetSettingsProps & { row: (series: Selected) => ReactNode }) {
-  const { series } = props.widget;
+}: WidgetSettingsProps & {
+  row: (series: Selected) => ReactNode;
+  series?: Selected[];
+  title?: string;
+  kind?: "overlay";
+  children?: ReactNode;
+}) {
+  const series = selected ?? props.widget.series;
+  const topics = Boolean(widgetSpecs[props.widget.type].viewKinds);
+  const noun = topics ? "topic" : "field";
   return (
-    <SettingsSection title="Series" aside={`${series.length} series`}>
-      <FieldPicker {...props} />
+    <SettingsSection
+      title={title ?? (topics ? "Topics" : "Fields")}
+      aside={`${series.length} ${noun}${series.length === 1 ? "" : "s"}`}
+    >
+      <FieldPicker {...props} kind={kind} />
+      {children}
       {series.length > 0 && <div>{series.map(row)}</div>}
     </SettingsSection>
   );
@@ -84,7 +101,7 @@ export function SeriesRow({
   marker?: ReactNode;
   children?: ReactNode;
   /** What the series is shown as, such as the view of a topic. */
-  detail?: string;
+  detail?: ReactNode;
   /** Off for widgets that do not stream series, so there is no loading state. */
   showStatus?: boolean;
 }) {

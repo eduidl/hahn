@@ -329,6 +329,22 @@ const viewName = (index: FieldIndex, series: Selected) =>
     .get(topicKey(series.source, series.topic))
     ?.views.find((view) => view.id === series.view)?.name;
 
+function ViewDetail({ index, series }: { index: FieldIndex; series: Selected }) {
+  const name = viewName(index, series);
+  const type = index.topics.get(topicKey(series.source, series.topic))?.schema_name;
+  return (
+    <>
+      <span>{name}</span>
+      {type && (
+        <>
+          {name && <br />}
+          {type}
+        </>
+      )}
+    </>
+  );
+}
+
 /** Series of a view have nothing to load in advance, and take no line width. */
 function ViewSeriesList(props: WidgetSettingsProps) {
   return (
@@ -340,7 +356,7 @@ function ViewSeriesList(props: WidgetSettingsProps) {
           {...props}
           series={s}
           showStatus={false}
-          detail={viewName(props.index, s)}
+          detail={<ViewDetail index={props.index} series={s} />}
           marker={<i className="series-dot" style={{ background: s.color }} />}
         >
           {props.widget.type === "scene" && selectedViewKind(props.index, s) === "image" && (
@@ -441,23 +457,32 @@ function ImageSettings(props: WidgetSettingsProps) {
         ) : (
           <p className="muted">Not selected</p>
         )}
+        {image && (
+          <div className="series-status">
+            <ViewDetail index={index} series={image} />
+          </div>
+        )}
         {image && <CalibrationSetting {...props} series={image} />}
         <FieldPicker {...props} kind="image" />
       </SettingsSection>
-      <SettingsSection title="Additional topics">
-        {!image && <p className="muted">Select an image topic first.</p>}
-        {additional.map((series) => (
+      <SeriesList
+        {...props}
+        title="Additional topics"
+        series={additional}
+        kind="overlay"
+        row={(series) => (
           <SeriesRow
             key={series.key}
             {...props}
             series={series}
             showStatus={false}
-            detail={viewName(props.index, series)}
+            detail={<ViewDetail index={index} series={series} />}
             marker={<i className="series-dot" style={{ background: series.color }} />}
           />
-        ))}
-        <FieldPicker {...props} kind="overlay" />
-      </SettingsSection>
+        )}
+      >
+        {!image && <p className="muted">Select an image topic first.</p>}
+      </SeriesList>
     </>
   );
 }

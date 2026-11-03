@@ -18,7 +18,7 @@ it("separates the image from additional topics and removes them together", () =>
   const topic = (name: string, kind: string): Topic => ({
     source: "r/0",
     topic: name,
-    schema_name: "T",
+    schema_name: `example/${kind}`,
     schema_encoding: null,
     views: [{ id: kind, kind, name: kind }],
     message_count: 1,
@@ -56,6 +56,21 @@ it("separates the image from additional topics and removes them together", () =>
   expect(
     within(screen.getByRole("region", { name: "Additional topics" })).getByText("/lidar"),
   ).toBeTruthy();
+  for (const [region, view, type] of [
+    ["Image topic", "image", "example/image"],
+    ["Additional topics", "pointcloud", "example/pointcloud"],
+  ]) {
+    const label = within(screen.getByRole("region", { name: region })).getByText(view);
+    expect(label.nextSibling?.nodeName).toBe("BR");
+    expect(label.nextSibling?.nextSibling?.textContent).toBe(type);
+  }
+  const additional = screen.getByRole("region", { name: "Additional topics" });
+  const add = within(additional).getByRole("button", { name: "Add topic" });
+  expect(add.textContent).toBe("+ Topic");
+  expect(
+    add.compareDocumentPosition(within(additional).getByText("/lidar")) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Remove image topic" }));
   expect(screen.queryByText("/lidar")).toBeNull();
   expect(screen.getByText("Select an image topic first.")).toBeTruthy();
@@ -66,7 +81,7 @@ it("sets an independent image distance in the 3D panel", () => {
   const image: Topic = {
     source: "r/0",
     topic: "/camera",
-    schema_name: "T",
+    schema_name: "sensor_msgs/msg/Image",
     schema_encoding: null,
     views: [{ id: "image", kind: "image", name: "Image" }],
     message_count: 1,
@@ -100,13 +115,25 @@ it("sets an independent image distance in the 3D panel", () => {
       </>
     );
   }
-  render(<Harness />);
+  const { rerender } = render(<Harness />);
+  const view = screen.getByText("Image");
+  expect(view.nextSibling?.nodeName).toBe("BR");
+  expect(view.nextSibling?.nextSibling?.textContent).toBe("sensor_msgs/msg/Image");
   const input = screen.getByRole("spinbutton", { name: /Image distance for/ }) as HTMLInputElement;
   expect(input.value).toBe("1");
   fireEvent.change(input, { target: { value: "5" } });
   expect(screen.getByTestId("distance").textContent).toBe("5");
   fireEvent.change(input, { target: { value: "0" } });
   expect(screen.getByTestId("distance").textContent).toBe("5");
+  rerender(
+    <WidgetSettings
+      widget={state.widgets["widget-1"]}
+      dispatch={() => {}}
+      records={[]}
+      index={buildFieldIndex([{ ...image, schema_name: null }])}
+    />,
+  );
+  expect(within(screen.getByRole("region", { name: "Topics" })).getByText("Image")).toBeTruthy();
 });
 
 it("sets and clears a pose topic's trail duration", () => {
