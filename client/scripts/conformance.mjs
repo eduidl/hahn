@@ -58,7 +58,8 @@ const parse = (media, bytes) => {
 };
 
 /** Sends the request and checks the response against `method path` in the spec. */
-async function check(path, url, expected, init = {}) {
+/** `code` is the error code a failure must carry. */
+async function check(path, url, expected, { code, ...init } = {}) {
   const method = (init.method ?? "GET").toLowerCase();
   const context = `${method} ${url} -> ${expected}`;
   exercised.add(`${method} ${path}`);
@@ -88,6 +89,8 @@ async function check(path, url, expected, init = {}) {
   for (const value of values)
     if (!validate(value))
       return fail(`${ajv.errorsText(validate.errors)}\n  ${JSON.stringify(value).slice(0, 300)}`);
+  if (code && values[0]?.code !== code)
+    return fail(`expected code ${code}, got ${values[0]?.code}`);
   return values;
 }
 
@@ -115,7 +118,7 @@ if (
   failures.push(`q=${named}: wrong matches`);
 const [noRuns] = await check("/api/runs", "/api/runs?q=no-such-run", 200);
 if (noRuns.items.length || noRuns.truncated) failures.push("q=no-such-run: expected nothing");
-await check("/api/runs/{run}", unknown, 404);
+await check("/api/runs/{run}", unknown, 404, { code: "run_not_found" });
 let root;
 let visual;
 for (const run of runs) {
@@ -131,11 +134,11 @@ const runRoot = root.slice(0, root.indexOf("/groups/"));
 
 const info = "/api/runs/{run}/groups/{group}";
 await check(info, root, 200);
-await check(info, `${unknown}/groups/x`, 404);
-await check(info, `${runRoot}/groups/no-such-group`, 404);
+await check(info, `${unknown}/groups/x`, 404, { code: "run_not_found" });
+await check(info, `${runRoot}/groups/no-such-group`, 404, { code: "group_not_found" });
 const topicsPath = `${info}/topics`;
 const [topics] = await check(topicsPath, `${root}/topics`, 200);
-await check(topicsPath, `${unknown}/groups/x/topics`, 404);
+await check(topicsPath, `${unknown}/groups/x/topics`, 404, { code: "run_not_found" });
 const topic = topics.find((t) => !t.error && t.message_count);
 const scalarPaths = (fields, prefix = []) =>
   fields.flatMap((f) => {
@@ -160,15 +163,29 @@ for (const path of scalars) {
   );
   endsComplete(`${messages} ${path}`, exact);
 }
-await check(messages, historyUrl({ topic: topic.topic, start_ns: "2", end_ns: "1" }), 400);
-await check(messages, historyUrl({ topic: topic.topic, start_ns: "x" }), 400);
-await check(messages, historyUrl({ topic: topic.topic, path: "nope" }), 400);
-await check(messages, historyUrl({ topic: topic.topic, preview: "maybe" }), 400);
-await check(messages, `${root}/messages`, 400);
-await check(messages, historyUrl({ topic: topic.topic }, `${unknown}/groups/x`), 404);
-await check(messages, historyUrl({ topic: "/nope" }), 422);
-await check(messages, historyUrl({ topic: topic.topic, path: '["nope"]' }), 422);
-await check(messages, historyUrl({ topic: topic.topic, preview: "false" }), 422);
+await check(messages, historyUrl({ topic: topic.topic, start_ns: "2", end_ns: "1" }), 400, {
+  code: "invalid_request",
+});
+await check(messages, historyUrl({ topic: topic.topic, start_ns: "x" }), 400, {
+  code: "invalid_request",
+});
+await check(messages, historyUrl({ topic: topic.topic, path: "nope" }), 400, {
+  code: "invalid_request",
+});
+await check(messages, historyUrl({ topic: topic.topic, preview: "maybe" }), 400, {
+  code: "invalid_request",
+});
+await check(messages, `${root}/messages`, 400, { code: "invalid_request" });
+await check(messages, historyUrl({ topic: topic.topic }, `${unknown}/groups/x`), 404, {
+  code: "run_not_found",
+});
+await check(messages, historyUrl({ topic: "/nope" }), 422, { code: "unknown_topic" });
+await check(messages, historyUrl({ topic: topic.topic, path: '["nope"]' }), 422, {
+  code: "unknown_field",
+});
+await check(messages, historyUrl({ topic: topic.topic, preview: "false" }), 422, {
+  code: "invalid_selection",
+});
 
 for (const { name } of topic.meta_fields) {
   endsComplete(
@@ -176,16 +193,22 @@ for (const { name } of topic.meta_fields) {
     await check(messages, historyUrl({ topic: topic.topic, meta: name }), 200),
   );
 }
-await check(messages, historyUrl({ topic: topic.topic, meta: "no-such-meta" }), 422);
-await check(messages, historyUrl({ topic: topic.topic, meta: "x", path: "[]" }), 400);
+await check(messages, historyUrl({ topic: topic.topic, meta: "no-such-meta" }), 422, {
+  code: "unknown_meta_field",
+});
+await check(messages, historyUrl({ topic: topic.topic, meta: "x", path: "[]" }), 400, {
+  code: "invalid_request",
+});
 
 const message = `${info}/messages/latest`;
 const query = (params) => `${root}/messages/latest?${new URLSearchParams(params)}`;
 await check(message, query({ topic: topic.topic, time_ns: "18446744073709551615" }), 200);
-await check(message, query({ topic: topic.topic, time_ns: "x" }), 400);
-await check(message, query({ topic: topic.topic }), 400);
-await check(message, `${unknown}/groups/x/messages/latest?topic=x&time_ns=1`, 404);
-await check(message, query({ topic: "/nope", time_ns: "1" }), 422);
+await check(message, query({ topic: topic.topic, time_ns: "x" }), 400, { code: "invalid_request" });
+await check(message, query({ topic: topic.topic }), 400, { code: "invalid_request" });
+await check(message, `${unknown}/groups/x/messages/latest?topic=x&time_ns=1`, 404, {
+  code: "run_not_found",
+});
+await check(message, query({ topic: "/nope", time_ns: "1" }), 422, { code: "unknown_topic" });
 
 const [visualTopics] = await check(topicsPath, `${visual}/topics`, 200);
 const viewed = visualTopics.filter((t) => t.views.length);
@@ -231,14 +254,20 @@ await check(
   viewUrl("views", { topic: viewedTopic, view: viewId, start_ns: "2", end_ns: "1" }),
   400,
 );
-await check(viewsPath, viewUrl("views", { topic: viewedTopic, view: "no-such-view" }), 422);
-await check(viewsPath, viewUrl("views", { topic: "/nope", view: viewId }), 422);
+await check(viewsPath, viewUrl("views", { topic: viewedTopic, view: "no-such-view" }), 422, {
+  code: "unknown_view",
+});
+await check(viewsPath, viewUrl("views", { topic: "/nope", view: viewId }), 422, {
+  code: "unknown_topic",
+});
 await check(
   viewsPath,
   viewUrl("views", { topic: viewedTopic, view: viewId }, `${unknown}/groups/x`),
   404,
 );
-await check(latestViewPath, viewUrl("views/latest", { topic: viewedTopic, view: viewId }), 400);
+await check(latestViewPath, viewUrl("views/latest", { topic: viewedTopic, view: viewId }), 400, {
+  code: "invalid_request",
+});
 await check(
   latestViewPath,
   viewUrl("views/latest", { topic: viewedTopic, view: viewId, time_ns: "1", known_time_ns: "x" }),
@@ -262,7 +291,7 @@ await check(
 const framesPath = "/api/runs/{run}/frames";
 const transformsPath = "/api/runs/{run}/transforms";
 const visualRun = visual.slice(0, visual.indexOf("/groups/"));
-await check(framesPath, `${unknown}/frames`, 404);
+await check(framesPath, `${unknown}/frames`, 404, { code: "run_not_found" });
 const [{ frames: graph }] = await check(framesPath, `${visualRun}/frames`, 200);
 if (!graph.length) failures.push(`${framesPath}: expected frames`);
 const transformsUrl = (params, at = visualRun) => `${at}/transforms?${new URLSearchParams(params)}`;
@@ -276,9 +305,15 @@ const [resolved] = await check(
 if (!resolved.frames[targetFrame])
   failures.push(`${transformsPath}: the target must resolve to itself`);
 await check(transformsPath, transformsUrl({ target: "no-such-frame", time_ns: "1" }), 422);
-await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "x" }), 400);
-await check(transformsPath, transformsUrl({ target: targetFrame }), 400);
-await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "1" }, unknown), 404);
+await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "x" }), 400, {
+  code: "invalid_request",
+});
+await check(transformsPath, transformsUrl({ target: targetFrame }), 400, {
+  code: "invalid_request",
+});
+await check(transformsPath, transformsUrl({ target: targetFrame, time_ns: "1" }, unknown), 404, {
+  code: "run_not_found",
+});
 
 // An operation added to the spec must be implemented and exercised here.
 for (const [path, item] of Object.entries(spec.paths))

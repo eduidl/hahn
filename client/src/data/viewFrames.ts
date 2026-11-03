@@ -1,3 +1,4 @@
+import { ServerError, responseError } from "./errors";
 import { sourceUrl } from "./sources";
 import type { Schemas, Selected } from "../types";
 
@@ -41,7 +42,7 @@ export function parseFrames(buffer: ArrayBuffer): ViewResponse {
     const header = JSON.parse(
       decoder.decode(new Uint8Array(buffer, at + lengths, headerLength)),
     ) as Header;
-    if (header.type === "error") throw new Error(header.message);
+    if (header.type === "error") throw new ServerError(header.message, header.code);
     if (header.type === "complete") ended = true;
     if (header.type === "unchanged") unchanged = true;
     if (header.type === "frame")
@@ -59,10 +60,7 @@ export function parseFrames(buffer: ArrayBuffer): ViewResponse {
 
 async function fetchBuffer(url: string, signal?: AbortSignal) {
   const response = await fetch(url, { signal });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? "Request failed");
-  }
+  if (!response.ok) throw await responseError(response);
   return response.arrayBuffer();
 }
 

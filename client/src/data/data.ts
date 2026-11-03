@@ -1,4 +1,5 @@
 import type { EnumValue, Schemas } from "../types";
+import { ServerError, responseError } from "./errors";
 
 export type Row = { time_ns: string; values: (number | string | boolean | null)[] };
 type MessagesEvent = Schemas["MessagesEvent"];
@@ -80,10 +81,7 @@ export async function consumeStream<T = Row>(
   response: Response,
   onEvent: (event: StreamEvent<T>) => void,
 ) {
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `HTTP ${response.status}`);
-  }
+  if (!response.ok) throw await responseError(response);
   if (!response.body) throw new Error("Empty response");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -92,7 +90,7 @@ export async function consumeStream<T = Row>(
   const accept = (line: string) => {
     if (!line.trim()) return;
     const event = JSON.parse(line) as StreamEvent<T>;
-    if (event.type === "error") throw new Error(event.message);
+    if (event.type === "error") throw new ServerError(event.message, event.code);
     if (event.type === "complete") complete = true;
     onEvent(event);
   };

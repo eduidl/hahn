@@ -107,7 +107,7 @@ export function useRunSources(
         onRestoreFailed();
         // A run the server no longer has is gone for good. Anything else may be
         // a server restart, so keep the session for the next reload.
-        if (e instanceof HttpError && e.status === 404) {
+        if (e instanceof HttpError && e.code === "run_not_found") {
           pendingRestore.current = null;
           setRestoring(false);
           dispatch({ type: "sources", open: new Set(), keepViews: true });

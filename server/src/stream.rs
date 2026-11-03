@@ -1,4 +1,7 @@
-use crate::source::{MessageTimes, TimeRange};
+use crate::{
+    error::Code,
+    source::{MessageTimes, TimeRange},
+};
 use axum::{
     body::{Body, Bytes},
     http::header,
@@ -25,6 +28,7 @@ enum Event<T> {
         scanned_messages: usize,
     },
     Error {
+        code: &'static str,
         message: String,
     },
 }
@@ -145,6 +149,7 @@ pub(crate) fn stream_rows<T: Serialize + Send + 'static>(
                 let _ = send(
                     &tx,
                     &Event::<T>::Error {
+                        code: Code::of(&e).as_str(),
                         message: e.to_string(),
                     },
                 );
