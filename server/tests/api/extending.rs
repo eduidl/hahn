@@ -252,6 +252,71 @@ async fn a_value_of_another_kind_than_declared_fails_its_frame() {
     assert_eq!(events.last().unwrap().0["type"], "complete");
 }
 
+#[tokio::test]
+async fn an_applications_own_file_format_is_served() {
+    let dir = tempfile::tempdir().unwrap();
+    support::acme_log::write_acme_log(&dir.path().join("acme.acmelog")).unwrap();
+    std::fs::write(dir.path().join("broken.acmelog"), "1 /speed fast\n").unwrap();
+    // Without the format, its files are not recordings.
+    let plain = hahn::router(dir.path()).unwrap();
+    let (_, runs) = raw_get(&plain, "/api/runs").await;
+    assert_eq!(runs["items"], json!([]));
+
+    let app = hahn::Builder::new(dir.path())
+        .format(support::acme_log::AcmeLog)
+        .router()
+        .unwrap();
+    let (_, runs) = raw_get(&app, "/api/runs").await;
+    let names: Vec<_> = runs["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|run| run["name"].clone())
+        .collect();
+    assert_eq!(names, vec![json!("acme.acmelog"), json!("broken.acmelog")]);
+
+    let (status, info) = get(app.clone(), "/g").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(info["start_ns"], "0");
+    assert_eq!(info["end_ns"], "3900000000");
+    assert_eq!(info["message_count"], 50);
+
+    let (_, topics) = get(app.clone(), "/g/topics").await;
+    assert_eq!(topics[0]["topic"], "/speed");
+    assert_eq!(topics[0]["schema_name"], "acme_log/Scalar");
+    assert_eq!(topics[0]["fields"][0]["name"], "value");
+    assert_eq!(topics[1]["topic"], "/battery");
+    assert_eq!(topics[1]["message_count"], 10);
+
+    let (status, events) = stream(
+        app.clone(),
+        "/g/messages",
+        json!({"topic":"/speed","path":["value"],"preview":false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let rows: Vec<_> = events
+        .iter()
+        .filter_map(|e| e["rows"].as_array())
+        .flatten()
+        .collect();
+    assert_eq!(rows.len(), 40);
+    assert_eq!(rows[3]["time_ns"], "300000000");
+    assert_eq!(rows[3]["value"], 3.);
+    assert_eq!(events.last().unwrap()["type"], "complete");
+
+    // A file that cannot be read fails for its own run only.
+    let broken = runs["items"][1]["id"].as_str().unwrap();
+    let (_, detail) = raw_get(&app, &format!("/api/runs/{broken}")).await;
+    let group = detail["groups"][0]["id"].as_str().unwrap();
+    let (status, body) = raw_get(&app, &format!("/api/runs/{broken}/groups/{group}")).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        body["error"].as_str().unwrap().contains("invalid"),
+        "{body}"
+    );
+}
+
 #[test]
 fn packed_points_are_unpacked_by_offset() {
     use hahn::{NumericType, PackedField, PointCloudView};
