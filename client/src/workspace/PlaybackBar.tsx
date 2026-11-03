@@ -95,6 +95,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
     <section className="playback-bar" aria-label="Playback">
       <div className="playback-controls">
         <button
+          type="button"
           aria-label="Go to start"
           title="Go to start"
           disabled={disabled}
@@ -103,6 +104,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
           {icon("M6 5h2v14H6zM20 5v14L9 12z")}
         </button>
         <button
+          type="button"
           aria-label="Back"
           title={`Back ${stepSeconds}s (Left; Shift+Left: ${largeStepSeconds}s)`}
           disabled={disabled}
@@ -111,6 +113,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
           {icon("M11 5v14L4 12zM20 5v14l-7-7z")}
         </button>
         <button
+          type="button"
           className="playback-toggle"
           aria-label={playing ? "Pause" : "Play"}
           title={`${playing ? "Pause" : "Play"} (Space)`}
@@ -120,6 +123,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
           {playing ? icon("M6 5h4v14H6zM14 5h4v14h-4z") : icon("M7 4v16l13-8z")}
         </button>
         <button
+          type="button"
           aria-label="Forward"
           title={`Forward ${stepSeconds}s (Right; Shift+Right: ${largeStepSeconds}s)`}
           disabled={disabled}
@@ -128,6 +132,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
           {icon("M4 5v14l7-7zM13 5v14l7-7z")}
         </button>
         <button
+          type="button"
           aria-label="Go to end"
           title="Go to end"
           disabled={disabled}
@@ -210,6 +215,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
         </select>
       </label>
       <button
+        type="button"
         className="playback-loop"
         aria-label="Loop playback"
         aria-pressed={loop}

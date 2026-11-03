@@ -94,6 +94,7 @@ export function SeriesRow({
   return (
     <div className="legend-row">
       <button
+        type="button"
         className={`series-toggle ${s.hidden ? "dim" : ""}`}
         aria-label={`Toggle visibility for ${name(s)}`}
         aria-pressed={!s.hidden}
@@ -116,6 +117,7 @@ export function SeriesRow({
         )
       )}
       <button
+        type="button"
         className="remove"
         aria-label={`Remove ${name(s)}`}
         onClick={() => update((list) => list.filter((f) => f.key !== s.key))}

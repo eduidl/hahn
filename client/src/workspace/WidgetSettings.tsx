@@ -166,8 +166,9 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
       </SettingsSection>
       {props.widget.type === "table" && target && (
         <SettingsSection title="Columns">
-          <div className="table-column-actions" role="group" aria-label="Bulk column controls">
+          <fieldset className="table-column-actions" aria-label="Bulk column controls">
             <button
+              type="button"
               className="small-button"
               disabled={visibleColumns === columns.length}
               onClick={() =>
@@ -182,6 +183,7 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
               Show all
             </button>
             <button
+              type="button"
               className="small-button"
               disabled={visibleColumns === 0}
               onClick={() =>
@@ -195,7 +197,7 @@ function SingleTargetSettings(props: WidgetSettingsProps) {
             >
               Hide all
             </button>
-          </div>
+          </fieldset>
           <div className="table-column-options">
             {columns.map((column) => {
               const key = JSON.stringify(column.path);
@@ -319,6 +321,7 @@ function ImageSettings(props: WidgetSettingsProps) {
               inline
             />
             <button
+              type="button"
               className="remove"
               aria-label="Remove image topic"
               onClick={() => dispatch({ type: "series", id: widget.id, update: () => [] })}
@@ -443,8 +446,9 @@ function FrameAxesSection({
       />
       {frames.length > 0 && (
         <>
-          <div className="table-column-actions" role="group" aria-label="Frame axes controls">
+          <fieldset className="table-column-actions" aria-label="Frame axes controls">
             <button
+              type="button"
               className="small-button"
               disabled={frames.every((id) => !hidden.has(id))}
               onClick={() => set({ hidden: [] })}
@@ -452,13 +456,14 @@ function FrameAxesSection({
               Show all
             </button>
             <button
+              type="button"
               className="small-button"
               disabled={frames.every((id) => hidden.has(id))}
               onClick={() => set({ hidden: [...new Set([...settings.hidden, ...frames])] })}
             >
               Hide all
             </button>
-          </div>
+          </fieldset>
           <div className="table-column-options">
             {frames.map((id) => (
               <label className="table-column-option" key={id}>
@@ -504,10 +509,14 @@ function MapSettings(props: WidgetSettingsProps) {
           The visible area is sent to the tile provider. Select None to disable tiles.
         </p>
         <div className="table-column-actions">
-          <button disabled={widget.tileUrl === osmTiles} onClick={() => setTiles(osmTiles)}>
+          <button
+            type="button"
+            disabled={widget.tileUrl === osmTiles}
+            onClick={() => setTiles(osmTiles)}
+          >
             Use OpenStreetMap
           </button>
-          <button disabled={!widget.tileUrl} onClick={() => setTiles("")}>
+          <button type="button" disabled={!widget.tileUrl} onClick={() => setTiles("")}>
             None
           </button>
         </div>

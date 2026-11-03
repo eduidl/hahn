@@ -172,9 +172,11 @@ it("names the selection only on widgets taking a single target", () => {
 it("puts the view actions left of the common ones, behind a separator", () => {
   const { container } = render(<Harness initialState={initialWorkspace()} />);
   const controls = container.querySelector(".mosaic-window-controls")!;
-  const parts = [...controls.querySelectorAll("button, [role=separator]")]
+  const parts = [...controls.querySelectorAll("button, hr")]
     .filter((element) => !element.closest("[popover]"))
-    .map((element) => element.getAttribute("aria-label") ?? element.getAttribute("role"));
+    .map((element) =>
+      element.tagName === "HR" ? "separator" : element.getAttribute("aria-label"),
+    );
   expect(parts).toEqual([
     "Pan",
     "Box zoom",
@@ -231,7 +233,7 @@ it("offers the 3D view a reset, at the same place in the title bar", () => {
   render(<Harness initialState={state} />);
   const reset = screen.getByRole("button", { name: "Reset view" }) as HTMLButtonElement;
   expect(reset.disabled).toBe(false);
-  expect(reset.nextElementSibling?.getAttribute("role")).toBe("separator");
+  expect(reset.nextElementSibling?.tagName).toBe("HR");
 });
 
 describe("Tab widget interactions", () => {

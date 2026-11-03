@@ -165,10 +165,10 @@ export function RawMessage({
             <span className="raw-status">
               {formatter.tooltip(secondsFrom(message.time_ns, info!.start_ns))}
             </span>
-            <button className="small-button" onClick={expandAll}>
+            <button type="button" className="small-button" onClick={expandAll}>
               Expand all
             </button>
-            <button className="small-button" onClick={resetFolding}>
+            <button type="button" className="small-button" onClick={resetFolding}>
               Reset
             </button>
           </div>

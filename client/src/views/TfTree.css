@@ -9,3 +9,6 @@
 .tf-tree g[role="button"] { cursor: pointer; }
 .tf-tree g[aria-pressed="true"] rect { stroke: white; stroke-width: 3; }
 .tf-tree-pose-handle { cursor: move; touch-action: none; }
+/* A button that keeps the look of the bold frame name it replaced. */
+.tf-tree-pose .tf-tree-pose-handle,
+.tf-tree-pose .tf-tree-pose-handle:hover { padding: 0; border: 0; background: none; font-weight: 700; text-align: left; line-height: inherit; }

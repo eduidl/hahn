@@ -33,9 +33,8 @@ function ColumnResizeHandle({
 }) {
   const drag = useRef<{ pointerId: number; x: number; width: number } | null>(null);
   return (
-    <div
+    <hr
       className="table-column-resize"
-      role="separator"
       aria-label={`${label} width`}
       aria-valuenow={width}
       tabIndex={0}
@@ -199,6 +198,7 @@ export function TableView({
                     {column.label}
                   </span>
                   <button
+                    type="button"
                     className="table-column-hide"
                     aria-label={`Hide ${column.label}`}
                     title="Hide this column"

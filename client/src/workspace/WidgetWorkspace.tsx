@@ -422,13 +422,14 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
               moving.setId(null);
             }}
           >
-            <div className="empty-widget-catalog" role="group" aria-label="Widgets to add">
+            <fieldset className="empty-widget-catalog" aria-label="Widgets to add">
               <p>Add widget</p>
               <div className="empty-widget-options">
                 {widgetTypes
                   .filter((type) => canPlaceWidget(type, container))
                   .map((type) => (
                     <button
+                      type="button"
                       key={type}
                       aria-label={`Add ${widgetSpecs[type].label}`}
                       aria-description={widgetSpecs[type].description}
@@ -439,7 +440,7 @@ function WorkspaceLayout(props: Props & { container?: Container; expanded?: stri
                     </button>
                   ))}
               </div>
-            </div>
+            </fieldset>
           </div>
         }
         renderTile={(id, path) => (

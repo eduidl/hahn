@@ -18,12 +18,12 @@ export function SidebarResizer({ onResize }: { onResize: (width: number) => void
     const available = element.closest(".workspace")!.getBoundingClientRect().width;
     onResize(clampSidebarWidth(width, available));
   };
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+  const onPointerMove = (event: PointerEvent<HTMLHRElement>) => {
     const handle = event.currentTarget;
     if (!handle.hasPointerCapture(event.pointerId)) return;
     resize(handle, event.clientX - handle.parentElement!.getBoundingClientRect().left);
   };
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLHRElement>) => {
     const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
     if (!direction) return;
     event.preventDefault();
@@ -31,9 +31,8 @@ export function SidebarResizer({ onResize }: { onResize: (width: number) => void
     resize(handle, handle.parentElement!.getBoundingClientRect().width + direction * keyStep);
   };
   return (
-    <div
+    <hr
       className="sidebar-resizer"
-      role="separator"
       aria-label="Resize sidebar"
       tabIndex={0}
       onPointerDown={(event) => {

@@ -11,6 +11,7 @@ export function WidgetHelp({ title, controls }: { title: string; controls: reado
   return (
     <>
       <button
+        type="button"
         className="widget-icon widget-help"
         aria-label={`${title} controls`}
         style={{ anchorName: anchor }}

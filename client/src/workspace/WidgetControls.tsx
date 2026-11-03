@@ -64,8 +64,9 @@ export function WidgetControls({
   return (
     <>
       {widget.type === "plot" && (
-        <div className="widget-drag-mode" role="group" aria-label="Drag mode">
+        <fieldset className="widget-drag-mode" aria-label="Drag mode">
           <button
+            type="button"
             className="widget-icon"
             aria-label="Pan"
             title="Pan"
@@ -86,6 +87,7 @@ export function WidgetControls({
             </svg>
           </button>
           <button
+            type="button"
             className="widget-icon"
             aria-label="Box zoom"
             title="Box zoom"
@@ -105,11 +107,12 @@ export function WidgetControls({
               <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 9v6M9 12h6" />
             </svg>
           </button>
-        </div>
+        </fieldset>
       )}
       {hasReset && (
         <>
           <button
+            type="button"
             className="widget-icon"
             aria-label="Reset view"
             title="Reset view"
@@ -135,13 +138,14 @@ export function WidgetControls({
               <path d="M4.5 10a8 8 0 1 1-.5 4" />
             </svg>
           </button>
-          <span className="widget-toolbar-separator" role="separator" />
+          <hr className="widget-toolbar-separator" />
         </>
       )}
       {widgetSpecs[widget.type].controls && (
         <WidgetHelp title={widget.title} controls={widgetSpecs[widget.type].controls!} />
       )}
       <button
+        type="button"
         className="widget-icon"
         aria-label={`${state.expandedId === widget.id ? "Restore" : "Maximize"} ${widget.title}`}
         title={state.expandedId === widget.id ? "Restore layout (Escape)" : "Maximize"}
@@ -173,6 +177,7 @@ export function WidgetControls({
         </svg>
       </button>
       <button
+        type="button"
         className="widget-icon"
         aria-label={`${widget.title} settings`}
         title="Settings"
@@ -194,6 +199,7 @@ export function WidgetControls({
         </svg>
       </button>
       <button
+        type="button"
         className="widget-icon"
         popoverTarget={menuId}
         aria-label={`${widget.title} menu`}
@@ -216,10 +222,10 @@ export function WidgetControls({
           }
         }}
       >
-        <button role="menuitem" onClick={() => action("row")}>
+        <button type="button" role="menuitem" onClick={() => action("row")}>
           Split right
         </button>
-        <button role="menuitem" onClick={() => action("column")}>
+        <button type="button" role="menuitem" onClick={() => action("column")}>
           Split down
         </button>
         <div
@@ -228,6 +234,7 @@ export function WidgetControls({
           onMouseLeave={() => openSubmenu(false)}
         >
           <button
+            type="button"
             role="menuitem"
             aria-haspopup="menu"
             aria-expanded={changingType}
@@ -255,6 +262,7 @@ export function WidgetControls({
                   const current = type === widget.type;
                   return (
                     <button
+                      type="button"
                       key={type}
                       role="menuitemradio"
                       aria-checked={current}
@@ -273,6 +281,7 @@ export function WidgetControls({
           )}
         </div>
         <button
+          type="button"
           role="menuitem"
           disabled={
             widget.type === "tabs"
@@ -283,7 +292,7 @@ export function WidgetControls({
         >
           Clear
         </button>
-        <button role="menuitem" className="danger" onClick={() => action("remove")}>
+        <button type="button" role="menuitem" className="danger" onClick={() => action("remove")}>
           Delete
         </button>
       </div>

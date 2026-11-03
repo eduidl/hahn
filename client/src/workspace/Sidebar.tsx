@@ -75,6 +75,7 @@ export function Sidebar({
       <SidebarResizer onResize={onResize} />
       <div className="sidebar-tabs" role="tablist" aria-label="Sidebar">
         <button
+          type="button"
           id="tab-settings"
           role="tab"
           aria-controls="sidebar-settings"
@@ -84,6 +85,7 @@ export function Sidebar({
           Settings
         </button>
         <button
+          type="button"
           id="tab-topics"
           role="tab"
           aria-controls="sidebar-topics"
@@ -93,6 +95,7 @@ export function Sidebar({
           Topics
         </button>
         <button
+          type="button"
           id="tab-errors"
           role="tab"
           aria-controls="sidebar-errors"
@@ -159,7 +162,7 @@ export function Sidebar({
       </p>
       <footer className="sidebar-footer">
         {tab === "topics" && <span>Drag or double-click to add</span>}
-        <button className="reset-workspace" onClick={onReset}>
+        <button type="button" className="reset-workspace" onClick={onReset}>
           Reset workspace
         </button>
       </footer>

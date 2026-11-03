@@ -106,6 +106,7 @@ export function ValueChangesView({
             const s = series[row.series];
             return (
               <button
+                type="button"
                 key={index}
                 className={`value-changes-row ${index === current ? "current" : ""}`}
                 style={{ top: index * rowHeight, height: rowHeight }}
