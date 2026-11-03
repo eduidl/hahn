@@ -17,7 +17,7 @@ async fn topics_declare_their_views_from_the_schema() {
     };
     assert_eq!(views("/camera")[0]["kind"], "image");
     assert_eq!(views("/lidar")[0]["kind"], "pointcloud");
-    assert_eq!(views("/gps")[0]["kind"], "geo");
+    assert_eq!(views("/gps")[0]["kind"], "geo_location");
     // Transforms are the frame graph, not a view.
     assert_eq!(views("/tf"), json!([]));
 
@@ -105,17 +105,41 @@ async fn point_frames_hold_a_column_per_field() {
 }
 
 #[tokio::test]
-async fn location_frames_are_geojson_in_longitude_order() {
+async fn locations_are_in_longitude_order() {
     let (_dir, app) = visual_app();
     let query = format!("&time_ns={}", support::ORIGIN);
     let (_, events) = frames(&app, &view_url("views/latest", "/gps", "geo", &query)).await;
-    let feature = &events[0].0["value"]["features"][0];
-    assert_eq!(
-        feature["geometry"],
-        json!({"type": "Point", "coordinates": [139.76, 35.68, 40.0]})
-    );
-    assert_eq!(feature["properties"]["accuracy_m"], 3.0);
+    let value = &events[0].0["value"];
+    assert_eq!(value["kind"], "geo_location");
+    assert_eq!(value["position"], json!([139.76, 35.68]));
+    assert_eq!(value["altitude"], 40.0);
+    assert_eq!(value["accuracy_m"], 3.0);
     assert!(events[0].1.is_empty());
+}
+
+#[tokio::test]
+async fn a_location_must_be_on_the_earth_and_its_optional_numbers_finite() {
+    let events = echoed(hahn::Kind::GeoLocation, 2, |case| {
+        hahn::GeoLocationView {
+            latitude: [10., 91.][case as usize],
+            longitude: 0.,
+            altitude: Some(f64::NAN),
+            heading: Some(1.5),
+            accuracy_m: None,
+        }
+        .into()
+    })
+    .await;
+    assert_eq!(
+        events[0].0["value"],
+        json!({"kind": "geo_location", "position": [0., 10.], "heading": 1.5})
+    );
+    assert!(
+        events[1].0["error"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid location")
+    );
 }
 
 #[tokio::test]
@@ -396,30 +420,52 @@ async fn points_without_a_position_are_left_out_with_their_values() {
 }
 
 #[tokio::test]
-async fn a_point_feature_must_be_on_the_earth() {
-    let events = echoed(hahn::Kind::Geo, 2, |case| {
+async fn a_shape_off_the_earth_is_left_out_alone_and_counted() {
+    let events = echoed(hahn::Kind::Geo, 1, |_| {
         hahn::GeoView {
             frame_id: None,
-            features: vec![hahn::GeoFeature::point(
-                [10., 91.][case as usize],
-                0.,
-                Some(f64::NAN),
-            )],
+            features: vec![
+                hahn::GeoFeature::point(10., 0., Some(f64::NAN)),
+                hahn::GeoFeature::point(91., 0., None),
+            ],
         }
         .into()
     })
     .await;
-    // An altitude that is not finite is left out.
+    let value = &events[0].0["value"];
+    // An altitude that is not finite is left out of the point.
     assert_eq!(
-        events[0].0["value"]["features"][0]["geometry"]["coordinates"],
-        json!([0., 10.])
+        value["features"],
+        json!([{"type": "Feature", "geometry": {"type": "Point", "coordinates": [0., 10.]}, "properties": {}}])
     );
-    assert!(
-        events[1].0["error"]
-            .as_str()
-            .unwrap()
-            .contains("Invalid location")
-    );
+    assert_eq!(value["omitted"], 1);
+}
+
+#[tokio::test]
+async fn foxglove_geojson_is_read_as_shapes() {
+    use crate::memory::Topic;
+    use hahn::{DataTypeDef as D, Value as V};
+    let text = |document: serde_json::Value| V::string(document.to_string());
+    let line = json!({"type": "LineString", "coordinates": [[0., 0.], [1., 1.]]});
+    let topic = Topic::new("shapes", "foxglove.GeoJSON", vec![("geojson", D::String)])
+        .at(
+            1,
+            vec![text(json!({"type": "FeatureCollection", "features": [
+                {"type": "Feature", "geometry": line, "properties": {"name": "road"}},
+                {"type": "Feature", "properties": {}},
+            ]}))],
+        )
+        .at(2, vec![text(line.clone())])
+        .at(3, vec![V::string("{broken")]);
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);
+    let (_, events) = frames(&app, &view_url("views", "shapes", "geojson", "")).await;
+    let first = &events[0].0["value"];
+    assert_eq!(first["kind"], "geo");
+    assert_eq!(first["features"][0]["properties"]["name"], "road");
+    // The feature without a geometry is left out and counted.
+    assert_eq!(first["omitted"], 1);
+    assert_eq!(events[1].0["value"]["features"][0]["geometry"], line);
+    assert!(events[2].0["error"].is_string());
 }
 
 #[tokio::test]

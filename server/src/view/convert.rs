@@ -1,8 +1,8 @@
 //! Converters from recorded message types to the protocol's fixed kinds.
 
 use super::value::{
-    CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, NumericType, PackedField,
-    PathView, PointCloudView, Pose, PoseView, RawImageView, View,
+    CameraCalibrationView, GeoFeature, GeoLocationView, GeoView, ImageView, Kind, NumericType,
+    PackedField, PathView, PointCloudView, Pose, PoseView, RawImageView, View,
 };
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
@@ -51,6 +51,7 @@ pub(crate) fn converters() -> Vec<Arc<dyn ViewConverter>> {
         Arc::new(PoseInFrame),
         Arc::new(PosesInFrame),
         Arc::new(Geo),
+        Arc::new(GeoJson),
     ];
     converters.extend(super::ros2::converters());
     converters
@@ -684,7 +685,7 @@ impl ViewConverter for Geo {
         "geo"
     }
     fn kind(&self) -> Kind {
-        Kind::Geo
+        Kind::GeoLocation
     }
     fn name(&self) -> &'static str {
         "Location"
@@ -697,37 +698,87 @@ impl ViewConverter for Geo {
             && has(defs, "frame_id", is_string)
     }
     fn convert(&self, message: &Message) -> anyhow::Result<View> {
-        let mut feature = location(message, true)?;
-        if let Ok(heading) = message.number("heading")
-            && heading.is_finite()
-        {
-            feature.properties.insert("heading".into(), heading.into());
-        }
-        Ok(GeoView {
-            frame_id: message.frame_id()?,
-            features: vec![feature],
-        }
-        .into())
+        let mut location = location(message, true)?;
+        location.heading = message.number("heading").ok();
+        Ok(location.into())
     }
 }
 
 /// A location from a message's `latitude`, `longitude`, `altitude` and, when
 /// `covariance` is usable, `position_covariance`.
-pub(super) fn location(message: &Message, covariance: bool) -> anyhow::Result<GeoFeature> {
-    let mut feature = GeoFeature::point(
-        message.number("latitude")?,
-        message.number("longitude")?,
-        Some(message.number("altitude")?),
-    );
+pub(super) fn location(message: &Message, covariance: bool) -> anyhow::Result<GeoLocationView> {
+    let mut location = GeoLocationView {
+        latitude: message.number("latitude")?,
+        longitude: message.number("longitude")?,
+        altitude: message.number("altitude").ok(),
+        ..Default::default()
+    };
     // The diagonal of the ENU covariance in row-major order: east and north.
     if covariance
         && let Ok(covariance) = message.numbers("position_covariance")
         && let [east, _, _, _, north, ..] = covariance[..]
         && east.max(north) > 0.
     {
-        feature
-            .properties
-            .insert("accuracy_m".into(), east.max(north).sqrt().into());
+        location.accuracy_m = Some(east.max(north).sqrt());
     }
-    Ok(feature)
+    Ok(location)
+}
+
+/// `foxglove.GeoJSON`: shapes on a map, held as GeoJSON text. A feature collection,
+/// a feature or a bare geometry are all read as features.
+struct GeoJson;
+
+impl ViewConverter for GeoJson {
+    fn id(&self) -> &'static str {
+        "geojson"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Geo
+    }
+    fn name(&self) -> &'static str {
+        "Shapes"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        is_foxglove(schema_name, "GeoJSON") && has(defs, "geojson", is_string)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let document: serde_json::Value = serde_json::from_str(message.string("geojson")?)
+            .context("The GeoJSON is not valid JSON")?;
+        let feature = |value: &serde_json::Value| -> Option<GeoFeature> {
+            Some(GeoFeature {
+                geometry: value.get("geometry")?.clone(),
+                properties: value
+                    .get("properties")
+                    .and_then(|p| p.as_object())
+                    .cloned()
+                    .unwrap_or_default(),
+            })
+        };
+        let features = match document.get("type").and_then(|t| t.as_str()) {
+            Some("FeatureCollection") => document
+                .get("features")
+                .and_then(|f| f.as_array())
+                .context("A FeatureCollection needs features")?
+                .iter()
+                .map(|value| {
+                    // One without a geometry fails on its own when checked.
+                    feature(value).unwrap_or(GeoFeature {
+                        geometry: serde_json::Value::Null,
+                        properties: Default::default(),
+                    })
+                })
+                .collect(),
+            Some("Feature") => vec![feature(&document).context("A Feature needs a geometry")?],
+            Some(_) => vec![GeoFeature {
+                geometry: document,
+                properties: Default::default(),
+            }],
+            None => bail!("GeoJSON needs a type"),
+        };
+        Ok(GeoView {
+            frame_id: None,
+            features,
+        }
+        .into())
+    }
 }

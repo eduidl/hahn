@@ -8,8 +8,8 @@ use super::convert::{
     location, pose_view, raw_image,
 };
 use super::value::{
-    GeoView, ImageView, Kind, NumericType, PackedField, PathView, PointCloudView, PosesView,
-    PositionView, View,
+    ImageView, Kind, NumericType, PackedField, PathView, PointCloudView, PosesView, PositionView,
+    View,
 };
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::FieldDefs;
@@ -291,7 +291,7 @@ impl ViewConverter for NavSatFix {
         "ros_location"
     }
     fn kind(&self) -> Kind {
-        Kind::Geo
+        Kind::GeoLocation
     }
     fn name(&self) -> &'static str {
         "Location"
@@ -312,11 +312,7 @@ impl ViewConverter for NavSatFix {
             .number("position_covariance_type")
             .is_ok_and(|kind| kind == 0.);
         // COVARIANCE_TYPE_UNKNOWN: the matrix holds no accuracy, whatever its values.
-        Ok(GeoView {
-            frame_id: header_frame(message)?,
-            features: vec![location(message, !unknown)?],
-        }
-        .into())
+        Ok(location(message, !unknown)?.into())
     }
 }
 
