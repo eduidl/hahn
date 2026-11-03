@@ -257,7 +257,10 @@ function CalibrationSetting({
     (option) => option.topic === suggested?.topic && option.view === suggested.view,
   )?.name;
   const value =
-    series.calibration === undefined
+    series.calibration === undefined ||
+    (series.calibration !== null &&
+      series.calibration.topic === suggested?.topic &&
+      series.calibration.view === suggested.view)
       ? "suggested"
       : series.calibration === null
         ? "none"
@@ -296,14 +299,16 @@ function CalibrationSetting({
           <option value="suggested">
             {suggestedName ? `Suggested: ${suggestedName}` : "Suggested: none"}
           </option>
-          {options.map((option) => (
-            <option
-              key={`${option.topic}:${option.view}`}
-              value={JSON.stringify([option.topic, option.view])}
-            >
-              {option.name}
-            </option>
-          ))}
+          {options
+            .filter((option) => option.topic !== suggested?.topic || option.view !== suggested.view)
+            .map((option) => (
+              <option
+                key={`${option.topic}:${option.view}`}
+                value={JSON.stringify([option.topic, option.view])}
+              >
+                {option.name}
+              </option>
+            ))}
           <option value="none">None</option>
         </select>
       </label>

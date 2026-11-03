@@ -14,6 +14,64 @@ vi.mock("../../src/data/useViewData", async (original) => ({
 
 afterEach(cleanup);
 
+it.each(["image", "scene"] as const)("does not repeat the suggested calibration in %s", (type) => {
+  const image: Topic = {
+    source: "r/0",
+    topic: "/camera",
+    schema_name: "Image",
+    schema_encoding: null,
+    views: [
+      { id: "image", kind: "image", name: "Image", calibration: { topic: "/info", view: "info" } },
+    ],
+    message_count: 1,
+    error: null,
+    fields: [],
+  };
+  const calibration: Topic = {
+    ...image,
+    topic: "/info",
+    views: [
+      { id: "info", kind: "camera_calibration", name: "Calibration" },
+      { id: "other", kind: "camera_calibration", name: "Other calibration" },
+    ],
+  };
+  const index = buildFieldIndex([image, calibration]);
+  let state = workspaceReducer(initialWorkspace(), {
+    type: "change-type",
+    id: "widget-1",
+    widgetType: type,
+  });
+  const entry = index.candidates[type][0];
+  state = workspaceReducer(
+    state,
+    addFieldAction(state.widgets["widget-1"], entry.topic, entry.field, index),
+  );
+  const widget = state.widgets["widget-1"];
+  const props = { dispatch: vi.fn(), records: [], index };
+  const { rerender } = render(<WidgetSettings {...props} widget={widget} />);
+  const select = screen.getByRole<HTMLSelectElement>("combobox", {
+    name: "Calibration for /camera",
+  });
+  expect([...select.options].map((option) => option.value)).toEqual([
+    "suggested",
+    JSON.stringify(["/info", "other"]),
+    "none",
+  ]);
+  expect(select.selectedOptions[0].textContent).toBe("Suggested: /info");
+  const manual = {
+    ...widget,
+    series: [{ ...widget.series[0], calibration: { topic: "/info", view: "info" } }],
+  };
+  rerender(<WidgetSettings {...props} widget={manual} />);
+  expect(select.value).toBe("suggested");
+  const changedIndex = buildFieldIndex([
+    { ...image, views: [{ ...image.views[0], calibration: { topic: "/info", view: "other" } }] },
+    calibration,
+  ]);
+  rerender(<WidgetSettings {...props} widget={manual} index={changedIndex} />);
+  expect(select.value).toBe(JSON.stringify(["/info", "info"]));
+});
+
 it("separates the image from additional topics and removes them together", () => {
   const topic = (name: string, kind: string): Topic => ({
     source: "r/0",
