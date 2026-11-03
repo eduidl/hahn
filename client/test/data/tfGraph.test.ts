@@ -105,6 +105,22 @@ describe("TfGraph", () => {
     expect(Math.abs(rotation[3])).toBeCloseTo(Math.SQRT1_2);
   });
 
+  it("resolves across chunks added in any order, and forgets a removed one", () => {
+    const graph = new TfGraph();
+    graph.add(1n, [sample("base", "map", 10, 20)]);
+    graph.add(0n, [sample("base", "map", 0, 10)]);
+    expect(x(graph.resolve("map", 15n), "base")).toBeCloseTo(5);
+    // A tie across chunks goes to the later one, in recording order.
+    graph.add(2n, [sample("base", "map", 99, 20)]);
+    expect(x(graph.resolve("map", 20n), "base")).toBe(99);
+    expect(x(graph.resolve("map", 15n), "base")).toBeCloseTo(49.5);
+    graph.remove(0n);
+    expect(graph.resolve("map", 15n).base).toBeUndefined();
+    graph.remove(1n);
+    graph.remove(2n);
+    expect(Object.keys(graph.resolve("map", 20n))).toEqual(["map"]);
+  });
+
   it("treats any frame name as a name", () => {
     const graph = new TfGraph(
       [{ child: "__proto__", parent: "constructor", translation: [1, 0, 0], rotation: still }],
