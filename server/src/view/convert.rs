@@ -2,7 +2,7 @@
 
 use super::value::{
     CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, NumericType, PackedField,
-    PointCloudView, Pose, PoseView, RawImageView, View,
+    PathView, PointCloudView, Pose, PoseView, RawImageView, View,
 };
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
@@ -48,6 +48,8 @@ pub(crate) fn converters() -> Vec<Arc<dyn ViewConverter>> {
         Arc::new(CameraCalibration),
         Arc::new(PointCloud),
         Arc::new(Odometry),
+        Arc::new(PoseInFrame),
+        Arc::new(PosesInFrame),
         Arc::new(Geo),
     ];
     converters.extend(super::ros2::converters());
@@ -508,6 +510,68 @@ impl ViewConverter for Odometry {
     fn convert(&self, message: &Message) -> anyhow::Result<View> {
         let pose = message.child("pose")?.context("Odometry has no pose")?;
         pose_view(&pose, message.frame_id()?)
+    }
+}
+
+/// `foxglove.PoseInFrame`.
+struct PoseInFrame;
+
+impl ViewConverter for PoseInFrame {
+    fn id(&self) -> &'static str {
+        "pose_in_frame"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Pose
+    }
+    fn name(&self) -> &'static str {
+        "Pose"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        is_foxglove(schema_name, "PoseInFrame")
+            && has(defs, "frame_id", is_string)
+            && has(defs, "pose", is_struct)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let pose = message.child("pose")?.context("PoseInFrame has no pose")?;
+        pose_view(&pose, message.frame_id()?)
+    }
+}
+
+/// `foxglove.PosesInFrame`. It serves for routes as well as for unordered poses, and
+/// which it is cannot be told from the recording; routes are more common (ADR 0005).
+struct PosesInFrame;
+
+impl ViewConverter for PosesInFrame {
+    fn id(&self) -> &'static str {
+        "path"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Path
+    }
+    fn name(&self) -> &'static str {
+        "Path"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        is_foxglove(schema_name, "PosesInFrame")
+            && has(defs, "frame_id", is_string)
+            && has(defs, "poses", is_list)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let poses = message
+            .children("poses")?
+            .iter()
+            .map(|pose| {
+                Ok(Pose {
+                    position: pose.vector("position")?,
+                    orientation: pose.quaternion("orientation")?,
+                })
+            })
+            .collect::<anyhow::Result<_>>()?;
+        Ok(PathView {
+            frame_id: message.frame_id()?,
+            poses,
+        }
+        .into())
     }
 }
 

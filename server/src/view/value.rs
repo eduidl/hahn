@@ -15,7 +15,10 @@ pub enum Kind {
     Image,
     CameraCalibration,
     PointCloud,
+    Position,
     Pose,
+    Poses,
+    Path,
     Geo,
 }
 
@@ -26,7 +29,10 @@ impl Kind {
             Kind::Image => "image",
             Kind::CameraCalibration => "camera_calibration",
             Kind::PointCloud => "pointcloud",
+            Kind::Position => "position",
             Kind::Pose => "pose",
+            Kind::Poses => "poses",
+            Kind::Path => "path",
             Kind::Geo => "geo",
         }
     }
@@ -39,7 +45,10 @@ pub enum View {
     RawImage(RawImageView),
     CameraCalibration(CameraCalibrationView),
     PointCloud(PointCloudView),
+    Position(PositionView),
     Pose(PoseView),
+    Poses(PosesView),
+    Path(PathView),
     Geo(GeoView),
 }
 
@@ -49,7 +58,10 @@ impl View {
             View::Image(_) | View::RawImage(_) => Kind::Image,
             View::CameraCalibration(_) => Kind::CameraCalibration,
             View::PointCloud(_) => Kind::PointCloud,
+            View::Position(_) => Kind::Position,
             View::Pose(_) => Kind::Pose,
+            View::Poses(_) => Kind::Poses,
+            View::Path(_) => Kind::Path,
             View::Geo(_) => Kind::Geo,
         }
     }
@@ -69,7 +81,10 @@ into_view!(
     RawImage(RawImageView),
     CameraCalibration(CameraCalibrationView),
     PointCloud(PointCloudView),
+    Position(PositionView),
     Pose(PoseView),
+    Poses(PosesView),
+    Path(PathView),
     Geo(GeoView)
 );
 
@@ -131,6 +146,30 @@ impl Default for Pose {
 pub struct PoseView {
     pub frame_id: Option<String>,
     pub pose: Pose,
+}
+
+/// One position in `frame_id`, without an orientation, such as a tracked point.
+#[derive(Clone, Debug)]
+pub struct PositionView {
+    pub frame_id: Option<String>,
+    /// Meters.
+    pub position: [f64; 3],
+}
+
+/// Poses in `frame_id` without an order, such as particles or the poses of several
+/// objects. One that is not finite is left out alone, and counted.
+#[derive(Clone, Debug)]
+pub struct PosesView {
+    pub frame_id: Option<String>,
+    pub poses: Vec<Pose>,
+}
+
+/// Poses in `frame_id` in order, such as a planned route. A pose that is not finite
+/// fails the whole path, which leaving it out would reshape.
+#[derive(Clone, Debug)]
+pub struct PathView {
+    pub frame_id: Option<String>,
+    pub poses: Vec<Pose>,
 }
 
 /// The type of a value in packed point data.
@@ -421,6 +460,28 @@ pub(crate) fn encode(view: View, payload: &mut Payload) -> anyhow::Result<serde_
         }
         View::Pose(pose) => {
             json!({"kind":"pose", "frame_id":pose.frame_id, "pose":pose_json(checked(pose.pose)?)})
+        }
+        View::Position(position) => {
+            ensure!(finite(&position.position), "Non-finite vector");
+            json!({"kind":"position", "frame_id":position.frame_id, "position":position.position})
+        }
+        View::Poses(poses) => {
+            let kept: Vec<_> = poses
+                .poses
+                .iter()
+                .filter_map(|pose| checked(*pose).ok())
+                .map(pose_json)
+                .collect();
+            let omitted = poses.poses.len() - kept.len();
+            json!({"kind":"poses", "frame_id":poses.frame_id, "poses":kept, "omitted":omitted})
+        }
+        View::Path(path) => {
+            let poses = path
+                .poses
+                .iter()
+                .map(|pose| checked(*pose).map(pose_json))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            json!({"kind":"path", "frame_id":path.frame_id, "poses":poses})
         }
         View::PointCloud(cloud) => {
             let points = cloud.positions.len();

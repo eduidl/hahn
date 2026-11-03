@@ -492,7 +492,7 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"];
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"];
         /** @description Coordinate frame and measurement time of a spatial value. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
@@ -663,6 +663,26 @@ export interface components {
             /** @enum {string} */
             kind: "pose";
             pose: components["schemas"]["Pose"];
+        };
+        /** @description One position in frame_id, without an orientation. A single value: its history may be drawn as a trail. */
+        PositionValue: components["schemas"]["FramedValue"] & {
+            /** @enum {string} */
+            kind: "position";
+            position: components["schemas"]["Vec3"];
+        };
+        /** @description Poses in frame_id without an order, such as particles. One message holds them all and replaces the last; they are never joined to each other or across messages. */
+        PosesValue: components["schemas"]["FramedValue"] & {
+            /** @enum {string} */
+            kind: "poses";
+            poses: components["schemas"]["Pose"][];
+            /** @description Poses left out because they were not finite or could not be read. */
+            omitted: components["schemas"]["Count"];
+        };
+        /** @description Poses in frame_id in order, such as a planned route, drawn joined. One message holds the whole path and replaces the last. A pose that is not finite fails the message. */
+        PathValue: components["schemas"]["FramedValue"] & {
+            /** @enum {string} */
+            kind: "path";
+            poses: components["schemas"]["Pose"][];
         };
     };
     responses: {

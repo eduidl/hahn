@@ -23,7 +23,7 @@ import {
 } from "../data/viewFrames";
 import { cameraSurface, defaultImageDistance } from "./camera";
 import { useCameraCalibration } from "./useCameraCalibration";
-import { placePoses, poseTrail, trailWindow } from "./poseTrail";
+import { locate, placePoses, poseTrail, trailWindow } from "./poseTrail";
 import type { ResolvedFrames } from "../data/tfGraph";
 import { fetchTransformGraph } from "../data/runTransforms";
 import { runUrl } from "../data/sources";
@@ -324,7 +324,10 @@ export function PoseTrail({
   return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
-/** The latest pose, with the arrow pointing along the body's positive x axis. */
+/**
+ * The latest pose, with the arrow pointing along the body's positive x axis, or the
+ * latest position, as a dot.
+ */
 export function PoseLayer({
   series,
   info,
@@ -339,7 +342,8 @@ export function PoseLayer({
   stage: Stage;
 }) {
   const { frame, error } = useViewFrame(series, info);
-  const value = frame?.value?.kind === "pose" ? frame.value : undefined;
+  const value = locate(frame?.value);
+  const isPosition = frame?.value?.kind === "position";
   const frameId = value?.frame_id;
   const {
     matrix: placement,
@@ -358,30 +362,55 @@ export function PoseLayer({
     arrow.matrixAutoUpdate = false;
     return arrow;
   }, []);
+  const dot = useMemo(() => {
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial());
+    dot.matrixAutoUpdate = false;
+    return dot;
+  }, []);
   useEffect(() => {
-    stage.scene.add(arrow);
+    stage.scene.add(arrow, dot);
     return () => {
-      stage.scene.remove(arrow);
+      stage.scene.remove(arrow, dot);
       arrow.dispose();
+      dot.geometry.dispose();
+      dot.material.dispose();
       stage.invalidate();
     };
-  }, [arrow, stage]);
+  }, [arrow, dot, stage]);
   useEffect(() => {
     if (!settled) return;
-    arrow.visible = !series.hidden && !!value && !!frameId && (!target || !!placement);
+    const shown = !series.hidden && !!value && !!frameId && (!target || !!placement);
+    arrow.visible = shown && !isPosition;
+    dot.visible = shown && isPosition;
     arrow.setColor(new THREE.Color(series.color));
+    dot.material.color.set(series.color);
     if (value) {
-      const pose = matrixOf({ translation: value.pose.position, rotation: value.pose.orientation });
-      arrow.matrix.copy(placement ? placement.clone().multiply(pose) : pose);
-      arrow.matrixWorldNeedsUpdate = true;
+      const pose = matrixOf(value.transform);
+      const matrix = placement ? placement.clone().multiply(pose) : pose;
+      for (const object of [arrow, dot]) {
+        object.matrix.copy(matrix);
+        object.matrixWorldNeedsUpdate = true;
+      }
     }
     stage.invalidate();
-  }, [arrow, value, frameId, target, placement, series.hidden, series.color, stage, settled]);
+  }, [
+    arrow,
+    dot,
+    value,
+    isPosition,
+    frameId,
+    target,
+    placement,
+    series.hidden,
+    series.color,
+    stage,
+    settled,
+  ]);
   const problem =
     error ||
     frame?.error ||
     transformError ||
-    (value && !frameId ? "Pose has no frame ID" : "") ||
+    (value && !frameId ? `${isPosition ? "Position" : "Pose"} has no frame ID` : "") ||
     (missing ? `No transform from ${frameId} to ${target} at this time` : "") ||
     (estimated ? estimatedPlacement : "");
   return (
@@ -392,6 +421,92 @@ export function PoseLayer({
       <ReportSeriesProblem series={series} problem={problem} />
     </>
   );
+}
+
+/** Half a meter along a pose's x axis: how far its heading is drawn. */
+const headingLength = 0.5;
+
+/**
+ * The latest set of poses: a `path` joined in order, or `poses` each drawn by its
+ * heading. A new message replaces the whole set (ADR 0005).
+ */
+export function PoseSetLayer({
+  series,
+  info,
+  target,
+  stage,
+}: {
+  series: Selected;
+  info: Info | null;
+  target: string | null;
+  stage: Stage;
+}) {
+  const { frame, error } = useViewFrame(series, info);
+  const value =
+    frame?.value?.kind === "poses" || frame?.value?.kind === "path" ? frame.value : undefined;
+  const frameId = value?.frame_id;
+  const {
+    matrix: placement,
+    missing,
+    error: transformError,
+    settled,
+    estimated,
+  } = useFramePlacement(series.source, frameId, target, frame);
+  const lines = useMemo(() => {
+    const lines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    lines.matrixAutoUpdate = false;
+    return lines;
+  }, []);
+  useEffect(() => {
+    stage.scene.add(lines);
+    return () => {
+      stage.scene.remove(lines);
+      lines.geometry.dispose();
+      lines.material.dispose();
+      stage.invalidate();
+    };
+  }, [lines, stage]);
+  useEffect(() => {
+    if (!value) return;
+    const segments: number[] = [];
+    if (value.kind === "path")
+      value.poses.forEach((pose, i) => {
+        if (i) segments.push(...value.poses[i - 1].position, ...pose.position);
+      });
+    else
+      for (const pose of value.poses) {
+        const [x, y, z, w] = pose.orientation;
+        const heading = new THREE.Vector3(headingLength, 0, 0).applyQuaternion(
+          new THREE.Quaternion(x, y, z, w),
+        );
+        const [px, py, pz] = pose.position;
+        segments.push(px, py, pz, px + heading.x, py + heading.y, pz + heading.z);
+      }
+    lines.geometry.dispose();
+    lines.geometry = new THREE.BufferGeometry();
+    lines.geometry.setAttribute("position", new THREE.Float32BufferAttribute(segments, 3));
+    stage.invalidate();
+  }, [lines, value, stage]);
+  useEffect(() => {
+    if (!settled) return;
+    lines.visible = !series.hidden && !!value && !!frameId && (!target || !!placement);
+    lines.material.color.set(series.color);
+    lines.matrix.copy(placement ?? new THREE.Matrix4());
+    lines.matrixWorldNeedsUpdate = true;
+    stage.invalidate();
+  }, [lines, value, frameId, target, placement, series.hidden, series.color, stage, settled]);
+  const omitted = value?.kind === "poses" ? value.omitted : 0;
+  const problem =
+    error ||
+    frame?.error ||
+    transformError ||
+    (value && !frameId ? "Poses have no frame ID" : "") ||
+    (missing ? `No transform from ${frameId} to ${target} at this time` : "") ||
+    (omitted
+      ? `${omitted.toLocaleString()} ${omitted === 1 ? "pose" : "poses"} left out: not finite or unreadable`
+      : "") ||
+    (estimated ? estimatedPlacement : "");
+  return <ReportSeriesProblem series={series} problem={problem} />;
 }
 
 /** An image on its camera's pinhole image plane, one meter from the origin. */

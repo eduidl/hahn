@@ -1,10 +1,29 @@
 import { compose, type ResolveOptions, type TfGraph } from "../data/tfGraph";
 import { frameIndexAt, type ViewFrame } from "../data/viewFrames";
 
+const still = [0, 0, 0, 1];
+
+/** Where a single value is: a pose, or a position without an orientation. */
+export function locate(value: ViewFrame["value"]) {
+  if (value?.kind === "pose")
+    return {
+      frame_id: value.frame_id,
+      stamp_ns: value.stamp_ns,
+      transform: { translation: value.pose.position, rotation: value.pose.orientation },
+    };
+  if (value?.kind === "position")
+    return {
+      frame_id: value.frame_id,
+      stamp_ns: value.stamp_ns,
+      transform: { translation: value.position, rotation: still },
+    };
+  return undefined;
+}
+
 /**
- * Poses expressed in `world`, each by the transform at its own time: its measurement
- * time when `axis` is `stamp` and it has one, else its log time (ADR 0002). A pose
- * that cannot be placed becomes an error, which leaves a gap in the trail.
+ * Poses and positions expressed in `world`, each by the transform at its own time:
+ * its measurement time when `axis` is `stamp` and it has one, else its log time
+ * (ADR 0002). One that cannot be placed becomes an error, which leaves a gap.
  */
 export function placePoses(
   frames: ViewFrame[],
@@ -13,37 +32,30 @@ export function placePoses(
   { axis = "stamp", interpolate = true }: ResolveOptions = {},
 ): ViewFrame[] {
   return frames.map((frame) => {
-    const value = frame.value?.kind === "pose" ? frame.value : undefined;
-    if (!value?.frame_id) return frame;
-    const byStamp = axis === "stamp" && value.stamp_ns !== undefined;
-    const at = BigInt(byStamp ? value.stamp_ns! : frame.time_ns);
-    const placement =
-      value.frame_id === world
-        ? undefined
-        : graph.between(world, value.frame_id, at, {
-            axis: byStamp ? "stamp" : "time",
-            interpolate,
-          });
-    if (value.frame_id !== world && !placement)
+    const located = locate(frame.value);
+    if (!located?.frame_id || located.frame_id === world) return frame;
+    const byStamp = axis === "stamp" && located.stamp_ns !== undefined;
+    const at = BigInt(byStamp ? located.stamp_ns! : frame.time_ns);
+    const placement = graph.between(world, located.frame_id, at, {
+      axis: byStamp ? "stamp" : "time",
+      interpolate,
+    });
+    if (!placement)
       return {
         ...frame,
         value: undefined,
-        error: `No transform from ${value.frame_id} to ${world}`,
+        error: `No transform from ${located.frame_id} to ${world}`,
       };
-    const pose = placement
-      ? compose(placement, {
-          translation: value.pose.position,
-          rotation: value.pose.orientation,
-        })
-      : { translation: value.pose.position, rotation: value.pose.orientation };
-    return {
-      ...frame,
-      value: {
-        ...value,
-        frame_id: world,
-        pose: { position: pose.translation, orientation: pose.rotation },
-      },
-    };
+    const placed = compose(placement, located.transform);
+    const value =
+      frame.value?.kind === "pose"
+        ? {
+            ...frame.value,
+            frame_id: world,
+            pose: { position: placed.translation, orientation: placed.rotation },
+          }
+        : { ...frame.value!, frame_id: world, position: placed.translation };
+    return { ...frame, value } as ViewFrame;
   });
 }
 
@@ -56,16 +68,16 @@ export function poseTrail(frames: ViewFrame[]) {
   let source: string | null | undefined;
   let gaps = false;
   for (const frame of frames) {
-    const value = frame.value?.kind === "pose" ? frame.value : undefined;
+    const value = locate(frame.value);
     if (value?.frame_id && source === undefined) source = value.frame_id;
     if (!value?.frame_id || value.frame_id !== source) {
       previous = undefined;
       gaps = true;
       continue;
     }
-    const prior = previous?.value?.kind === "pose" ? previous.value : undefined;
+    const prior = locate(previous?.value);
     if (prior) {
-      positions.push(...prior.pose.position, ...value.pose.position);
+      positions.push(...prior.transform.translation, ...value.transform.translation);
       starts.push({ time_ns: previous!.time_ns });
       ends.push({ time_ns: frame.time_ns });
     }

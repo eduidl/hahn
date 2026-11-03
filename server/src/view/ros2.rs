@@ -7,7 +7,10 @@ use super::convert::{
     Message, ViewConverter, calibration, has, is_bytes, is_list, is_number, is_string, is_struct,
     location, pose_view, raw_image,
 };
-use super::value::{GeoView, ImageView, Kind, NumericType, PackedField, PointCloudView, View};
+use super::value::{
+    GeoView, ImageView, Kind, NumericType, PackedField, PathView, PointCloudView, PosesView,
+    PositionView, View,
+};
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::FieldDefs;
 use std::sync::Arc;
@@ -20,6 +23,9 @@ pub(super) fn converters() -> Vec<Arc<dyn ViewConverter>> {
         Arc::new(PointCloud2),
         Arc::new(Odometry),
         Arc::new(PoseStamped),
+        Arc::new(PointStamped),
+        Arc::new(PoseArray),
+        Arc::new(Path),
         Arc::new(NavSatFix),
     ]
 }
@@ -312,4 +318,109 @@ impl ViewConverter for NavSatFix {
         }
         .into())
     }
+}
+
+/// `geometry_msgs/msg/PointStamped`.
+struct PointStamped;
+
+impl ViewConverter for PointStamped {
+    fn id(&self) -> &'static str {
+        "ros_position"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Position
+    }
+    fn name(&self) -> &'static str {
+        "Position"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "geometry_msgs/msg/PointStamped"
+            && has(defs, "header", is_struct)
+            && has(defs, "point", is_struct)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        Ok(PositionView {
+            frame_id: header_frame(message)?,
+            position: message.vector("point")?,
+        }
+        .into())
+    }
+}
+
+/// `geometry_msgs/msg/PoseArray`: poses without an order.
+struct PoseArray;
+
+impl ViewConverter for PoseArray {
+    fn id(&self) -> &'static str {
+        "ros_poses"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Poses
+    }
+    fn name(&self) -> &'static str {
+        "Poses"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "geometry_msgs/msg/PoseArray"
+            && has(defs, "header", is_struct)
+            && has(defs, "poses", is_list)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        // A pose that cannot be read is left out by itself, and counted, like one that
+        // is not finite: the others do not depend on it.
+        let unreadable = super::value::Pose {
+            position: [f64::NAN; 3],
+            ..Default::default()
+        };
+        let poses = message
+            .children("poses")?
+            .iter()
+            .map(|pose| pose_of(pose).unwrap_or(unreadable))
+            .collect();
+        Ok(PosesView {
+            frame_id: header_frame(message)?,
+            poses,
+        }
+        .into())
+    }
+}
+
+/// `nav_msgs/msg/Path`: poses in order, each a `PoseStamped`.
+struct Path;
+
+impl ViewConverter for Path {
+    fn id(&self) -> &'static str {
+        "ros_path"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Path
+    }
+    fn name(&self) -> &'static str {
+        "Path"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        schema_name == "nav_msgs/msg/Path"
+            && has(defs, "header", is_struct)
+            && has(defs, "poses", is_list)
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let poses = message
+            .children("poses")?
+            .iter()
+            .map(|stamped| stamped.pose("pose"))
+            .collect::<anyhow::Result<_>>()?;
+        Ok(PathView {
+            frame_id: header_frame(message)?,
+            poses,
+        }
+        .into())
+    }
+}
+
+/// A `geometry_msgs/msg/Pose` itself.
+fn pose_of(pose: &Message) -> anyhow::Result<super::value::Pose> {
+    Ok(super::value::Pose {
+        position: pose.vector("position")?,
+        orientation: pose.quaternion("orientation")?,
+    })
 }
