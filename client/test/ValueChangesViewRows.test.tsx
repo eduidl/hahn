@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Series } from "../src/views/Plot";
 import { ValueChangesView } from "../src/views/ValueChangesView";
 import { PlaybackContext, createPlaybackStore } from "../src/workspace/playback";
-import { initialWorkspace } from "../src/workspace/widgets";
 
 const series = (topic: string) =>
   ({
@@ -40,12 +39,7 @@ afterEach(() => {
 it("names the topic so that the same field of two topics can be told apart", () => {
   render(
     <PlaybackContext.Provider value={createPlaybackStore()}>
-      <ValueChangesView
-        widget={initialWorkspace().widgets["widget-1"]}
-        series={[series("/a"), series("/b")]}
-        originNs="0"
-        revision={0}
-      />
+      <ValueChangesView series={[series("/a"), series("/b")]} originNs="0" revision={0} />
     </PlaybackContext.Provider>,
   );
   act(() => resize(500));

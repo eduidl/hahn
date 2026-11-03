@@ -311,7 +311,7 @@ describe("Tab widget interactions", () => {
     expect(toolbar.contains(screen.getByRole("button", { name: "Maximize Tabs" }))).toBe(true);
     expect(toolbar.querySelector(".mosaic-window-controls")).not.toBeNull();
     expect(within(toolbar as HTMLElement).queryByText("Tabs")).toBeNull();
-    expect(within(toolbar as HTMLElement).getByLabelText("Move Tabs widget")).toBeDefined();
+    expect(within(toolbar as HTMLElement).getByTitle("Move Tabs widget")).toBeDefined();
   });
 
   it("accepts a catalog widget in an empty tab without adding it at the root", () => {
@@ -411,7 +411,7 @@ describe("Tab widget interactions", () => {
 
   it("switches after 500ms of valid hover, cancels on leave and reorders tab headings", () => {
     vi.useFakeTimers();
-    let state = reduce(initial(), { type: "tab-add", id: "widget-1" });
+    const state = reduce(initial(), { type: "tab-add", id: "widget-1" });
     render(<Harness initialState={state} catalog="table" />);
     const hoveredTab = tab("tab-1");
     fireEvent.dragOver(hoveredTab, { dataTransfer: transfer(widgetDragMime) });

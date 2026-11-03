@@ -136,7 +136,7 @@ describe("drop verdict", () => {
   });
 
   it("replaces the series of a single-series widget", () => {
-    const single = { ...widgetSpecs["plot"], maxSeries: 1 };
+    const single = { ...widgetSpecs.plot, maxSeries: 1 };
     const w = widget("plot", [fields[0]]);
     expect(
       dropVerdict(index, { source: "r/0", topic: "/t", path: ["flag"] }, w, single),
@@ -182,7 +182,7 @@ describe("addable fields", () => {
   });
 
   it("appends series with distinct colors and ignores duplicates", () => {
-    const spec = widgetSpecs["plot"];
+    const spec = widgetSpecs.plot;
     const one = addSeries([], topic, fields[0], spec);
     const two = addSeries(one, topic, { path: ["speed2"], data_type: "float64" }, spec);
     expect(two).toHaveLength(2);

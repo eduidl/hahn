@@ -51,10 +51,10 @@ describe("formatDuration", () => {
     expect(formatDuration({ start_ns: start, end_ns: "1700000000001000000" })).toBe("0.001s");
   });
   it("formats each magnitude", () => {
-    const after = (seconds: bigint) => String(BigInt(start) + seconds * 1_000_000_000n);
+    const later = (seconds: bigint) => String(BigInt(start) + seconds * 1_000_000_000n);
     expect(formatDuration({ start_ns: start, end_ns: start })).toBe("0.000s");
-    expect(formatDuration({ start_ns: start, end_ns: after(65n) })).toBe("1m 05.000s");
-    expect(formatDuration({ start_ns: start, end_ns: after(3725n) })).toBe("1h 02m 05.000s");
+    expect(formatDuration({ start_ns: start, end_ns: later(65n) })).toBe("1m 05.000s");
+    expect(formatDuration({ start_ns: start, end_ns: later(3725n) })).toBe("1h 02m 05.000s");
   });
 });
 

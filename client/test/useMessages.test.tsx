@@ -20,13 +20,12 @@ function widgets(path: string[] = []): Record<string, Widget> {
   state.widgets["widget-2"].series = [target(path)];
   return state.widgets;
 }
-const batch =
-  JSON.stringify({
-    type: "batch",
-    rows: [{ time_ns: "1000000000", value: { x: 1 } }],
-    scanned_messages: 1,
-  }) + "\n";
-const complete = JSON.stringify({ type: "complete", scanned_messages: 1 }) + "\n";
+const batch = `${JSON.stringify({
+  type: "batch",
+  rows: [{ time_ns: "1000000000", value: { x: 1 } }],
+  scanned_messages: 1,
+})}\n`;
+const complete = `${JSON.stringify({ type: "complete", scanned_messages: 1 })}\n`;
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

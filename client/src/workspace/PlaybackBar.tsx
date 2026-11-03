@@ -196,8 +196,8 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
         )}
       </div>
       <label className="playback-speed">
-        <span className="sr-only">Playback speed</span>
         <select
+          title="Playback speed"
           value={speed}
           disabled={disabled}
           onChange={(event) => store.setSpeed(Number(event.target.value))}
@@ -222,7 +222,6 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
       <div className="playback-status">
         <span role="status" title={status}>
           <i className={active ? "pulse" : ""} />
-          <span className="sr-only">{status}</span>
         </span>
       </div>
     </section>
