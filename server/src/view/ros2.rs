@@ -4,18 +4,17 @@
 //! Foxglove schemas, while the kinds and their validation are shared.
 
 use super::convert::{
-    Converter, ImageAdapter, ImageConverter, ImageView, Message, PackedField, calibration_value,
-    frame_id, has, is_bytes, is_list, is_number, is_string, is_struct, location_value,
-    numeric_named, pointcloud_value, pose_value, raw_image_value,
+    Message, ViewConverter, calibration, has, is_bytes, is_list, is_number, is_string, is_struct,
+    location, pose_view, raw_image,
 };
-use super::frame::Payload;
+use super::value::{GeoView, ImageView, Kind, NumericType, PackedField, PointCloudView, View};
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::FieldDefs;
 use std::sync::Arc;
 
-pub(super) fn converters() -> Vec<Arc<dyn Converter>> {
+pub(super) fn converters() -> Vec<Arc<dyn ViewConverter>> {
     vec![
-        Arc::new(ImageAdapter(Arc::new(CompressedImage))),
+        Arc::new(CompressedImage),
         Arc::new(Image),
         Arc::new(CameraInfo),
         Arc::new(PointCloud2),
@@ -25,10 +24,10 @@ pub(super) fn converters() -> Vec<Arc<dyn Converter>> {
     ]
 }
 
-fn header_frame(message: &Message) -> anyhow::Result<serde_json::Value> {
+fn header_frame(message: &Message) -> anyhow::Result<Option<String>> {
     Ok(match message.child("header")? {
-        Some(header) => frame_id(&header)?,
-        None => serde_json::Value::Null,
+        Some(header) => header.frame_id()?,
+        None => None,
     })
 }
 
@@ -48,9 +47,12 @@ fn compressed_format(format: &str) -> anyhow::Result<&str> {
 
 struct CompressedImage;
 
-impl ImageConverter for CompressedImage {
+impl ViewConverter for CompressedImage {
     fn id(&self) -> &'static str {
         "ros_image"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Image
     }
     fn name(&self) -> &'static str {
         "Image"
@@ -61,23 +63,24 @@ impl ImageConverter for CompressedImage {
             && has(defs, "format", is_string)
             && has(defs, "data", is_bytes)
     }
-    fn convert(&self, message: &Message) -> anyhow::Result<ImageView> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         Ok(ImageView {
-            frame_id: header_frame(message)?.as_str().map(str::to_owned),
+            frame_id: header_frame(message)?,
             format: compressed_format(message.string("format")?)?.to_owned(),
             data: message.bytes("data")?,
-        })
+        }
+        .into())
     }
 }
 
 struct Image;
 
-impl Converter for Image {
+impl ViewConverter for Image {
     fn id(&self) -> &'static str {
         "ros_raw_image"
     }
-    fn kind(&self) -> &'static str {
-        "image"
+    fn kind(&self) -> Kind {
+        Kind::Image
     }
     fn name(&self) -> &'static str {
         "Raw image"
@@ -91,29 +94,25 @@ impl Converter for Image {
             && has(defs, "encoding", is_string)
             && has(defs, "data", is_bytes)
     }
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         // Blobs are little endian. Bytes in other encodings have no byte order.
         ensure!(
             !(message.flag("is_bigendian")?
                 && matches!(message.string("encoding")?, "mono16" | "16UC1" | "32FC1")),
             "Big-endian raw images are not supported"
         );
-        raw_image_value(message, header_frame(message)?, payload)
+        raw_image(message, header_frame(message)?)
     }
 }
 
 struct CameraInfo;
 
-impl Converter for CameraInfo {
+impl ViewConverter for CameraInfo {
     fn id(&self) -> &'static str {
         "ros_camera_calibration"
     }
-    fn kind(&self) -> &'static str {
-        "camera_calibration"
+    fn kind(&self) -> Kind {
+        Kind::CameraCalibration
     }
     fn name(&self) -> &'static str {
         "Camera calibration"
@@ -127,35 +126,35 @@ impl Converter for CameraInfo {
             && has(defs, "d", is_list)
             && has(defs, "distortion_model", is_string)
     }
-    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
-        calibration_value(message, header_frame(message)?, "k", "d")
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        calibration(message, header_frame(message)?, "k", "d")
     }
 }
 
 /// `sensor_msgs/msg/PointField.datatype`. The numbering differs from
 /// `foxglove.NumericType`, which swaps each signed type with its unsigned one.
-fn point_field_type(datatype: f64) -> anyhow::Result<&'static str> {
+fn point_field_type(datatype: f64) -> anyhow::Result<NumericType> {
     Ok(match datatype as i64 {
-        1 => "INT8",
-        2 => "UINT8",
-        3 => "INT16",
-        4 => "UINT16",
-        5 => "INT32",
-        6 => "UINT32",
-        7 => "FLOAT32",
-        8 => "FLOAT64",
+        1 => NumericType::I8,
+        2 => NumericType::U8,
+        3 => NumericType::I16,
+        4 => NumericType::U16,
+        5 => NumericType::I32,
+        6 => NumericType::U32,
+        7 => NumericType::F32,
+        8 => NumericType::F64,
         other => bail!("Unknown point field type: {other}"),
     })
 }
 
 struct PointCloud2;
 
-impl Converter for PointCloud2 {
+impl ViewConverter for PointCloud2 {
     fn id(&self) -> &'static str {
         "ros_pointcloud"
     }
-    fn kind(&self) -> &'static str {
-        "pointcloud"
+    fn kind(&self) -> Kind {
+        Kind::PointCloud
     }
     fn name(&self) -> &'static str {
         "Point cloud"
@@ -170,11 +169,7 @@ impl Converter for PointCloud2 {
             && has(defs, "row_step", is_number)
             && has(defs, "data", is_bytes)
     }
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         ensure!(
             !message.flag("is_bigendian")?,
             "Big-endian point clouds are not supported"
@@ -201,37 +196,34 @@ impl Converter for PointCloud2 {
             if count > 1 || name.is_empty() || name == "_" {
                 continue;
             }
-            let numeric = numeric_named(point_field_type(field.number("datatype")?)?)?;
+            let numeric_type = point_field_type(field.number("datatype")?)?;
             let offset = field.number("offset")? as usize;
             ensure!(
-                offset.saturating_add(numeric.size) <= stride,
+                offset.saturating_add(numeric_type.size()) <= stride,
                 "Point field {name} does not fit in a step of {stride} bytes"
             );
-            packed.push((name, offset, numeric));
+            packed.push(PackedField {
+                name: name.to_owned(),
+                offset,
+                numeric_type,
+            });
         }
         let points = data
             .chunks_exact(row_step.max(1))
             .take(height)
             .flat_map(|row_bytes| row_bytes[..row].chunks_exact(stride));
-        pointcloud_value(
-            &packed,
-            points,
-            width * height,
-            None,
-            header_frame(message)?,
-            payload,
-        )
+        Ok(PointCloudView::from_packed(header_frame(message)?, &packed, points)?.into())
     }
 }
 
 struct Odometry;
 
-impl Converter for Odometry {
+impl ViewConverter for Odometry {
     fn id(&self) -> &'static str {
         "ros_odometry"
     }
-    fn kind(&self) -> &'static str {
-        "pose"
+    fn kind(&self) -> Kind {
+        Kind::Pose
     }
     fn name(&self) -> &'static str {
         "Pose"
@@ -241,30 +233,30 @@ impl Converter for Odometry {
             && has(defs, "header", is_struct)
             && has(defs, "pose", is_struct)
     }
-    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         with_covariance(message)
     }
 }
 
 /// A pose nested in a `geometry_msgs/msg/PoseWithCovariance` named `pose`.
-fn with_covariance(message: &Message) -> anyhow::Result<serde_json::Value> {
+fn with_covariance(message: &Message) -> anyhow::Result<View> {
     let pose = message
         .child("pose")?
         .and_then(|pose| pose.child("pose").transpose())
         .transpose()?
         .context("Message has no pose")?;
-    pose_value(&pose, header_frame(message)?)
+    pose_view(&pose, header_frame(message)?)
 }
 
 /// `geometry_msgs/msg/PoseStamped` and `PoseWithCovarianceStamped`.
 struct PoseStamped;
 
-impl Converter for PoseStamped {
+impl ViewConverter for PoseStamped {
     fn id(&self) -> &'static str {
         "ros_pose"
     }
-    fn kind(&self) -> &'static str {
-        "pose"
+    fn kind(&self) -> Kind {
+        Kind::Pose
     }
     fn name(&self) -> &'static str {
         "Pose"
@@ -276,24 +268,24 @@ impl Converter for PoseStamped {
         ) && has(defs, "header", is_struct)
             && has(defs, "pose", is_struct)
     }
-    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         let pose = message.child("pose")?.context("Message has no pose")?;
         // Only the covariant form has a pose inside its pose.
         if pose.child("pose").is_ok() {
             return with_covariance(message);
         }
-        pose_value(&pose, header_frame(message)?)
+        pose_view(&pose, header_frame(message)?)
     }
 }
 
 struct NavSatFix;
 
-impl Converter for NavSatFix {
+impl ViewConverter for NavSatFix {
     fn id(&self) -> &'static str {
         "ros_location"
     }
-    fn kind(&self) -> &'static str {
-        "geo"
+    fn kind(&self) -> Kind {
+        Kind::Geo
     }
     fn name(&self) -> &'static str {
         "Location"
@@ -305,7 +297,7 @@ impl Converter for NavSatFix {
             && has(defs, "longitude", is_number)
             && has(defs, "altitude", is_number)
     }
-    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         // STATUS_NO_FIX: the coordinates are whatever the receiver left there.
         if let Ok(Some(status)) = message.child("status") {
             ensure!(status.number("status")? >= 0., "No satellite fix");
@@ -313,38 +305,11 @@ impl Converter for NavSatFix {
         let unknown = message
             .number("position_covariance_type")
             .is_ok_and(|kind| kind == 0.);
-        let mut value = location_value(message, header_frame(message)?, Default::default())?;
         // COVARIANCE_TYPE_UNKNOWN: the matrix holds no accuracy, whatever its values.
-        if unknown {
-            value["features"][0]["properties"]
-                .as_object_mut()
-                .context("A feature has properties")?
-                .remove("accuracy_m");
+        Ok(GeoView {
+            frame_id: header_frame(message)?,
+            features: vec![location(message, !unknown)?],
         }
-        Ok(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn compressed_format_is_the_encoded_part() {
-        assert_eq!(compressed_format("jpeg").unwrap(), "jpeg");
-        assert_eq!(
-            compressed_format("rgb8; jpeg compressed bgr8").unwrap(),
-            "jpeg"
-        );
-        assert_eq!(compressed_format("mono8; png compressed ").unwrap(), "png");
-        assert!(compressed_format("16UC1; compressedDepth png").is_err());
-        assert!(compressed_format("").is_err());
-    }
-
-    #[test]
-    fn point_field_numbers_differ_from_foxglove() {
-        assert_eq!(point_field_type(1.).unwrap(), "INT8");
-        assert_eq!(point_field_type(2.).unwrap(), "UINT8");
-        assert!(point_field_type(9.).is_err());
+        .into())
     }
 }

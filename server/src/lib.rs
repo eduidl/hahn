@@ -1,11 +1,26 @@
+//! Hahn's server: runs and groups of recordings over HTTP, for the Hahn client.
+//!
+//! An application that records its own message types builds its own server with
+//! [`Builder`], adding a [`ViewConverter`] for each type it wants shown as an image,
+//! point cloud, pose, map location or camera calibration, and a [`TransformReader`]
+//! for each type that holds coordinate frames. A [`Format`] adds a kind of recording
+//! file other than MCAP. [`cli::main`] gives that
+//! server the same command line as Hahn's.
+
 mod catalog;
+pub mod cli;
 mod message;
 mod source;
 mod stream;
 mod view;
 
-pub use mcapdecode::core::{DataTypeDef, FieldDefs};
-pub use view::{ImageConverter, ImageView, Message};
+pub use mcapdecode::core::{DataTypeDef, ElementDef, FieldDef, FieldDefs, Value};
+pub use source::{Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit};
+pub use view::{
+    CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, Message, NumericType, PackedField,
+    PointCloudView, PointField, Pose, PoseView, RawImageView, TransformReader, TransformSample,
+    View, ViewConverter, schema,
+};
 
 use axum::{
     Json, Router,
@@ -18,7 +33,10 @@ use axum::{
 };
 use catalog::{Group, Run};
 use serde::{Deserialize, Serialize};
-use std::{path::Path as FsPath, sync::Arc};
+use std::{
+    path::{Path as FsPath, PathBuf},
+    sync::Arc,
+};
 use tower_http::compression::{
     CompressionLayer, CompressionLevel,
     predicate::{DefaultPredicate, NotForContentType, Predicate},
@@ -31,7 +49,8 @@ const MAX_RUNS: usize = 200;
 #[derive(Clone)]
 struct AppState {
     runs: Arc<Vec<Run>>,
-    converters: Arc<Vec<Arc<dyn view::Converter>>>,
+    converters: Arc<Vec<Arc<dyn ViewConverter>>>,
+    transforms: Arc<Vec<Arc<dyn TransformReader>>>,
 }
 
 /// Compresses API responses at the fastest level, which beats higher ones once their
@@ -47,47 +66,108 @@ pub fn gzip(router: Router) -> Router {
 }
 
 pub fn router(root: &FsPath) -> anyhow::Result<Router> {
-    router_with_timezone(root, None)
+    Builder::new(root).router()
 }
 
 /// `timezone` is the IANA name to declare for every run.
 pub fn router_with_timezone(root: &FsPath, timezone: Option<String>) -> anyhow::Result<Router> {
-    router_with_image_converters(root, timezone, Vec::new())
+    Builder::new(root).timezone(timezone).router()
 }
 
-/// Builds a router with additional image converters alongside the built-in converters.
-pub fn router_with_image_converters(
-    root: &FsPath,
+/// Sets up a server: where its recordings are, and what it can convert them to.
+pub struct Builder {
+    data_dir: PathBuf,
     timezone: Option<String>,
-    converters: Vec<Arc<dyn ImageConverter>>,
-) -> anyhow::Result<Router> {
-    let converters = Arc::new(view::converters(converters)?);
-    let runs = catalog::discover(&root.canonicalize()?, timezone)?;
-    Ok(Router::new()
-        .route("/api/runs", get(runs_list))
-        .route("/api/runs/{run}", get(run_detail))
-        .route("/api/runs/{run}/groups/{group}", get(info))
-        .route("/api/runs/{run}/groups/{group}/topics", get(topics))
-        .route(
-            "/api/runs/{run}/groups/{group}/messages",
-            get(message::messages),
-        )
-        .route(
-            "/api/runs/{run}/groups/{group}/messages/latest",
-            get(message::latest),
-        )
-        .route("/api/runs/{run}/groups/{group}/views", get(view::views))
-        .route(
-            "/api/runs/{run}/groups/{group}/views/latest",
-            get(view::latest),
-        )
-        .route("/api/runs/{run}/frames", get(view::frames))
-        .route("/api/runs/{run}/transforms", get(view::transforms))
-        .layer(map_response(json_errors))
-        .with_state(AppState {
-            runs: Arc::new(runs),
-            converters,
-        }))
+    views: Vec<Arc<dyn ViewConverter>>,
+    transforms: Vec<Arc<dyn TransformReader>>,
+    formats: Vec<Arc<dyn source::Format>>,
+}
+
+impl Builder {
+    /// Serves the recordings in `data_dir`, read once when the router is built.
+    pub fn new(data_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            data_dir: data_dir.into(),
+            timezone: None,
+            views: Vec::new(),
+            transforms: Vec::new(),
+            formats: Vec::new(),
+        }
+    }
+
+    /// The IANA name of where the runs took place, such as `Asia/Tokyo`, declared for
+    /// every run.
+    pub fn timezone(mut self, timezone: Option<String>) -> Self {
+        self.timezone = timezone;
+        self
+    }
+
+    /// Adds a converter after the built-in ones. Its ID must differ from theirs and
+    /// from those added before; building the router fails otherwise.
+    pub fn view(mut self, converter: impl ViewConverter + 'static) -> Self {
+        self.views.push(Arc::new(converter));
+        self
+    }
+
+    /// Adds a reader of transforms. A topic is read by the first reader that accepts
+    /// it, trying the built-in ones first.
+    pub fn transforms(mut self, reader: impl TransformReader + 'static) -> Self {
+        self.transforms.push(Arc::new(reader));
+        self
+    }
+
+    /// Adds a file format. Each file is opened by the first format that accepts it,
+    /// trying the added ones before the built-in MCAP format.
+    pub fn format(mut self, format: impl Format + 'static) -> Self {
+        self.formats.push(Arc::new(format));
+        self
+    }
+
+    /// The API, under `/api`.
+    pub fn router(self) -> anyhow::Result<Router> {
+        Ok(self.build()?.0)
+    }
+
+    /// The API and every converter it offers, built in or added.
+    fn build(self) -> anyhow::Result<(Router, Vec<view::ViewInfo>)> {
+        let converters = Arc::new(view::converters(self.views)?);
+        let infos = converters
+            .iter()
+            .map(|converter| view::ViewInfo::of(&**converter))
+            .collect();
+        let runs = catalog::discover(
+            &self.data_dir.canonicalize()?,
+            self.timezone,
+            &source::formats(self.formats),
+        )?;
+        let router = Router::new()
+            .route("/api/runs", get(runs_list))
+            .route("/api/runs/{run}", get(run_detail))
+            .route("/api/runs/{run}/groups/{group}", get(info))
+            .route("/api/runs/{run}/groups/{group}/topics", get(topics))
+            .route(
+                "/api/runs/{run}/groups/{group}/messages",
+                get(message::messages),
+            )
+            .route(
+                "/api/runs/{run}/groups/{group}/messages/latest",
+                get(message::latest),
+            )
+            .route("/api/runs/{run}/groups/{group}/views", get(view::views))
+            .route(
+                "/api/runs/{run}/groups/{group}/views/latest",
+                get(view::latest),
+            )
+            .route("/api/runs/{run}/frames", get(view::frames))
+            .route("/api/runs/{run}/transforms", get(view::transforms))
+            .layer(map_response(json_errors))
+            .with_state(AppState {
+                runs: Arc::new(runs),
+                converters,
+                transforms: Arc::new(view::readers(self.transforms)),
+            });
+        Ok((router, infos))
+    }
 }
 
 #[derive(Debug)]

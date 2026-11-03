@@ -85,7 +85,7 @@ impl Group {
     /// Built on first use like the source. Blocks, so call it inside `blocking`.
     pub(crate) fn views(
         &self,
-        converters: &[Arc<dyn Converter>],
+        converters: &[Arc<dyn ViewConverter>],
     ) -> anyhow::Result<Arc<ViewIndex>> {
         if let Some(views) = self.views.get() {
             return Ok(views.clone());
@@ -120,7 +120,11 @@ fn is_bag(dir: &Path) -> bool {
     dir.join("metadata.yaml").is_file()
 }
 
-pub(crate) fn discover(root: &Path, timezone: Option<String>) -> anyhow::Result<Vec<Run>> {
+pub(crate) fn discover(
+    root: &Path,
+    timezone: Option<String>,
+    formats: &[Arc<dyn Format>],
+) -> anyhow::Result<Vec<Run>> {
     let mut runs = Vec::new();
     for entry in entries(root)? {
         let (path, kind) = (entry.path(), entry.file_type()?);
@@ -128,13 +132,13 @@ pub(crate) fn discover(root: &Path, timezone: Option<String>) -> anyhow::Result<
         let groups = if kind.is_dir() {
             let mut groups = Vec::new();
             if is_bag(&path) {
-                bag_groups(&path, &name, &mut groups)?;
+                bag_groups(formats, &path, &name, &mut groups)?;
             } else {
-                dir_groups(&path, &path, &mut groups)?;
+                dir_groups(formats, &path, &path, &mut groups)?;
             }
             groups
         } else if kind.is_file()
-            && let Some(format) = format_of(&path)
+            && let Some(format) = format_of(formats, &path)
         {
             vec![Group::new(name.clone(), vec![path], format)]
         } else {
@@ -153,17 +157,22 @@ pub(crate) fn discover(root: &Path, timezone: Option<String>) -> anyhow::Result<
     Ok(runs)
 }
 
-fn dir_groups(dir: &Path, run: &Path, groups: &mut Vec<Arc<Group>>) -> anyhow::Result<()> {
+fn dir_groups(
+    formats: &[Arc<dyn Format>],
+    dir: &Path,
+    run: &Path,
+    groups: &mut Vec<Arc<Group>>,
+) -> anyhow::Result<()> {
     for entry in entries(dir)? {
         let (path, kind) = (entry.path(), entry.file_type()?);
         if kind.is_dir() {
             if is_bag(&path) {
-                bag_groups(&path, &relative(&path, run)?, groups)?;
+                bag_groups(formats, &path, &relative(&path, run)?, groups)?;
             } else {
-                dir_groups(&path, run, groups)?;
+                dir_groups(formats, &path, run, groups)?;
             }
         } else if kind.is_file()
-            && let Some(format) = format_of(&path)
+            && let Some(format) = format_of(formats, &path)
         {
             groups.push(Group::new(relative(&path, run)?, vec![path], format));
         }
@@ -179,11 +188,16 @@ fn segment_of(file_name: &str) -> Option<(String, u64)> {
 }
 
 /// A bag's segment series, normally just one, named after the bag.
-fn bag_groups(bag: &Path, name: &str, groups: &mut Vec<Arc<Group>>) -> anyhow::Result<()> {
+fn bag_groups(
+    formats: &[Arc<dyn Format>],
+    bag: &Path,
+    name: &str,
+    groups: &mut Vec<Arc<Group>>,
+) -> anyhow::Result<()> {
     let mut series: BTreeMap<String, Vec<(u64, PathBuf)>> = BTreeMap::new();
     for entry in entries(bag)? {
         let path = entry.path();
-        if !entry.file_type()?.is_file() || format_of(&path).is_none() {
+        if !entry.file_type()?.is_file() || format_of(formats, &path).is_none() {
             continue;
         }
         let file_name = entry.file_name().to_string_lossy().into_owned();
@@ -194,7 +208,7 @@ fn bag_groups(bag: &Path, name: &str, groups: &mut Vec<Arc<Group>>) -> anyhow::R
     for (key, mut segments) in series {
         segments.sort();
         let paths: Vec<_> = segments.into_iter().map(|(_, path)| path).collect();
-        let format = format_of(&paths[0]).expect("filtered above");
+        let format = format_of(formats, &paths[0]).expect("filtered above");
         let name = if only {
             name.to_owned()
         } else {

@@ -121,6 +121,13 @@ pub const NAV_SAT_FIX: RosType = (
     &[HEADER, NAV_SAT_STATUS],
 );
 
+/// A type of an application's own, unknown to Hahn: a pose on a plane.
+pub const ACME_POSE2D: RosType = (
+    "acme_msgs/msg/Pose2D",
+    "string frame_id\nfloat64 x\nfloat64 y\nfloat64 theta\n",
+    &[],
+);
+
 fn schema_text((_, root, dependencies): RosType) -> String {
     let mut text = root.to_owned();
     for (name, definition) in dependencies {
@@ -544,3 +551,13 @@ pub fn write_ros2_fixture(path: &Path) -> anyhow::Result<()> {
     }
     writer.finish()
 }
+fn link2d(parent: &str, child: &str, x: f64, y: f64, theta: f64) -> Cdr {
+    let mut cdr = Cdr::new();
+    cdr.string(parent).string(child).f64(x).f64(y).f64(theta);
+    cdr
+}
+
+/// Steps of the `acme_msgs/msg/Pose2D` fixture: 100 ms apart from 0.
+pub const ACME_COUNT: u64 = 40;
+pub const ACME_STEP_NS: u64 = 100_000_000;
+
