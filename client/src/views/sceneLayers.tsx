@@ -423,12 +423,12 @@ export function PoseLayer({
   );
 }
 
-/** Half a meter along a pose's x axis: how far its heading is drawn. */
+/** The length of the arrow drawn for each pose of a set, in meters. */
 const headingLength = 0.5;
 
 /**
- * The latest set of poses: a `path` joined in order, or `poses` each drawn by its
- * heading. A new message replaces the whole set (ADR 0005).
+ * The latest set of poses: a `path` joined in order, or `poses` each drawn as an
+ * arrow along its x axis, like a single pose. A new message replaces the whole set (ADR 0005).
  */
 export function PoseSetLayer({
   series,
@@ -475,12 +475,21 @@ export function PoseSetLayer({
       });
     else
       for (const pose of value.poses) {
+        // An arrow along the pose's x axis: its shaft, then the two sides of its head.
         const [x, y, z, w] = pose.orientation;
-        const heading = new THREE.Vector3(headingLength, 0, 0).applyQuaternion(
-          new THREE.Quaternion(x, y, z, w),
-        );
-        const [px, py, pz] = pose.position;
-        segments.push(px, py, pz, px + heading.x, py + heading.y, pz + heading.z);
+        const rotation = new THREE.Quaternion(x, y, z, w);
+        const at = (along: number, across: number) =>
+          new THREE.Vector3(along, across, 0)
+            .applyQuaternion(rotation)
+            .add(new THREE.Vector3(...(pose.position as [number, number, number])));
+        const [base, tip] = [at(0, 0), at(headingLength, 0)];
+        const head = headingLength * 0.3;
+        for (const [from, to] of [
+          [base, tip],
+          [tip, at(headingLength - head, head / 2)],
+          [tip, at(headingLength - head, -head / 2)],
+        ])
+          segments.push(from.x, from.y, from.z, to.x, to.y, to.z);
       }
     lines.geometry.dispose();
     lines.geometry = new THREE.BufferGeometry();

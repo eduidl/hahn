@@ -311,7 +311,7 @@ it("shows a position as a dot, without a heading", () => {
   view.unmount();
 });
 
-it("draws a path joined in order and unordered poses by their headings", () => {
+it("draws a path joined in order and unordered poses as arrows", () => {
   const problems: string[] = [];
   const segments = (view: string, value: object) => {
     const stage = quietStage();
@@ -328,14 +328,14 @@ it("draws a path joined in order and unordered poses by their headings", () => {
     const points = [...(lines.geometry.getAttribute("position").array as Float32Array)];
     problems.push(rendered.container.textContent ?? "");
     rendered.unmount();
-    return points.map((v) => Math.round(v * 100) / 100);
+    return points.map((v) => Math.round(v * 1000) / 1000);
   };
   const pose = (x: number, orientation = still) => ({ position: [x, 0, 0], orientation });
   // Three poses in order make two segments.
   expect(
     segments("path", { kind: "path", frame_id: "map", poses: [pose(0), pose(1), pose(2)] }),
   ).toEqual([0, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0]);
-  // Unordered, each is a short heading of its own; nothing joins them.
+  // Unordered, each is an arrow of its own along its x axis; nothing joins them.
   expect(
     segments("poses", {
       kind: "poses",
@@ -343,7 +343,12 @@ it("draws a path joined in order and unordered poses by their headings", () => {
       poses: [pose(0), pose(5, turn)],
       omitted: 1,
     }),
-  ).toEqual([0, 0, 0, 0.5, 0, 0, 5, 0, 0, 5, 0.5, 0]);
+  ).toEqual([
+    // A shaft from the pose to its tip, and the two sides of the head.
+    0, 0, 0, 0.5, 0, 0, 0.5, 0, 0, 0.35, 0.075, 0, 0.5, 0, 0, 0.35, -0.075, 0,
+    // Turned a quarter, it points along y.
+    5, 0, 0, 5, 0.5, 0, 5, 0.5, 0, 4.925, 0.35, 0, 5, 0.5, 0, 5.075, 0.35, 0,
+  ]);
   expect(problems.at(-1)).toContain("1 pose left out");
 });
 
