@@ -596,3 +596,93 @@ async fn meta_fields_read_times_recorded_beside_the_message() {
     );
 }
 
+/// The latest message of a topic of the in-memory recording at `time`.
+async fn latest(app: &axum::Router, topic: &str, time: u64) -> Value {
+    let (status, body) = get(
+        app.clone(),
+        &format!("/g/messages/latest?topic={topic}&time_ns={time}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body["value"].clone()
+}
+
+#[tokio::test]
+async fn values_of_every_shape_are_shown_within_the_display_limits() {
+    use crate::memory::{Topic, list, structure};
+    use hahn::{DataTypeDef, ElementDef, Value as V};
+    let point = || structure(vec![("x", DataTypeDef::F64)]);
+    let map = || DataTypeDef::Map {
+        key: Box::new(ElementDef::new(DataTypeDef::String, false)),
+        value: Box::new(ElementDef::new(point(), false)),
+    };
+    let pair = (V::string("k"), V::Struct(vec![V::F64(1.)]));
+    let topic = Topic::new(
+        "shapes",
+        "test/Shapes",
+        vec![
+            ("points", list(point())),
+            ("data", DataTypeDef::Bytes),
+            ("short_map", map()),
+            ("long_map", map()),
+        ],
+    )
+    .at(
+        0,
+        vec![
+            V::List(vec![V::Struct(vec![V::F64(1.)])]),
+            V::Bytes(vec![7; 50].into()),
+            V::Map(vec![pair.clone()]),
+            V::Map(vec![pair; 101]),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);
+    let value = latest(&app, "shapes", 0).await;
+    // Structs are named, also inside lists and maps.
+    assert_eq!(value["points"], json!([{"x": 1.0}]));
+    assert_eq!(value["data"], json!({"$bytes": 50, "head": vec![7; 32]}));
+    assert_eq!(value["short_map"], json!([["k", {"x": 1.0}]]));
+    let long = &value["long_map"];
+    assert_eq!(long["$truncated"], true);
+    assert_eq!(long["length"], 101);
+    assert_eq!(long["items"].as_array().unwrap().len(), 100);
+}
+
+#[tokio::test]
+async fn json_text_is_parsed_within_the_display_limits_or_stays_text() {
+    use crate::memory::Topic;
+    use hahn::{DataTypeDef, Value as V};
+    let document = json!({
+        "speed": 1.5,
+        "big": 9007199254740993_u64,
+        "text": "x".repeat(10_001),
+        "list": vec![0; 101],
+    });
+    let mut topic = Topic::new("doc", "test/Doc", vec![("json", DataTypeDef::String)])
+        .at(0, vec![V::string(document.to_string())])
+        .at(1, vec![V::string("{broken")]);
+    topic.json_text = true;
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);
+
+    let shown = &latest(&app, "doc", 0).await["json"];
+    assert_eq!(shown["speed"], 1.5);
+    assert_eq!(shown["big"], "9007199254740993");
+    assert!(shown["text"].as_str().unwrap().ends_with('…'));
+    assert_eq!(shown["list"]["$truncated"], true);
+    assert_eq!(shown["list"]["items"].as_array().unwrap().len(), 100);
+
+    assert_eq!(latest(&app, "doc", 1).await, json!({"json": "{broken"}));
+
+    // Exact values are the text as recorded.
+    let (_, events) = stream(
+        app,
+        "/g/messages",
+        json!({"topic":"doc","path":["json"],"preview":false}),
+    )
+    .await;
+    assert_eq!(events[0]["rows"][1]["value"], "{broken");
+    assert_eq!(
+        serde_json::from_str::<Value>(events[0]["rows"][0]["value"].as_str().unwrap()).unwrap(),
+        document
+    );
+}

@@ -187,6 +187,10 @@ async fn pose_history_resolves_transforms_at_each_recorded_time() {
     );
 }
 
+/// Reads topic `tf` and `tf_static` of the in-memory recording: one transform per
+/// message, rotated about z.
+struct Links;
+
 impl hahn::TransformReader for Links {
     fn accepts(&self, schema_name: &str, _: &hahn::FieldDefs) -> bool {
         schema_name == "test/Link"
@@ -201,3 +205,177 @@ impl hahn::TransformReader for Links {
     }
 }
 
+/// `child` in `parent`: moved by `x` and rotated by `[0, 0, qz, qw]`.
+type Link = (u64, &'static str, &'static str, f64, [f64; 2]);
+
+/// A quarter turn about z.
+const TURN: [f64; 2] = [
+    std::f64::consts::FRAC_1_SQRT_2,
+    std::f64::consts::FRAC_1_SQRT_2,
+];
+const STILL: [f64; 2] = [0., 1.];
+
+fn links_app(dynamic: &[Link], fixed: &[Link]) -> (tempfile::TempDir, axum::Router) {
+    use crate::memory::Topic;
+    use hahn::{DataTypeDef as D, Value as V};
+    let topic = |name, links: &[Link]| {
+        let mut topic = Topic::new(
+            name,
+            "test/Link",
+            vec![
+                ("parent", D::String),
+                ("child", D::String),
+                ("x", D::F64),
+                ("qz", D::F64),
+                ("qw", D::F64),
+            ],
+        );
+        for &(time, parent, child, x, [qz, qw]) in links {
+            topic = topic.at(
+                time,
+                vec![
+                    V::string(parent),
+                    V::string(child),
+                    V::F64(x),
+                    V::F64(qz),
+                    V::F64(qw),
+                ],
+            );
+        }
+        topic
+    };
+    crate::memory::app(
+        vec![topic("tf", dynamic), topic("tf_static", fixed)],
+        |builder| builder.transforms(Links),
+    )
+}
+
+/// Every frame's transform into `target` at `time`.
+async fn resolved(app: &axum::Router, target: &str, time: u64) -> Value {
+    let (status, body) = get(
+        app.clone(),
+        &format!("/r/transforms?target={target}&time_ns={time}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body["frames"].clone()
+}
+
+fn close(value: &Value, expected: &[f64]) {
+    let actual: Vec<f64> = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(actual.len(), expected.len(), "{value}");
+    for (a, b) in actual.iter().zip(expected) {
+        assert!((a - b).abs() < 1e-9, "{value} != {expected:?}");
+    }
+}
+
+#[tokio::test]
+async fn a_transform_rotates_before_it_translates() {
+    // `base` is 1 m along x of `map`, turned a quarter; `lidar` is 1 m ahead of it.
+    let (_dir, app) = links_app(
+        &[],
+        &[
+            (1, "map", "base", 1., TURN),
+            (1, "base", "lidar", 1., STILL),
+        ],
+    );
+    let frames = resolved(&app, "map", 1).await;
+    close(&frames["lidar"]["translation"], &[1., 1., 0.]);
+    // The other way round, the inverse.
+    let frames = resolved(&app, "lidar", 1).await;
+    close(&frames["map"]["translation"], &[-1., 1., 0.]);
+}
+
+#[tokio::test]
+async fn dynamic_transforms_are_interpolated_but_never_extrapolated() {
+    let (_dir, app) = links_app(
+        &[
+            (100, "map", "base", 0., STILL),
+            (200, "map", "base", 10., STILL),
+        ],
+        &[],
+    );
+    assert!(resolved(&app, "map", 99).await.get("base").is_none());
+    close(
+        &resolved(&app, "map", 100).await["base"]["translation"],
+        &[0., 0., 0.],
+    );
+    close(
+        &resolved(&app, "map", 150).await["base"]["translation"],
+        &[5., 0., 0.],
+    );
+    close(
+        &resolved(&app, "map", 200).await["base"]["translation"],
+        &[10., 0., 0.],
+    );
+    assert!(resolved(&app, "map", 201).await.get("base").is_none());
+}
+
+#[tokio::test]
+async fn rotations_are_interpolated_the_short_way_round() {
+    // The same quarter turn written as -q.
+    let (_dir, app) = links_app(
+        &[
+            (100, "map", "base", 0., STILL),
+            (200, "map", "base", 0., TURN.map(|v| -v)),
+        ],
+        &[],
+    );
+    let eighth = std::f64::consts::FRAC_PI_8;
+    let rotation = &resolved(&app, "map", 150).await["base"]["rotation"];
+    close(rotation, &[0., 0., eighth.sin(), eighth.cos()]);
+}
+
+#[tokio::test]
+async fn static_and_dynamic_transforms_chain_in_both_directions() {
+    let (_dir, app) = links_app(
+        &[
+            (100, "map", "base", 1., STILL),
+            (200, "map", "base", 1., STILL),
+        ],
+        &[(1, "base", "lidar", 2., STILL)],
+    );
+    close(
+        &resolved(&app, "map", 150).await["lidar"]["translation"],
+        &[3., 0., 0.],
+    );
+    close(
+        &resolved(&app, "lidar", 150).await["map"]["translation"],
+        &[-3., 0., 0.],
+    );
+    // Past the dynamic samples only the static transform remains.
+    let later = resolved(&app, "lidar", 300).await;
+    assert!(later.get("base").is_some());
+    assert!(later.get("map").is_none());
+}
+
+#[tokio::test]
+async fn frames_not_connected_to_the_target_are_left_out() {
+    let (_dir, app) = links_app(
+        &[],
+        &[
+            (1, "map", "base", 1., STILL),
+            (1, "other", "tag", 1., STILL),
+        ],
+    );
+    let frames = resolved(&app, "map", 1).await;
+    assert!(frames.get("base").is_some());
+    assert!(frames.get("tag").is_none());
+}
+
+#[tokio::test]
+async fn a_frame_changing_parent_is_not_interpolated_across() {
+    let (_dir, app) = links_app(
+        &[(100, "a", "base", 1., STILL), (200, "b", "base", 9., STILL)],
+        &[],
+    );
+    close(
+        &resolved(&app, "a", 150).await["base"]["translation"],
+        &[1., 0., 0.],
+    );
+    assert!(resolved(&app, "b", 150).await.get("base").is_none());
+    close(
+        &resolved(&app, "b", 200).await["base"]["translation"],
+        &[9., 0., 0.],
+    );
+}
