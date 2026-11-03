@@ -46,6 +46,8 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
   const needsSeed =
     !!series && !!info && !!rows && index < 0 && seed === undefined && !cache.hasHistory(series);
 
+  // A history let go by its other users leaves this hook to load windows itself.
+  const history = !!series && cache.hasHistory(series);
   useEffect(() => {
     if (!series || !info) return;
     const controller = new AbortController();
@@ -73,7 +75,7 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
       controller.abort();
       release();
     };
-  }, [cache, identity]);
+  }, [cache, identity, history]);
   useEffect(() => {
     if (!series || !needsSeed) return;
     let active = true;

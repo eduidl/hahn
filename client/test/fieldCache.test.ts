@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FieldCache, type FieldTarget } from "../src/data/fieldCache";
+import { FieldCache, holdHistories, type FieldTarget } from "../src/data/fieldCache";
 import type { MessageRow } from "../src/views/table";
 const root: FieldTarget = { source: "r/0", topic: "/t", path: [] };
 const child = { ...root, path: ["pose", "x"] };
@@ -189,4 +189,28 @@ it("sorts reversed times without colliding non-consecutive equal-time messages",
     cache.read(root)?.map((r) => (r.value as { pose: { x: number } | null }).pose?.x ?? null),
   ).toEqual([null, 11, 22]);
   cache.clear();
+});
+
+it("lets go of a full history once nothing holds it", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => stream()),
+  );
+  const cache = new FieldCache();
+  const other = { ...root, topic: "/other" };
+  await load(cache, other);
+  const held = new Map<string, () => void>();
+  holdHistories(cache, held, [
+    { ...root, key: "root" },
+    { ...child, key: "child" },
+  ]);
+  await load(cache);
+  // The parent's history also serves the child, so it stays while the child is held.
+  holdHistories(cache, held, [{ ...child, key: "child" }]);
+  expect(cache.read(child)).toHaveLength(3);
+  holdHistories(cache, held, []);
+  expect(held.size).toBe(0);
+  expect(cache.read(root)).toBeUndefined();
+  // A history nobody held is left alone.
+  expect(cache.read(other)).toHaveLength(3);
 });

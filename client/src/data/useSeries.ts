@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { FieldCache } from "./fieldCache";
+import { holdHistories, type FieldCache } from "./fieldCache";
 import { appendPoints, consumeStream, point } from "./data";
 import type { Series } from "../views/Plot";
 import { messagesUrl } from "./sources";
@@ -20,6 +20,7 @@ export type CachedSeries = Series & {
 export function useSeries(origin: string | null, selected: Selected[], sharedCache?: FieldCache) {
   const cache = useRef(new Map<string, CachedSeries>());
   const requests = useRef(new Map<AbortController, CachedSeries[]>());
+  const held = useRef(new Map<string, () => void>());
   const dirty = useRef(false);
   const [revision, setRevision] = useState(0);
   // Fields are rebuilt from this key, so it must carry everything decoding needs.
@@ -37,6 +38,8 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
 
   useEffect(() => {
     cache.current = new Map();
+    // The shared cache is replaced along with the origin.
+    held.current = new Map();
     dirty.current = true;
     return () => {
       for (const controller of requests.current.keys()) controller.abort();
@@ -51,12 +54,16 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
     for (const [controller, targets] of requests.current) {
       if (targets.every((t) => !keys.has(t.key))) {
         controller.abort();
-        // Forget the partial data, so that adding the field again fetches all of it.
-        targets.forEach((t) => cache.current.delete(t.key));
         requests.current.delete(controller);
-        dirty.current = true;
       }
     }
+    // Forget removed fields, so that adding one again fetches all of it.
+    for (const key of cache.current.keys())
+      if (!keys.has(key)) {
+        cache.current.delete(key);
+        dirty.current = true;
+      }
+    if (sharedCache) holdHistories(sharedCache, held.current, fields);
     // Wait out quick field additions, without cancelling existing streams.
     const timer = setTimeout(() => {
       for (const field of fields) {
