@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addableFields, dropVerdict } from "../src/workspace/drop";
+import { dropVerdict, pickableFields } from "../src/workspace/drop";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import type { Topic } from "../src/types";
 import { fixedFrameOf } from "../src/data/useViewData";
@@ -39,13 +39,19 @@ function widgetOf(type: Widget["type"]) {
 describe("widgets showing views", () => {
   it("offer only whole topics with a view of their kinds", () => {
     const image = widgetOf("image").widgets["widget-1"];
-    expect(addableFields(index, image).map((entry) => entry.topic.topic)).toEqual(["/camera"]);
-    expect(addableFields(index, widgetOf("map").widgets["widget-1"])).toEqual([]);
+    expect(pickableFields(index, image).addable.map((entry) => entry.topic.topic)).toEqual([
+      "/camera",
+    ]);
+    expect(pickableFields(index, widgetOf("map").widgets["widget-1"]).addable).toEqual([]);
     expect(
-      addableFields(index, widgetOf("scene").widgets["widget-1"]).map((entry) => entry.topic.topic),
+      pickableFields(index, widgetOf("scene").widgets["widget-1"]).addable.map(
+        (entry) => entry.topic.topic,
+      ),
     ).toEqual(["/camera", "/lidar", "/odom"]);
     const plot = widgetOf("plot").widgets["widget-1"];
-    expect(addableFields(index, plot).map((entry) => entry.label)).toContain("/camera · x");
+    expect(pickableFields(index, plot).addable.map((entry) => entry.label)).toContain(
+      "/camera · x",
+    );
   });
   it("requires an image before adding point clouds and replaces the image", () => {
     const imageIndex = buildFieldIndex([
@@ -93,7 +99,7 @@ describe("widgets showing views", () => {
   });
   it("remember which view of the topic they read", () => {
     const state = widgetOf("scene");
-    const entry = addableFields(index, state.widgets["widget-1"]).find(
+    const entry = pickableFields(index, state.widgets["widget-1"]).addable.find(
       (item) => item.topic.topic === "/lidar",
     )!;
     const next = workspaceReducer(
