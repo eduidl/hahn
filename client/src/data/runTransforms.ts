@@ -23,7 +23,7 @@ export class RunTransforms {
   private loading = new Map<bigint, Promise<void>>();
   private listeners = new Set<() => void>();
   private version = 0;
-  private built?: { version: number; graph: TfGraph };
+  private resolver = new TfGraph();
 
   constructor(readonly run: string) {}
 
@@ -64,6 +64,7 @@ export class RunTransforms {
       )
       .then((fixed) => {
         this.fixed = fixed;
+        this.resolver.setFixed(fixed.transforms);
         this.changed();
       });
     return this.fixedLoad;
@@ -85,6 +86,7 @@ export class RunTransforms {
         .then((chunk) => {
           this.loading.delete(k);
           this.chunks.set(k, chunk);
+          this.resolver.add(k, chunk.samples);
           this.changed();
         });
       this.loading.set(k, load);
@@ -97,7 +99,10 @@ export class RunTransforms {
     if (this.chunks.size <= keptChunks) return;
     const distance = (k: bigint) => (k > around ? k - around : around - k);
     const far = [...this.chunks.keys()].sort((a, b) => Number(distance(b) - distance(a)));
-    for (const k of far.slice(0, this.chunks.size - keptChunks)) this.chunks.delete(k);
+    for (const k of far.slice(0, this.chunks.size - keptChunks)) {
+      this.chunks.delete(k);
+      this.resolver.remove(k);
+    }
     this.changed();
   }
 
@@ -106,18 +111,12 @@ export class RunTransforms {
     return this.fixed?.error || [...this.chunks.values()].find((c) => c.error)?.error || "";
   }
 
-  /** The graph from everything loaded, rebuilt only when that changes. */
+  /**
+   * The graph of everything loaded. It changes as chunks come and go, each indexed on
+   * its own, so a new chunk does not cost the samples already held.
+   */
   graph() {
-    if (this.built?.version !== this.version) {
-      const keys = [...this.chunks.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-      // Chunks hold disjoint ranges of recording time, so this keeps recording order.
-      const samples = keys.flatMap((k) => this.chunks.get(k)!.samples);
-      this.built = {
-        version: this.version,
-        graph: new TfGraph(this.fixed?.transforms ?? [], samples),
-      };
-    }
-    return this.built.graph;
+    return this.resolver;
   }
 }
 

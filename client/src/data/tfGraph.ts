@@ -91,52 +91,52 @@ function interpolateTransform(a: Transform, b: Transform, ratio: number): Transf
 }
 
 type Sample = { parent: string; transform: Transform; at: bigint };
+type Fixed = { parent: string; transform: Transform };
 
-/** A frame's link to its parent: fixed, or samples ordered on each axis. */
-type Edge = { fixed?: { parent: string; transform: Transform }; samples: DynamicTransform[] };
+/** The last index whose time is at or before `at`, plus one: the first after it. */
+function firstAfter(samples: Sample[], at: bigint) {
+  let low = 0,
+    high = samples.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (samples[mid].at <= at) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
 
 /**
- * The frame graph of a run from what the server delivers, resolved here so that the
- * axis and interpolation can change without asking it (ADR 0001, 0003). Dynamic
- * samples must be given in recording order, which settles ties of equal times.
+ * Samples received together, indexed per frame on their own. Adding or dropping a
+ * chunk then costs only its own samples, however many others the graph holds.
  */
-export class TfGraph {
-  private edges = new Map<string, Edge>();
+class Chunk {
+  private byChild = new Map<string, DynamicTransform[]>();
   private sorted = new Map<string, Sample[]>();
 
-  constructor(fixed: StaticTransform[], dynamic: DynamicTransform[]) {
-    for (const t of fixed)
-      this.edge(t.child).fixed = {
-        parent: t.parent,
-        transform: { translation: t.translation, rotation: t.rotation },
-      };
-    for (const sample of dynamic) this.edge(sample.child).samples.push(sample);
+  constructor(samples: DynamicTransform[]) {
+    for (const sample of samples) {
+      const list = this.byChild.get(sample.child);
+      if (list) list.push(sample);
+      else this.byChild.set(sample.child, [sample]);
+    }
   }
 
-  private edge(child: string) {
-    let edge = this.edges.get(child);
-    if (!edge) {
-      edge = { samples: [] };
-      this.edges.set(child, edge);
-    }
-    return edge;
+  children() {
+    return this.byChild.keys();
   }
 
   /** A frame's samples that have a time on `axis`, ordered by it, ties in recording order. */
-  private samples(child: string, edge: Edge, axis: Axis): Sample[] {
+  samples(child: string, axis: Axis): Sample[] | undefined {
+    const recorded = this.byChild.get(child);
+    if (!recorded) return undefined;
     const key = `${axis}\0${child}`;
     let samples = this.sorted.get(key);
     if (!samples) {
-      samples = edge.samples.flatMap((s) => {
+      samples = recorded.flatMap((s) => {
         const at = axis === "time" ? s.time_ns : s.stamp_ns;
         if (at === undefined) return [];
-        return [
-          {
-            parent: s.parent,
-            transform: { translation: s.translation, rotation: s.rotation },
-            at: BigInt(at),
-          },
-        ];
+        const transform = { translation: s.translation, rotation: s.rotation };
+        return [{ parent: s.parent, transform, at: BigInt(at) }];
       });
       // Stable, so that the last of equal times stays the last recorded.
       samples.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
@@ -144,23 +144,80 @@ export class TfGraph {
     }
     return samples;
   }
+}
+
+/**
+ * The frame graph of a run from what the server delivers, resolved here so that the
+ * axis and interpolation can change without asking it (ADR 0001, 0003). Dynamic
+ * samples come in chunks keyed in recording order, each in recording order itself,
+ * which settles ties of equal times: the later chunk, then the later sample.
+ */
+export class TfGraph {
+  private fixed = new Map<string, Fixed>();
+  private chunks = new Map<bigint, Chunk>();
+  /** Chunk keys in recording order. */
+  private order: bigint[] = [];
+  /** How many chunks hold samples of each dynamic frame. */
+  private dynamic = new Map<string, number>();
+
+  constructor(fixed: StaticTransform[] = [], dynamic: DynamicTransform[] = []) {
+    this.setFixed(fixed);
+    if (dynamic.length) this.add(0n, dynamic);
+  }
+
+  setFixed(fixed: StaticTransform[]) {
+    this.fixed = new Map(
+      fixed.map((t) => [
+        t.child,
+        { parent: t.parent, transform: { translation: t.translation, rotation: t.rotation } },
+      ]),
+    );
+  }
+
+  /** Adds the samples of chunk `key`, replacing any it held. */
+  add(key: bigint, samples: DynamicTransform[]) {
+    this.remove(key);
+    const chunk = new Chunk(samples);
+    this.chunks.set(key, chunk);
+    this.order.push(key);
+    this.order.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    for (const child of chunk.children())
+      this.dynamic.set(child, (this.dynamic.get(child) ?? 0) + 1);
+  }
+
+  remove(key: bigint) {
+    const chunk = this.chunks.get(key);
+    if (!chunk) return;
+    this.chunks.delete(key);
+    this.order = this.order.filter((k) => k !== key);
+    for (const child of chunk.children()) {
+      const count = this.dynamic.get(child)! - 1;
+      if (count) this.dynamic.set(child, count);
+      else this.dynamic.delete(child);
+    }
+  }
 
   /** The frame's parent and transform at `at`. Never extrapolates. */
-  private at(child: string, edge: Edge, at: bigint, axis: Axis, interpolate: boolean) {
-    if (edge.fixed) return edge.fixed;
-    const samples = this.samples(child, edge, axis);
-    // The first sample after `at`.
-    let after = 0,
-      end = samples.length;
-    while (after < end) {
-      const mid = (after + end) >>> 1;
-      if (samples[mid].at <= at) after = mid + 1;
-      else end = mid;
+  private at(child: string, at: bigint, axis: Axis, interpolate: boolean): Fixed | undefined {
+    const fixed = this.fixed.get(child);
+    if (fixed) return fixed;
+    // The last sample at or before `at` and the last of the first time after it,
+    // over every chunk; on equal times the later chunk wins.
+    let before: Sample | undefined;
+    let next: Sample | undefined;
+    for (const key of this.order) {
+      const samples = this.chunks.get(key)!.samples(child, axis);
+      if (!samples?.length) continue;
+      const after = firstAfter(samples, at);
+      const last = samples[after - 1];
+      if (last && (!before || last.at >= before.at)) before = last;
+      const first = samples[after];
+      if (first && (!next || first.at <= next.at)) {
+        next = samples[firstAfter(samples, first.at) - 1];
+      }
     }
-    const before = samples[after - 1];
     if (!before) return undefined;
     if (before.at === at) return before;
-    const next = samples[after];
     if (!next) return undefined;
     // A change of parent cannot be interpolated across.
     if (next.parent !== before.parent || !interpolate) return before;
@@ -184,8 +241,8 @@ export class TfGraph {
       if (list) list.push([to, transform]);
       else neighbours.set(from, [[to, transform]]);
     };
-    for (const [child, edge] of this.edges) {
-      const found = this.at(child, edge, at, axis, interpolate);
+    for (const child of new Set([...this.fixed.keys(), ...this.dynamic.keys()])) {
+      const found = this.at(child, at, axis, interpolate);
       if (!found) continue;
       link(found.parent, child, found.transform);
       link(child, found.parent, invert(found.transform));
