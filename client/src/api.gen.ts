@@ -45,7 +45,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Time range and message count of a group. A group with no messages returns 422, since it has no time range. */
+        /** @description Time range and message count of a group. A group with no messages is a successful result without a time range. */
         get: operations["info"];
         put?: never;
         post?: never;
@@ -258,13 +258,23 @@ export interface components {
             /** @description Whether to open the group first when opening the run. It is fine for no group to be `true`; the user then chooses which groups to open. The client opens the only group of a run regardless. */
             default_open: boolean;
         };
+        /**
+         * @example {
+         *       "start_ns": "1760000000000000000",
+         *       "end_ns": "1760000060000000000",
+         *       "message_count": 4400
+         *     }
+         * @example {
+         *       "message_count": 0
+         *     }
+         */
         RecordingInfo: {
-            /** @description The last primary time. Unlike a range in a request, it includes the last time. */
-            end_ns: components["schemas"]["TimeNs"];
+            /** @description The last primary time. Unlike a range in a request, it includes the last time. Omitted, like `start_ns`, when the group has no messages. */
+            end_ns?: components["schemas"]["TimeNs"];
             /** @description `null` when the recording has no statistics. */
             message_count: components["schemas"]["Count"] | null;
-            /** @description The first primary time. */
-            start_ns: components["schemas"]["TimeNs"];
+            /** @description The first primary time. Omitted, like `end_ns`, when the group has no messages. */
+            start_ns?: components["schemas"]["TimeNs"];
         };
         Topic: {
             /** @description Opaque identifier unique within the group. Use as the topic parameter in requests. */

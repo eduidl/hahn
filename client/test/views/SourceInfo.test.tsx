@@ -102,6 +102,15 @@ describe("SourceInfo", () => {
     expect(screen.getByText("cannot decode")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toBe("Group B: no messages");
   });
+  it("says when the open groups hold no messages, still listing their topics", () => {
+    show(
+      [open("r/a", [topic("/quiet", "r/a", { message_count: 0 })], { info: { message_count: 0 } })],
+      null,
+    );
+    expect(screen.getByText("No messages")).toBeTruthy();
+    expect(screen.queryByText("Start")).toBeNull();
+    expect(screen.getByRole("row", { name: /\/quiet/ })).toBeTruthy();
+  });
   it("shows only the errors when every group failed", () => {
     show([open("r/a", [], { info: null, error: "gone" })], null);
     expect(screen.getByRole("alert").textContent).toBe("Group A: gone");

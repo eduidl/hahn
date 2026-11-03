@@ -321,8 +321,22 @@ async fn runs_declare_the_configured_timezone() {
 async fn a_group_without_messages_has_no_time_range() {
     for stats in [true, false] {
         let dir = fixture(0, stats);
-        let (status, body) = get(hahn::router(dir.path()).unwrap(), "/g").await;
-        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "stats: {stats}");
-        assert!(body["error"].is_string());
+        let app = hahn::router(dir.path()).unwrap();
+        let (status, body) = get(app.clone(), "/g").await;
+        assert_eq!(status, StatusCode::OK, "stats: {stats}: {body}");
+        assert_eq!(body, json!({"message_count": 0}), "stats: {stats}");
+        // Its topics are still listed, and reading one finds nothing rather than failing.
+        let (status, topics) = get(app.clone(), "/g/topics").await;
+        assert_eq!(status, StatusCode::OK);
+        let topic = topics[0]["id"].as_str().unwrap();
+        let (status, latest) = get(
+            app.clone(),
+            &format!("/g/messages/latest?topic={}&time_ns=1", encode(topic)),
+        )
+        .await;
+        assert_eq!((status, latest), (StatusCode::OK, Value::Null));
+        let (status, events) = stream(app, "/g/messages", json!({"topic": topic})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(events, vec![json!({"type":"complete","scanned_messages":0})]);
     }
 }

@@ -145,7 +145,7 @@ Coordinates are right-handed, in meters and radians. The server converts recordi
 
 HTTP errors contain a stable `code` and a human-readable `error`; terminal stream errors contain `type: "error"`, the same `code` and a human-readable `message`. Clients tell failures apart by `code` and never parse the descriptions. A code the client does not know is still a failure, never an empty result. A message that cannot be converted to a view is a `frame` with `error`, not a terminal error, and the stream goes on.
 
-An empty latest message is `null`; an empty history or latest view ends with `complete`. An empty group has no time range and its info request returns 422 with `recording_unreadable`.
+An empty latest message is `null`; an empty history or latest view ends with `complete`. A group without messages is not a failure: its info has no time range, and its topics read as empty. A recording that cannot be read is `recording_unreadable`, never an empty result.
 
 | Status | Code | Meaning |
 |---|---|---|

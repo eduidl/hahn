@@ -34,6 +34,7 @@ export function SourceInfo({ info, sources }: { info: Info | null; sources: Open
           {names.get(source.id) ?? source.id}: {source.error}
         </p>
       ))}
+      {!info && failed.length < sources.length && <p className="widget-status">No messages</p>}
       {info && (
         <dl className="source-info-summary">
           <dt>Start</dt>

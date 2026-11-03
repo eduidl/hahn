@@ -82,7 +82,7 @@
     "/api/runs/{run}/groups/{group}": {
       "get": {
         "operationId": "info",
-        "description": "Time range and message count of a group. A group with no messages returns 422, since it has no time range.",
+        "description": "Time range and message count of a group. A group with no messages is a successful result without a time range.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Run"
@@ -702,14 +702,12 @@
       "RecordingInfo": {
         "type": "object",
         "required": [
-          "start_ns",
-          "end_ns",
           "message_count"
         ],
         "properties": {
           "end_ns": {
             "$ref": "#/components/schemas/TimeNs",
-            "description": "The last primary time. Unlike a range in a request, it includes the last time."
+            "description": "The last primary time. Unlike a range in a request, it includes the last time. Omitted, like `start_ns`, when the group has no messages."
           },
           "message_count": {
             "description": "`null` when the recording has no statistics.",
@@ -724,9 +722,19 @@
           },
           "start_ns": {
             "$ref": "#/components/schemas/TimeNs",
-            "description": "The first primary time."
+            "description": "The first primary time. Omitted, like `end_ns`, when the group has no messages."
           }
-        }
+        },
+        "examples": [
+          {
+            "start_ns": "1760000000000000000",
+            "end_ns": "1760000060000000000",
+            "message_count": 4400
+          },
+          {
+            "message_count": 0
+          }
+        ]
       },
       "Topic": {
         "type": "object",

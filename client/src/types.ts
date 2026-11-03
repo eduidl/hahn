@@ -4,7 +4,10 @@ export type Schemas = components["schemas"];
 export type RunList = Schemas["RunList"];
 export type Run = Schemas["Run"];
 export type Group = Schemas["Group"];
-export type Info = Schemas["RecordingInfo"];
+/** A group's summary, without a time range when the group has no messages. */
+export type RecordingInfo = Schemas["RecordingInfo"];
+/** A time axis to place values on: the open groups' messages together. */
+export type Info = RecordingInfo & { start_ns: string; end_ns: string };
 export type EnumValue = Schemas["EnumValue"];
 /** A struct field as the UI browses it; see `flattenFields`. */
 export type Field = Pick<Schemas["FieldType"], "data_type" | "type_name" | "enum_values"> & {
