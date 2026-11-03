@@ -25,7 +25,11 @@ import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 import { cameraDistortionError, cloudToCameraMatrix, projectCameraPoint } from "./camera";
 import { wheelZoomFactor } from "./Plot";
-import { applyCalibration, calibrationChoice, fetchCalibration } from "./useCameraCalibration";
+import {
+  applyCalibration,
+  calibrationChoice,
+  createCalibrationLoader,
+} from "./useCameraCalibration";
 
 const mimeTypes: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -161,6 +165,8 @@ export function ImageView({
   const { frame, error } = useViewFrame(series, info);
   const formatter = useTimeFormatter(info?.start_ns ?? null);
   const choice = calibrationChoice(index, series);
+  const calibrationLoader = useRef<ReturnType<typeof createCalibrationLoader>>(undefined);
+  calibrationLoader.current ??= createCalibrationLoader();
   const identity =
     series && info
       ? JSON.stringify([
@@ -200,7 +206,7 @@ export function ImageView({
         return { frame: imageFrame, clouds: [], marks, error: "Image has no frame ID" };
       const failed = (error: string) => ({ frame: imageFrame, clouds: [], marks, error });
       if (!choice.target) return failed("No camera calibration chosen for this image");
-      const found = await fetchCalibration(choice.target, imageFrame, signal);
+      const found = await calibrationLoader.current!(choice.target, imageFrame, signal);
       if (found?.error) return failed(found.error);
       if (found?.value?.kind !== "camera_calibration")
         return failed("No camera calibration for this image");
