@@ -211,7 +211,7 @@ export function TableView({
                       })
                     }
                   >
-                    <svg width="12" height="12" viewBox="0 0 16 16">
+                    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16">
                       <path
                         d="m4 4 8 8m0-8-8 8"
                         fill="none"

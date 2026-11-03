@@ -74,6 +74,7 @@ export function WidgetControls({
             onClick={() => dispatch({ type: "mode", id: widget.id, mode: "pan" })}
           >
             <svg
+              aria-hidden="true"
               width="15"
               height="15"
               viewBox="0 0 24 24"
@@ -95,6 +96,7 @@ export function WidgetControls({
             onClick={() => dispatch({ type: "mode", id: widget.id, mode: "zoom" })}
           >
             <svg
+              aria-hidden="true"
               width="15"
               height="15"
               viewBox="0 0 24 24"
@@ -125,6 +127,7 @@ export function WidgetControls({
             }
           >
             <svg
+              aria-hidden="true"
               width="15"
               height="15"
               viewBox="0 0 24 24"
@@ -158,6 +161,7 @@ export function WidgetControls({
         }
       >
         <svg
+          aria-hidden="true"
           width="15"
           height="15"
           viewBox="0 0 24 24"
@@ -187,6 +191,7 @@ export function WidgetControls({
         }}
       >
         <svg
+          aria-hidden="true"
           width="15"
           height="15"
           viewBox="0 0 24 24"

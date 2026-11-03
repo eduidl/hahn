@@ -79,6 +79,7 @@ export function AppHeader({
             title="Open groups"
           >
             <svg
+              aria-hidden="true"
               width="19"
               height="19"
               viewBox="0 0 24 24"
@@ -133,6 +134,7 @@ export function AppHeader({
         onClick={onToggleSidebar}
       >
         <svg
+          aria-hidden="true"
           width="20"
           height="20"
           viewBox="0 0 24 24"
@@ -152,6 +154,7 @@ export function AppHeader({
         popoverTarget="widget-catalog"
       >
         <svg
+          aria-hidden="true"
           width="18"
           height="18"
           viewBox="0 0 24 24"

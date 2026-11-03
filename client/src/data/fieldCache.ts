@@ -64,14 +64,14 @@ export class FieldCache {
   };
   private changed() {
     this.revision++;
-    this.listeners.forEach((listener) => listener());
+    for (const listener of this.listeners) listener();
   }
 
   clear() {
     this.generation++;
-    this.jobs.forEach((job) => job.controller.abort());
+    for (const job of this.jobs.values()) job.controller.abort();
     this.jobs.clear();
-    this.seeds.forEach((seed) => seed.controller.abort());
+    for (const seed of this.seeds.values()) seed.controller.abort();
     this.seeds.clear();
     this.blocks = [];
     this.fields.clear();
@@ -206,7 +206,7 @@ export class FieldCache {
             b.topic === target.topic &&
             !this.pinned(b),
         );
-        unheld.forEach((b) => this.discard(b));
+        for (const b of unheld) this.discard(b);
         if (unheld.length) this.changed();
       }
       this.evict();
@@ -375,7 +375,7 @@ export class FieldCache {
             if (controller.signal.aborted || generation !== this.generation) return;
             if (event.type === "batch") this.append(block, event.rows);
             if (event.type === "complete") block.complete = true;
-            current.listeners.forEach((listener) => listener(event));
+            for (const listener of current.listeners) listener(event);
             this.changed();
           }),
         )

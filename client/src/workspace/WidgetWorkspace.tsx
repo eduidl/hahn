@@ -302,7 +302,13 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
               onDragEnd={() => moving.setId(null)}
             >
               {widget.type === "tabs" ? (
-                <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
+                <svg
+                  aria-hidden="true"
+                  width="12"
+                  height="16"
+                  viewBox="0 0 12 16"
+                  fill="currentColor"
+                >
                   <circle cx="4" cy="4" r="1" />
                   <circle cx="8" cy="4" r="1" />
                   <circle cx="4" cy="8" r="1" />

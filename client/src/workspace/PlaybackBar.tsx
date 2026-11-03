@@ -38,7 +38,7 @@ function ownsKey(target: EventTarget | null, key: string) {
 }
 
 const icon = (path: string) => (
-  <svg width="14" height="14" viewBox="0 0 24 24">
+  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24">
     <path d={path} fill="currentColor" />
   </svg>
 );

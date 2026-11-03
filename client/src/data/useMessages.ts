@@ -52,7 +52,7 @@ export function useMessages(
     held.current = new Map();
     dirty.current = true;
     return () => {
-      requests.current.forEach((controller) => controller.abort());
+      for (const controller of requests.current.values()) controller.abort();
       requests.current.clear();
     };
   }, [origin]);

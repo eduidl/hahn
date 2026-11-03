@@ -59,7 +59,7 @@ describe("NDJSON", () => {
     const response = new Response(
       new ReadableStream({
         start(c) {
-          chunks.forEach((s) => c.enqueue(encoder.encode(s)));
+          for (const s of chunks) c.enqueue(encoder.encode(s));
           c.close();
         },
       }),

@@ -299,6 +299,7 @@ export function StatePlot({
               ].join(" ");
               return (
                 <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the index disambiguates segments that share a timestamp
                   key={`${band.first.ns}-${i}`}
                   className={className}
                   style={{
