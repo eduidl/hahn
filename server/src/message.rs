@@ -407,6 +407,12 @@ mod tests {
     }
 
     #[test]
+    fn byte_buffers_show_their_length_and_head() {
+        let shown = to_json(&Value::Bytes(vec![7; 50].into()), &DataTypeDef::Bytes);
+        assert_eq!(shown, json!({ "$bytes": 50, "head": vec![7; MAX_BYTES] }));
+    }
+
+    #[test]
     fn maps_are_pairs_with_a_truncation_marker() {
         let data_type = DataTypeDef::Map {
             key: Box::new(ElementDef::new(DataTypeDef::String, false)),

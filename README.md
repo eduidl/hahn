@@ -1,6 +1,6 @@
 # Hahn
 
-A local viewer for robot and sensor recordings. A Rust server decodes MCAP, CSV, and Parquet files and streams them to the browser, where you can arrange plots, tables, logs, images, 3D views, and maps on a shared timeline.
+A local viewer for robot and sensor recordings. A Rust server decodes MCAP files and streams them to the browser, where you can arrange plots, tables, logs, images, 3D views, and maps on a shared timeline.
 
 ## Getting started
 
@@ -59,15 +59,6 @@ A run is what you open. It contains one or more groups, which you can open and c
 | Format | Requirements |
 | --- | --- |
 | MCAP | Must be chunked and indexed. Decodes ROS 2 and Protobuf. JSON channels are not decoded into fields |
-| CSV | One file is one topic, and one row is one message |
-| Parquet | One file is one topic, and one row is one message |
-
-For CSV and Parquet:
-
-- The first column is the time, in absolute time since the epoch. A time starting from 0 will not line up with other recordings.
-- A numeric time column's unit comes from its name: `_ns`, `_us`, or `_ms`, and otherwise seconds. Parquet timestamp columns use their own unit.
-- In CSV, a dot in a column name makes a nested field, so `pose.x` becomes `x` inside `pose`. An empty cell is a missing value.
-- The whole file is loaded into memory.
 
 ## Controls
 
