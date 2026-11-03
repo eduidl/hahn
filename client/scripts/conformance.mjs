@@ -12,7 +12,9 @@ const ajv = new Ajv({ strict: false, validateFormats: false, allErrors: true });
 const exercised = new Set();
 const failures = [];
 // Report on exit too, so failures explain a later crash on missing data.
-process.on("exit", () => failures.forEach((failure) => console.error(`FAIL ${failure}`)));
+process.on("exit", () => {
+  for (const failure of failures) console.error(`FAIL ${failure}`);
+});
 
 const FRAMES = "application/vnd.hahn.frames";
 

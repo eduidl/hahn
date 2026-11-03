@@ -32,8 +32,9 @@ vi.mock("../src/data/useViewData", async (original) => ({
 afterEach(cleanup);
 
 const turned = (yaw: number) => [0, 0, Math.sin(yaw / 2), Math.cos(yaw / 2)];
-const close = (vector: THREE.Vector3, expected: number[]) =>
-  vector.toArray().forEach((value, i) => expect(value).toBeCloseTo(expected[i]));
+const close = (vector: THREE.Vector3, expected: number[]) => {
+  for (const [i, value] of vector.toArray().entries()) expect(value).toBeCloseTo(expected[i]);
+};
 
 it("puts the grid level with the origin, its lines staying put in the root", () => {
   close(gridOffset(new THREE.Vector3(12.3, -4.5, 0.8), 1), [-0.3, -0.5, 0]);

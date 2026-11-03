@@ -338,15 +338,15 @@ export function TfTree({
                     Time: {clock.tooltip(secondsFrom(transforms.time_ns, info!.start_ns))}
                   </span>
                   <span>Translation (m):</span>
-                  {pose.translation.map((value, i) => (
-                    <span key={i}>
-                      {["x", "y", "z"][i]}: {value}
+                  {["x", "y", "z"].map((axis, i) => (
+                    <span key={axis}>
+                      {axis}: {pose.translation[i]}
                     </span>
                   ))}
                   <span>Rotation:</span>
-                  {pose.rotation.map((value, i) => (
-                    <span key={i}>
-                      {["x", "y", "z", "w"][i]}: {value}
+                  {["x", "y", "z", "w"].map((axis, i) => (
+                    <span key={axis}>
+                      {axis}: {pose.rotation[i]}
                     </span>
                   ))}
                 </>

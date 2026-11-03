@@ -21,19 +21,18 @@
     },
     "rules": {
       "style": {
+        // Most uses are refs and lookups the surrounding code already proved present;
+        // guards or casts in their place would add noise without catching more bugs.
         "noNonNullAssertion": "off"
       },
       "a11y": {
-        "noSvgWithoutTitle": "off",
-        "useAriaPropsForRole": "off",
-        "noStaticElementInteractions": "off",
-        "noNoninteractiveElementToInteractiveRole": "off"
-      },
-      "suspicious": {
-        "useIterableCallbackReturn": "off",
-        "noArrayIndexKey": "off"
+        // Remaining hits are drag-and-drop targets, drag handles and hover hosts, which
+        // have no keyboard equivalent to add; clickable divs are covered by useKeyWithClickEvents.
+        "noStaticElementInteractions": "off"
       },
       "correctness": {
+        // Hooks intentionally depend on stable identity keys (series.key, info?.start_ns)
+        // rather than on the objects they read; following the rule would re-run fetches.
         "useExhaustiveDependencies": "off"
       }
     }
@@ -49,9 +48,13 @@
       "linter": {
         "rules": {
           "suspicious": {
-            "noExplicitAny": "off"
+            // Module mocks stand in for typed hooks and browser objects.
+            "noExplicitAny": "off",
+            // Fixture lists are static, so index keys are stable.
+            "noArrayIndexKey": "off"
           },
           "correctness": {
+            // Test harness components close over per-test fixtures.
             "noComponentHookFactories": "off"
           }
         }

@@ -189,6 +189,7 @@ export function TimeDisplayToggle({
     >
       {/* A clock, so the setting reads as being about time. */}
       <svg
+        aria-hidden="true"
         width="14"
         height="14"
         viewBox="0 0 24 24"

@@ -5,6 +5,7 @@ import { useSourceLabel } from "./data/sources";
 /** Allow line breaks only after `/` and `.`, so names wrap between segments. */
 function breakable(text: string) {
   return text.split(/(?<=[/.])/).map((part, i) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: segments are derived from one string and never reorder
     <Fragment key={i}>
       {i > 0 && <wbr />}
       {part}

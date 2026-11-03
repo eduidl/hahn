@@ -100,6 +100,7 @@ export function RunsDialog({
           : list && `${items.length} runs`}
       </div>
       {error && <p role="alert">{error}</p>}
+      {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA combobox pattern; the search box owns focus */}
       <ul ref={listRef} id="runs-list" className="runs-list" role="listbox" aria-label="Runs">
         {items.map((run, i) => (
           // biome-ignore lint/a11y/useFocusableInteractive: focus stays in the search box (aria-activedescendant)
@@ -107,6 +108,7 @@ export function RunsDialog({
           <li
             key={run.id}
             id={`run-option-${i}`}
+            // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: options of the listbox above
             role="option"
             aria-selected={i === active}
             aria-current={run.id === current || undefined}

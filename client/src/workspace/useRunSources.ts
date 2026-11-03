@@ -148,7 +148,9 @@ export function useRunSources(
   }, [sources]);
   useEffect(() => {
     const current = requests.current;
-    return () => current.forEach((controller) => controller.abort());
+    return () => {
+      for (const controller of current.values()) controller.abort();
+    };
   }, []);
 
   /** Switch runs: everything stays, and each series moves to the new run's matching group. */

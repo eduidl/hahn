@@ -84,7 +84,7 @@ export function createPlaybackStore(
       if (active) waiting.add(consumer);
       else waiting.delete(consumer);
       if (was && !waiting.size) last = null;
-      if (was !== waiting.size > 0) listeners.forEach((listener) => listener());
+      if (was !== waiting.size > 0) for (const listener of listeners) listener();
     },
     subscribe: (listener: () => void) => {
       listeners.add(listener);
