@@ -52,6 +52,10 @@ impl ViewConverter for AcmePose2d {
     }
 }
 
+/// `string parent`, `string child`, `float64 x`, `float64 y`, `float64 theta`: where
+/// frame `child` is in frame `parent`, on a plane.
+struct AcmeLink2d;
+
 impl TransformReader for AcmeLink2d {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         schema_name == "acme_msgs/msg/Link2D"

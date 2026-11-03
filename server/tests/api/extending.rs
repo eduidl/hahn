@@ -137,6 +137,9 @@ impl hahn::ViewConverter for WrongKind {
     }
 }
 
+/// `acme_msgs/msg/Link2D`: one transform on a plane, as an application would add it.
+struct AcmeLink2d;
+
 impl hahn::TransformReader for AcmeLink2d {
     fn accepts(&self, schema_name: &str, _: &hahn::FieldDefs) -> bool {
         schema_name == "acme_msgs/msg/Link2D"

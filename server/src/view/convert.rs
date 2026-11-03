@@ -41,55 +41,6 @@ pub(crate) fn converters() -> Vec<Arc<dyn ViewConverter>> {
     converters
 }
 
-/// An encoded image in Hahn's image view.
-pub struct ImageView {
-    pub frame_id: Option<String>,
-    pub format: String,
-    pub data: Arc<[u8]>,
-}
-
-/// Converts a decoded message into a Hahn image view.
-pub trait ImageConverter: Send + Sync {
-    /// Unique among all view converters registered with a server.
-    fn id(&self) -> &'static str;
-    fn name(&self) -> &'static str;
-    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool;
-    fn convert(&self, message: &Message<'_>) -> anyhow::Result<ImageView>;
-}
-
-pub(crate) struct ImageAdapter(pub Arc<dyn ImageConverter>);
-
-impl Converter for ImageAdapter {
-    fn id(&self) -> &'static str {
-        self.0.id()
-    }
-    fn kind(&self) -> &'static str {
-        "image"
-    }
-    fn name(&self) -> &'static str {
-        self.0.name()
-    }
-    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
-        self.0.accepts(schema_name, defs)
-    }
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
-        let image = self.0.convert(message)?;
-        let format = image.format.to_ascii_lowercase();
-        ensure!(
-            matches!(format.as_str(), "jpeg" | "jpg" | "png" | "webp" | "avif"),
-            "Unsupported image format: {format:?}"
-        );
-        let format = if format == "jpg" { "jpeg" } else { &format };
-        Ok(
-            json!({"kind": "image", "frame_id": image.frame_id, "format": format, "role": "color", "data": payload.add(image.data)}),
-        )
-    }
-}
-
 /// Whether `schema_name` is the Foxglove schema `name`, as Protobuf or as the
 /// `foxglove_msgs` ROS 2 package, which share their field names.
 pub(super) fn is_foxglove(schema_name: &str, name: &str) -> bool {

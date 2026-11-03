@@ -139,6 +139,50 @@ async fn frames_span_the_groups_of_a_run() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+#[tokio::test]
+async fn a_run_without_transforms_has_no_frames() {
+    let dir = fixture(1, true);
+    let app = hahn::router(dir.path()).unwrap();
+    let (status, body) = get(app.clone(), "/r/frames").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, json!({"frames": []}));
+    let (status, _) = get(app, "/r/transforms?target=map&time_ns=1").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn pose_history_resolves_transforms_at_each_recorded_time() {
+    let dir = tempfile::tempdir().unwrap();
+    support::write_odometry(&dir.path().join("odom.mcap")).unwrap();
+    let app = hahn::router(dir.path()).unwrap();
+    let (_, events) = frames(
+        &app,
+        &view_url("views", "/odometry", "pose", "&target_frame=fixed"),
+    )
+    .await;
+    assert_eq!(events[0].0["value"]["frame_id"], "fixed");
+    assert_eq!(
+        events[0].0["value"]["pose"]["position"],
+        json!([12., 3., 4.])
+    );
+    assert!(events[1].0["error"].is_string());
+    assert_eq!(
+        events[3].0["value"]["pose"]["position"],
+        json!([26., 0., 0.])
+    );
+    let (_, missing) = frames(
+        &app,
+        &view_url("views", "/odometry", "pose", "&target_frame=unknown"),
+    )
+    .await;
+    assert!(
+        missing[0].0["error"]
+            .as_str()
+            .unwrap()
+            .contains("No transform")
+    );
+}
+
 impl hahn::TransformReader for Links {
     fn accepts(&self, schema_name: &str, _: &hahn::FieldDefs) -> bool {
         schema_name == "test/Link"
