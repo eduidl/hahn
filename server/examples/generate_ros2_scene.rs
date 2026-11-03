@@ -1,0 +1,12 @@
+//! A synthetic ROS 2 recording to look at in Hahn: a vehicle driving a circle with a
+//! camera, a lidar recorded late, detections, a plan, particles and GNSS.
+mod support;
+
+fn main() -> anyhow::Result<()> {
+    let path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "ros2_scene.mcap".into());
+    support::ros2::write_ros2_scene(std::path::Path::new(&path))?;
+    println!("Created {path}");
+    Ok(())
+}
