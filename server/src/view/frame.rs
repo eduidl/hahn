@@ -59,39 +59,3 @@ pub(crate) fn encode<H: Serialize>(header: &H, payload: Payload) -> anyhow::Resu
     }
     Ok(chunks)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn blob(length: usize) -> Arc<[u8]> {
-        vec![7; length].into()
-    }
-
-    #[test]
-    fn payload_and_blobs_are_aligned_within_the_frame() {
-        let mut payload = Payload::default();
-        let first = payload.add(blob(3));
-        let second = payload.add(blob(8));
-        assert_eq!(first["$blob"]["offset"], 0);
-        assert_eq!(first["$blob"]["length"], 3);
-        assert_eq!(second["$blob"]["offset"], 8);
-
-        let frame = encode(&json!({ "a": "b" }), payload).unwrap().concat();
-        let header = u32::from_le_bytes(frame[..4].try_into().unwrap()) as usize;
-        let body = u32::from_le_bytes(frame[4..8].try_into().unwrap()) as usize;
-        assert_eq!(&frame[8..8 + header], br#"{"a":"b"}"#);
-        assert_eq!(body, 16);
-        let start = frame.len() - body;
-        assert_eq!(start % ALIGNMENT, 0);
-        assert_eq!(&frame[start..start + 3], [7, 7, 7]);
-        assert_eq!(&frame[start + 3..start + 8], [0; 5]);
-        assert_eq!(&frame[start + 8..], [7; 8]);
-    }
-
-    #[test]
-    fn a_frame_without_a_payload_is_padded_to_a_boundary() {
-        let frame = encode(&json!({}), Payload::default()).unwrap().concat();
-        assert_eq!(frame.len() % ALIGNMENT, 0);
-    }
-}

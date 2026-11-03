@@ -23,8 +23,7 @@ use axum::{
     http::header,
     response::{IntoResponse, Response},
 };
-pub(crate) use convert::Converter;
-pub use convert::{ImageConverter, ImageView, Message};
+pub use convert::{Message, ViewConverter, schema};
 pub(crate) use frame::CONTENT_TYPE;
 use frame::{Payload, encode};
 use mcapdecode::core::{FieldDefs, Value};
@@ -32,10 +31,15 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+pub use value::{
+    CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, NumericType, PackedField,
+    PointCloudView, PointField, Pose, PoseView, RawImageView, View,
+};
 
+/// The built-in converters followed by `extra`, whose IDs must be new.
 pub(crate) fn converters(
-    extra: Vec<Arc<dyn ImageConverter>>,
-) -> anyhow::Result<Vec<Arc<dyn Converter>>> {
+    extra: Vec<Arc<dyn ViewConverter>>,
+) -> anyhow::Result<Vec<Arc<dyn ViewConverter>>> {
     let mut converters = convert::converters();
     for converter in extra {
         anyhow::ensure!(!converter.id().is_empty(), "Converter ID must not be empty");
@@ -46,38 +50,44 @@ pub(crate) fn converters(
             "Duplicate converter ID: {}",
             converter.id()
         );
-        converters.push(Arc::new(convert::ImageAdapter(converter)));
+        converters.push(converter);
     }
     Ok(converters)
 }
 
 #[derive(Clone, Serialize)]
 pub(crate) struct ViewInfo {
-    id: &'static str,
-    kind: &'static str,
-    name: &'static str,
+    pub(crate) id: &'static str,
+    pub(crate) kind: &'static str,
+    pub(crate) name: &'static str,
+}
+
+impl ViewInfo {
+    pub(crate) fn of(converter: &dyn ViewConverter) -> Self {
+        Self {
+            id: converter.id(),
+            kind: converter.kind().as_str(),
+            name: converter.name(),
+        }
+    }
 }
 
 /// The views a topic of this schema offers.
 pub(crate) fn declared(
     schema_name: Option<&str>,
     defs: &FieldDefs,
-    converters: &[Arc<dyn Converter>],
+    converters: &[Arc<dyn ViewConverter>],
 ) -> Vec<ViewInfo> {
     accepted(schema_name, defs, converters)
-        .map(|converter| ViewInfo {
-            id: converter.id(),
-            kind: converter.kind(),
-            name: converter.name(),
-        })
+        .map(|converter| ViewInfo::of(&**converter))
         .collect()
 }
 
 fn accepted<'a>(
     schema_name: Option<&'a str>,
     defs: &'a FieldDefs,
-    converters: &'a [Arc<dyn Converter>],
-) -> impl Iterator<Item = &'a Arc<dyn Converter>> + 'a {
+    converters: &'a [Arc<dyn ViewConverter>],
+) -> impl Iterator<Item = &'a Arc<dyn ViewConverter>> + 'a {
     converters.iter().filter(move |converter| {
         schema_name.is_some_and(|schema_name| converter.accepts(schema_name, defs))
     })
@@ -85,7 +95,7 @@ fn accepted<'a>(
 
 struct TopicViews {
     defs: Arc<FieldDefs>,
-    converters: Vec<Arc<dyn Converter>>,
+    converters: Vec<Arc<dyn ViewConverter>>,
 }
 
 /// Which converters apply to which topic. Kept per group, since it is looked up on
@@ -97,7 +107,7 @@ pub(crate) struct ViewIndex {
 impl ViewIndex {
     pub(crate) fn build(
         source: &dyn Source,
-        registry: &[Arc<dyn Converter>],
+        registry: &[Arc<dyn ViewConverter>],
     ) -> anyhow::Result<Self> {
         let mut topics = HashMap::new();
         for meta in source.topics()? {
@@ -113,7 +123,11 @@ impl ViewIndex {
         Ok(Self { topics })
     }
 
-    fn get(&self, topic: &str, view: &str) -> anyhow::Result<(Arc<FieldDefs>, Arc<dyn Converter>)> {
+    fn get(
+        &self,
+        topic: &str,
+        view: &str,
+    ) -> anyhow::Result<(Arc<FieldDefs>, Arc<dyn ViewConverter>)> {
         self.topics
             .get(topic)
             .and_then(|views| {
@@ -151,7 +165,7 @@ fn control(header: &Header) -> anyhow::Result<Vec<Bytes>> {
 /// One message as a frame. A message that cannot be converted fails on its own: the
 /// schema cannot rule that out, and the messages around it may be fine.
 fn frame(
-    converter: &dyn Converter,
+    converter: &dyn ViewConverter,
     defs: &FieldDefs,
     times: MessageTimes,
     value: &Value,
@@ -159,26 +173,42 @@ fn frame(
 ) -> anyhow::Result<Vec<Bytes>> {
     let mut payload = Payload::default();
     let converted = Message::new(defs, value).and_then(|message| {
-        let mut value = converter.convert(&message, &mut payload)?;
+        let mut view = converter.convert(&message)?;
+        anyhow::ensure!(
+            view.kind() == converter.kind(),
+            "Converter {} returned {} instead of {}",
+            converter.id(),
+            view.kind().as_str(),
+            converter.kind().as_str()
+        );
         if let Some((target, tf)) = target {
-            anyhow::ensure!(
-                value["kind"] == "pose",
-                "Target frame is only supported for pose views"
-            );
-            let source = value["frame_id"]
-                .as_str()
+            let View::Pose(pose) = &mut view else {
+                anyhow::bail!("Target frame is only supported for pose views");
+            };
+            pose.pose = value::checked(pose.pose)?;
+            let source = pose
+                .frame_id
+                .as_deref()
                 .filter(|id| !id.is_empty())
                 .ok_or_else(|| anyhow::anyhow!("Pose has no frame ID"))?;
-            let position = serde_json::from_value(value["pose"]["position"].clone())?;
-            let orientation = serde_json::from_value(value["pose"]["orientation"].clone())?;
             let (position, orientation) = tf
-                .pose_in_target(target, source, times.log_time, position, orientation)
+                .pose_in_target(
+                    target,
+                    source,
+                    times.log_time,
+                    pose.pose.position,
+                    pose.pose.orientation,
+                )
                 .ok_or_else(|| {
                     anyhow::anyhow!("No transform from {source} to {target} at this time")
                 })?;
-            value["frame_id"] = target.into();
-            value["pose"] = serde_json::json!({"position":position,"orientation":orientation});
+            pose.frame_id = Some(target.to_owned());
+            pose.pose = Pose {
+                position,
+                orientation,
+            };
         }
+        let value = value::encode(view, &mut payload)?;
         anyhow::ensure!(payload.fits(), "The message is too large for a frame");
         Ok(value)
     });
@@ -236,7 +266,7 @@ pub(crate) async fn views(
         let (defs, converter) = group.views(&state.converters)?.get(&topic, &view)?;
         if target.is_some() {
             anyhow::ensure!(
-                converter.kind() == "pose",
+                converter.kind() == Kind::Pose,
                 "Target frame is only supported for pose views"
             );
         }

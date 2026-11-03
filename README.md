@@ -92,9 +92,28 @@ The Map widget gets its tiles from OpenStreetMap by default, which sends the are
 
 ## Extending
 
-- **Image converters:** Rust applications embedding Hahn can implement `hahn::ImageConverter` and pass it to `hahn::router_with_image_converters`. Other view types use the built-in converters. See `external_image_converter_is_declared_and_served` in [`server/tests/api.rs`](server/tests/api.rs).
-- **Formats:** Implement the `Source` trait in [`server/src/source/mod.rs`](server/src/source/mod.rs).
-- **Other servers:** The HTTP API is specified in [`protocol/openapi.json`](protocol/openapi.json) and [`protocol/README.md`](protocol/README.md).
+### Showing your own message types
+
+Hahn shows a topic as an image, point cloud, pose, map location or camera calibration when a converter accepts its type, and reads it as transforms between coordinate frames when a transform reader accepts it. To add either for your own types, or to read a file format other than MCAP, build your own server on the `hahn` crate:
+
+1. Create a Rust crate that depends on `hahn` (for now, as a path dependency on `server/`).
+2. For each type, implement `hahn::ViewConverter`: `accepts` decides from the schema name and fields (`hahn::schema` has checks for field types), and `convert` reads a `hahn::Message` and returns a `hahn::View`, such as a `PoseView` or `PointCloudView`. Hahn checks every value before sending it, and a message that cannot be converted shows an error for that message only.
+3. For each type that holds coordinate frames, implement `hahn::TransformReader`: `read` returns the transforms a message holds as `hahn::TransformSample`s. They join the run's frames with those of `/tf`. Transforms on a topic ending in `tf_static` hold at all times; override `is_static` to decide otherwise.
+4. For a file format, implement `hahn::Format`, which recognizes its files by path and opens them as a `hahn::Source`. A source lists its topics with their fields (`hahn::FieldDefs`) and reads the messages of a topic within a time range as `hahn::Value`s. Files of your format become runs and groups like MCAP files, and are tried before MCAP.
+5. In `main`, call `hahn::cli::main(|builder| builder.view(MyConverter).transforms(MyReader).format(MyFormat))`. The server takes the same options as Hahn and lists every view it offers when it starts.
+
+[`server/examples/custom_server.rs`](server/examples/custom_server.rs) shows a type `acme_msgs/msg/Pose2D` as a pose, reads `acme_msgs/msg/Link2D` as transforms, and opens a text format `.acmelog` ([`server/examples/support/acme_log.rs`](server/examples/support/acme_log.rs)). To try it:
+
+```bash
+cargo run --manifest-path server/Cargo.toml --example generate_acme -- data/samples/acme/acme.mcap
+cargo run --manifest-path server/Cargo.toml --example custom_server -- --data-dir data/samples/acme
+```
+
+Then select `acme.mcap` and add `/acme_pose` to a 3D widget, or open the TF tree widget to see `map`, `base` and `sensor`. Select `acme.acmelog` to plot `/speed` and `/battery`.
+
+### Other servers
+
+The HTTP API is specified in [`protocol/openapi.json`](protocol/openapi.json) and [`protocol/README.md`](protocol/README.md).
 
 ## Development
 

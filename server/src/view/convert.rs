@@ -1,30 +1,36 @@
 //! Converters from recorded message types to the protocol's fixed kinds.
 
-use super::frame::Payload;
+use super::value::{
+    CameraCalibrationView, GeoFeature, GeoView, ImageView, Kind, NumericType, PackedField,
+    PointCloudView, Pose, PoseView, RawImageView, View,
+};
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
-use serde_json::json;
 use std::sync::Arc;
 
 /// Turns messages of the types it accepts into one fixed kind.
-pub(crate) trait Converter: Send + Sync {
-    /// Unique among the converters; a topic's views are named after them.
+///
+/// Built-in converters implement this too. An application adds its own with
+/// [`Builder::view`](crate::Builder::view).
+pub trait ViewConverter: Send + Sync {
+    /// Unique among the converters of a server; a topic's views are named after them.
     fn id(&self) -> &'static str;
-    fn kind(&self) -> &'static str;
+    /// Every value [`convert`](Self::convert) returns must be of this kind.
+    fn kind(&self) -> Kind;
+    /// For display, such as `Pose`.
     fn name(&self) -> &'static str;
-    /// Decided from the schema alone. Both the name and the shape must match, so
-    /// that an unrelated type of the same name does not fail on every message.
+    /// Decided from the schema alone. Check the shape as well as the name, so that an
+    /// unrelated type of the same name does not fail on every message. The helpers in
+    /// [`crate::schema`] check field types.
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool;
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value>;
+    /// Converts one message. An error fails only this message, which the client shows
+    /// in place of the value.
+    fn convert(&self, message: &Message) -> anyhow::Result<View>;
 }
 
-pub(crate) fn converters() -> Vec<Arc<dyn Converter>> {
-    let mut converters: Vec<Arc<dyn Converter>> = vec![
-        Arc::new(ImageAdapter(Arc::new(Image))),
+pub(crate) fn converters() -> Vec<Arc<dyn ViewConverter>> {
+    let mut converters: Vec<Arc<dyn ViewConverter>> = vec![
+        Arc::new(Image),
         Arc::new(RawImage),
         Arc::new(CameraCalibration),
         Arc::new(PointCloud),
@@ -101,7 +107,8 @@ pub struct Message<'a> {
 }
 
 impl<'a> Message<'a> {
-    pub(crate) fn new(defs: &'a FieldDefs, value: &'a Value) -> anyhow::Result<Self> {
+    /// A decoded message of the schema `defs`, which must be a struct.
+    pub fn new(defs: &'a FieldDefs, value: &'a Value) -> anyhow::Result<Self> {
         match value {
             Value::Struct(values) => Ok(Self { defs, values }),
             _ => bail!("Expected a struct"),
@@ -128,6 +135,17 @@ impl<'a> Message<'a> {
         })
     }
 
+    /// Whether the schema has a field `name`, whatever its value.
+    pub fn has(&self, name: &str) -> bool {
+        self.field(name).is_ok()
+    }
+
+    /// The raw decoded value of a field.
+    pub fn value(&self, name: &str) -> anyhow::Result<&'a Value> {
+        Ok(self.field(name)?.1)
+    }
+
+    /// A string, or an empty one when the message leaves it out.
     pub fn string(&self, name: &str) -> anyhow::Result<&'a str> {
         match self.present(name)? {
             Some(Value::String(value)) => Ok(value),
@@ -188,7 +206,8 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub(crate) fn children(&self, name: &str) -> anyhow::Result<Vec<Message<'a>>> {
+    /// A list of structs.
+    pub fn children(&self, name: &str) -> anyhow::Result<Vec<Message<'a>>> {
         let (data_type, value) = self.field(name)?;
         let element = match data_type {
             DataTypeDef::List(element)
@@ -208,6 +227,38 @@ impl<'a> Message<'a> {
             _ => bail!("Field {name} is not a list"),
         }
     }
+
+    /// The frame named in the field `frame_id`. An empty name means the message does
+    /// not say.
+    pub fn frame_id(&self) -> anyhow::Result<Option<String>> {
+        Ok(match self.string("frame_id")? {
+            "" => None,
+            id => Some(id.to_owned()),
+        })
+    }
+
+    /// `[x, y, z]` from a nested struct, all zero when it is left out.
+    pub fn vector(&self, name: &str) -> anyhow::Result<[f64; 3]> {
+        vector(self.child(name)?)
+    }
+
+    /// `[x, y, z, w]` from a nested struct, normalized. A rotation of zero length,
+    /// which is what an unset quaternion decodes to, means none.
+    pub fn quaternion(&self, name: &str) -> anyhow::Result<[f64; 4]> {
+        quaternion(self.child(name)?)
+    }
+
+    /// A pose from a nested struct of `position` and `orientation`, identity when it
+    /// is left out.
+    pub fn pose(&self, name: &str) -> anyhow::Result<Pose> {
+        let Some(pose) = self.child(name)? else {
+            return Ok(Pose::default());
+        };
+        Ok(Pose {
+            position: pose.vector("position")?,
+            orientation: pose.quaternion("orientation")?,
+        })
+    }
 }
 
 fn number(value: &Value) -> Option<f64> {
@@ -226,60 +277,60 @@ fn number(value: &Value) -> Option<f64> {
     })
 }
 
-/// Whether `defs` has a field `name` whose type passes `check`.
-pub(crate) fn has(defs: &FieldDefs, name: &str, check: fn(&DataTypeDef) -> bool) -> bool {
-    defs.iter()
-        .any(|field| field.name == name && check(&field.element.data_type))
+/// Checks on a schema, for [`ViewConverter::accepts`].
+pub mod schema {
+    use mcapdecode::core::{DataTypeDef, FieldDefs};
+
+    /// Whether `defs` has a field `name` whose type passes `check`, such as
+    /// `has(defs, "x", is_number)`.
+    pub fn has(defs: &FieldDefs, name: &str, check: fn(&DataTypeDef) -> bool) -> bool {
+        defs.iter()
+            .any(|field| field.name == name && check(&field.element.data_type))
+    }
+
+    pub fn is_struct(data_type: &DataTypeDef) -> bool {
+        matches!(data_type, DataTypeDef::Struct(_))
+    }
+
+    pub fn is_list(data_type: &DataTypeDef) -> bool {
+        matches!(
+            data_type,
+            DataTypeDef::List(_) | DataTypeDef::BoundedList(..) | DataTypeDef::Array(..)
+        )
+    }
+
+    pub fn is_bytes(data_type: &DataTypeDef) -> bool {
+        matches!(
+            data_type,
+            DataTypeDef::Bytes | DataTypeDef::Uint8List | DataTypeDef::BoundedUint8List(_)
+        )
+    }
+
+    pub fn is_string(data_type: &DataTypeDef) -> bool {
+        matches!(
+            data_type,
+            DataTypeDef::String | DataTypeDef::BoundedString(_)
+        )
+    }
+
+    pub fn is_number(data_type: &DataTypeDef) -> bool {
+        matches!(
+            data_type,
+            DataTypeDef::I8
+                | DataTypeDef::I16
+                | DataTypeDef::I32
+                | DataTypeDef::I64
+                | DataTypeDef::U8
+                | DataTypeDef::U16
+                | DataTypeDef::U32
+                | DataTypeDef::U64
+                | DataTypeDef::F32
+                | DataTypeDef::F64
+        )
+    }
 }
 
-pub(crate) fn is_struct(data_type: &DataTypeDef) -> bool {
-    matches!(data_type, DataTypeDef::Struct(_))
-}
-
-pub(super) fn is_list(data_type: &DataTypeDef) -> bool {
-    matches!(
-        data_type,
-        DataTypeDef::List(_) | DataTypeDef::BoundedList(..) | DataTypeDef::Array(..)
-    )
-}
-
-pub(super) fn is_bytes(data_type: &DataTypeDef) -> bool {
-    matches!(
-        data_type,
-        DataTypeDef::Bytes | DataTypeDef::Uint8List | DataTypeDef::BoundedUint8List(_)
-    )
-}
-
-pub(crate) fn is_string(data_type: &DataTypeDef) -> bool {
-    matches!(
-        data_type,
-        DataTypeDef::String | DataTypeDef::BoundedString(_)
-    )
-}
-
-pub(super) fn is_number(data_type: &DataTypeDef) -> bool {
-    matches!(
-        data_type,
-        DataTypeDef::I8
-            | DataTypeDef::I16
-            | DataTypeDef::I32
-            | DataTypeDef::I64
-            | DataTypeDef::U8
-            | DataTypeDef::U16
-            | DataTypeDef::U32
-            | DataTypeDef::U64
-            | DataTypeDef::F32
-            | DataTypeDef::F64
-    )
-}
-
-/// An empty frame name means the message does not say.
-pub(super) fn frame_id(message: &Message) -> anyhow::Result<serde_json::Value> {
-    Ok(match message.string("frame_id")? {
-        "" => serde_json::Value::Null,
-        id => id.into(),
-    })
-}
+pub(crate) use schema::{has, is_bytes, is_list, is_number, is_string, is_struct};
 
 /// `[x, y, z, w]`, normalized. A rotation of zero length, which is what an unset
 /// quaternion decodes to, means none.
@@ -317,12 +368,12 @@ pub(crate) fn vector(message: Option<Message>) -> anyhow::Result<[f64; 3]> {
 /// `foxglove.CameraCalibration`.
 struct CameraCalibration;
 
-impl Converter for CameraCalibration {
+impl ViewConverter for CameraCalibration {
     fn id(&self) -> &'static str {
         "camera_calibration"
     }
-    fn kind(&self) -> &'static str {
-        "camera_calibration"
+    fn kind(&self) -> Kind {
+        Kind::CameraCalibration
     }
     fn name(&self) -> &'static str {
         "Camera calibration"
@@ -337,51 +388,49 @@ impl Converter for CameraCalibration {
                 || has(defs, "k", is_list) && has(defs, "d", is_list))
             && has(defs, "distortion_model", is_string)
     }
-    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
-        let (matrix, distortion) = if message.field("K").is_ok() {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let (matrix, distortion) = if message.has("K") {
             ("K", "D")
         } else {
             ("k", "d")
         };
-        calibration_value(message, frame_id(message)?, matrix, distortion)
+        calibration(message, message.frame_id()?, matrix, distortion)
     }
 }
 
 /// A calibration from a message's `width`, `height` and `distortion_model`, and the
 /// camera matrix and distortion in the named fields.
-pub(super) fn calibration_value(
+pub(super) fn calibration(
     message: &Message,
-    frame: serde_json::Value,
+    frame_id: Option<String>,
     matrix: &str,
     distortion: &str,
-) -> anyhow::Result<serde_json::Value> {
-    let width = message.number("width")?;
-    let height = message.number("height")?;
-    let k = message.numbers(matrix)?;
-    let d = message.numbers(distortion)?;
-    ensure!(
-        width.is_finite() && width > 0. && height.is_finite() && height > 0.,
-        "Invalid camera dimensions"
-    );
-    ensure!(
-        k.len() == 9 && k.iter().all(|v| v.is_finite()) && k[0] > 0. && k[4] > 0.,
-        "Invalid camera matrix"
-    );
-    ensure!(
-        d.iter().all(|v| v.is_finite()),
-        "Invalid distortion coefficients"
-    );
-    Ok(
-        json!({"kind":"camera_calibration", "frame_id":frame, "width":width, "height":height, "intrinsics":k, "distortion":d, "distortion_model":message.string("distortion_model")?}),
-    )
+) -> anyhow::Result<View> {
+    let intrinsics = message
+        .numbers(matrix)?
+        .try_into()
+        .ok()
+        .context("Invalid camera matrix")?;
+    Ok(CameraCalibrationView {
+        frame_id,
+        width: message.number("width")?,
+        height: message.number("height")?,
+        intrinsics,
+        distortion: message.numbers(distortion)?,
+        distortion_model: message.string("distortion_model")?.to_owned(),
+    }
+    .into())
 }
 
 /// `foxglove.CompressedImage`.
 struct Image;
 
-impl ImageConverter for Image {
+impl ViewConverter for Image {
     fn id(&self) -> &'static str {
         "image"
+    }
+    fn kind(&self) -> Kind {
+        Kind::Image
     }
     fn name(&self) -> &'static str {
         "Image"
@@ -392,25 +441,25 @@ impl ImageConverter for Image {
             && has(defs, "format", is_string)
             && has(defs, "frame_id", is_string)
     }
-    fn convert(&self, message: &Message) -> anyhow::Result<ImageView> {
-        let frame = message.string("frame_id")?;
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         Ok(ImageView {
-            frame_id: (!frame.is_empty()).then(|| frame.to_owned()),
+            frame_id: message.frame_id()?,
             format: message.string("format")?.to_owned(),
             data: message.bytes("data")?,
-        })
+        }
+        .into())
     }
 }
 
 /// `foxglove.RawImage`, retaining the recorded pixel bytes and row stride.
 struct RawImage;
 
-impl Converter for RawImage {
+impl ViewConverter for RawImage {
     fn id(&self) -> &'static str {
         "raw_image"
     }
-    fn kind(&self) -> &'static str {
-        "image"
+    fn kind(&self) -> Kind {
+        Kind::Image
     }
     fn name(&self) -> &'static str {
         "Raw image"
@@ -424,85 +473,41 @@ impl Converter for RawImage {
             && has(defs, "encoding", is_string)
             && has(defs, "data", is_bytes)
     }
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
-        raw_image_value(message, frame_id(message)?, payload)
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        raw_image(message, message.frame_id()?)
     }
 }
 
 /// A raw image from a message's `width`, `height`, `step`, `encoding` and `data`.
-pub(super) fn raw_image_value(
-    message: &Message,
-    frame: serde_json::Value,
-    payload: &mut Payload,
-) -> anyhow::Result<serde_json::Value> {
-    let dimension = |name| -> anyhow::Result<usize> {
+pub(super) fn raw_image(message: &Message, frame_id: Option<String>) -> anyhow::Result<View> {
+    let dimension = |name| -> anyhow::Result<u32> {
         let n = message.number(name)?;
         ensure!(
             n.is_finite() && n > 0. && n.fract() == 0. && n <= u32::MAX as f64,
             "Invalid image {name}"
         );
-        Ok(n as usize)
+        Ok(n as u32)
     };
-    let width = dimension("width")?;
-    let height = dimension("height")?;
-    let step = dimension("step")?;
-    let encoding = message.string("encoding")?;
-    let bytes_per_pixel = match encoding {
-        "mono8" | "8UC1" | "nv12" | "bayer_rggb8" | "bayer_bggr8" | "bayer_gbrg8"
-        | "bayer_grbg8" => 1usize,
-        "mono16" | "16UC1" | "yuv422" | "uyvy" | "yuv422_yuy2" | "yuyv" => 2,
-        "rgb8" | "bgr8" | "8UC3" => 3,
-        "rgba8" | "bgra8" | "32FC1" => 4,
-        _ => bail!("Unsupported raw image encoding: {encoding:?}"),
-    };
-    if matches!(
-        encoding,
-        "yuv422" | "uyvy" | "yuv422_yuy2" | "yuyv" | "nv12"
-    ) {
-        ensure!(
-            width.is_multiple_of(2),
-            "Raw image width must be even for {encoding}"
-        );
+    Ok(RawImageView {
+        frame_id,
+        width: dimension("width")?,
+        height: dimension("height")?,
+        step: dimension("step")?,
+        encoding: message.string("encoding")?.to_owned(),
+        data: message.bytes("data")?,
     }
-    if encoding == "nv12" {
-        ensure!(
-            height.is_multiple_of(2),
-            "Raw image height must be even for nv12"
-        );
-    }
-    ensure!(
-        step >= width
-            .checked_mul(bytes_per_pixel)
-            .context("Image row is too large")?,
-        "Raw image step is too small"
-    );
-    let rows = height
-        .checked_add(if encoding == "nv12" { height / 2 } else { 0 })
-        .context("Image height is too large")?;
-    let size = step.checked_mul(rows).context("Image data is too large")?;
-    let data = message.bytes("data")?;
-    ensure!(
-        data.len() == size,
-        "Raw image data length does not match step and height"
-    );
-    Ok(
-        json!({"kind":"image", "frame_id":frame, "format":"raw", "width":width, "height":height, "step":step, "encoding":encoding, "data":payload.add(data)}),
-    )
+    .into())
 }
 
 /// The current body pose from `foxglove.Odometry`.
 struct Odometry;
 
-impl Converter for Odometry {
+impl ViewConverter for Odometry {
     fn id(&self) -> &'static str {
         "pose"
     }
-    fn kind(&self) -> &'static str {
-        "pose"
+    fn kind(&self) -> Kind {
+        Kind::Pose
     }
     fn name(&self) -> &'static str {
         "Pose"
@@ -512,33 +517,33 @@ impl Converter for Odometry {
             && has(defs, "frame_id", is_string)
             && has(defs, "pose", is_struct)
     }
-    fn convert(&self, message: &Message, _: &mut Payload) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         let pose = message.child("pose")?.context("Odometry has no pose")?;
-        pose_value(&pose, frame_id(message)?)
+        pose_view(&pose, message.frame_id()?)
     }
 }
 
 /// A pose from a message of `position` and `orientation`.
-pub(super) fn pose_value(
-    pose: &Message,
-    frame: serde_json::Value,
-) -> anyhow::Result<serde_json::Value> {
-    let position = vector(pose.child("position")?)?;
-    let orientation = quaternion(pose.child("orientation")?)?;
-    Ok(
-        json!({"kind":"pose", "frame_id":frame, "pose":{"position":position, "orientation":orientation}}),
-    )
+pub(super) fn pose_view(pose: &Message, frame_id: Option<String>) -> anyhow::Result<View> {
+    Ok(PoseView {
+        frame_id,
+        pose: Pose {
+            position: pose.vector("position")?,
+            orientation: pose.quaternion("orientation")?,
+        },
+    }
+    .into())
 }
 
 /// `foxglove.PointCloud`.
 struct PointCloud;
 
-impl Converter for PointCloud {
+impl ViewConverter for PointCloud {
     fn id(&self) -> &'static str {
         "pointcloud"
     }
-    fn kind(&self) -> &'static str {
-        "pointcloud"
+    fn kind(&self) -> Kind {
+        Kind::PointCloud
     }
     fn name(&self) -> &'static str {
         "Point cloud"
@@ -551,11 +556,7 @@ impl Converter for PointCloud {
             && has(defs, "pose", is_struct)
             && has(defs, "frame_id", is_string)
     }
-    fn convert(
-        &self,
-        message: &Message,
-        payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
         let stride = message.number("point_stride")? as usize;
         let data = message.bytes("data")?;
         ensure!(stride > 0, "Point stride must not be zero");
@@ -570,107 +571,28 @@ impl Converter for PointCloud {
             .map(|field| {
                 let name = field.string("name")?;
                 let offset = field.number("offset")? as usize;
-                let numeric = numeric_type(field)?;
+                let numeric_type = numeric_type(field)?;
                 ensure!(
-                    offset + numeric.size <= stride,
+                    offset + numeric_type.size() <= stride,
                     "Point field {name} does not fit in a stride of {stride} bytes"
                 );
-                Ok((name, offset, numeric))
+                Ok(PackedField {
+                    name: name.to_owned(),
+                    offset,
+                    numeric_type,
+                })
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
-        let pose = message.child("pose")?;
-        pointcloud_value(
-            &fields,
-            data.chunks_exact(stride),
-            data.len() / stride,
-            pose,
-            frame_id(message)?,
-            payload,
-        )
-    }
-}
-
-/// A named value inside a packed point: its name, byte offset and type.
-pub(super) type PackedField<'a> = (&'a str, usize, Numeric);
-
-/// A point cloud from packed points, split into positions and one column per field.
-pub(super) fn pointcloud_value<'a>(
-    fields: &[PackedField],
-    packed: impl Iterator<Item = &'a [u8]>,
-    points: usize,
-    pose: Option<Message>,
-    frame: serde_json::Value,
-    payload: &mut Payload,
-) -> anyhow::Result<serde_json::Value> {
-    let axis = |name: &str| fields.iter().find(|(n, ..)| *n == name);
-    let axes = [axis("x"), axis("y"), axis("z")];
-    ensure!(
-        axes.iter().flatten().count() >= 2,
-        "A point cloud needs at least two of the fields x, y and z"
-    );
-    let columns: Vec<_> = fields
-        .iter()
-        .filter(|(name, ..)| !matches!(*name, "x" | "y" | "z"))
-        .collect();
-    let mut positions = Vec::with_capacity(points * 12);
-    let mut bytes: Vec<Vec<u8>> = columns
-        .iter()
-        .map(|(_, _, numeric)| Vec::with_capacity(points * numeric.size))
-        .collect();
-    let mut count = 0;
-    for point in packed {
-        let position = axes
-            .map(|axis| axis.map_or(0., |(_, offset, numeric)| numeric.read(&point[*offset..])));
-        // A point with no return has no position to draw.
-        if !position.iter().all(|v| v.is_finite()) {
-            continue;
-        }
-        count += 1;
-        for v in position {
-            positions.extend_from_slice(&(v as f32).to_le_bytes());
-        }
-        for ((_, offset, numeric), column) in columns.iter().zip(&mut bytes) {
-            column.extend_from_slice(&point[*offset..*offset + numeric.size]);
-        }
-    }
-    let position = vector(pose.map(|p| p.child("position")).transpose()?.flatten())?;
-    let orientation = quaternion(pose.map(|p| p.child("orientation")).transpose()?.flatten())?;
-    let fields: Vec<_> = columns
-        .iter()
-        .zip(bytes)
-        .map(|((name, _, numeric), column)| {
-            json!({ "name": name, "type": numeric.name, "data": payload.add(column.into()) })
-        })
-        .collect();
-    Ok(json!({
-        "kind": "pointcloud",
-        "frame_id": frame,
-        "count": count,
-        "pose": { "position": position, "orientation": orientation },
-        "positions": payload.add(positions.into()),
-        "fields": fields,
-    }))
-}
-
-/// A `foxglove.NumericType`: its name in the protocol, and how to read it.
-#[derive(Clone, Copy)]
-pub(super) struct Numeric {
-    name: &'static str,
-    pub(super) size: usize,
-    read: fn(&[u8]) -> f64,
-}
-
-impl Numeric {
-    /// Reads from the start of `bytes`, little endian as the schema defines.
-    fn read(&self, bytes: &[u8]) -> f64 {
-        (self.read)(bytes)
+        let mut cloud =
+            PointCloudView::from_packed(message.frame_id()?, &fields, data.chunks_exact(stride))?;
+        cloud.pose = message.pose("pose")?;
+        Ok(cloud.into())
     }
 }
 
 /// The type of a `foxglove.PackedElementField`.
-fn numeric_type(field: &Message) -> anyhow::Result<Numeric> {
-    let (_, value) = field.field("type")?;
-    let name = match value {
+fn numeric_type(field: &Message) -> anyhow::Result<NumericType> {
+    let name = match field.value("type")? {
         Value::String(name) => name.to_string(),
         value => match number(value).map(|v| v as i64) {
             Some(1) => "UINT8".into(),
@@ -688,27 +610,16 @@ fn numeric_type(field: &Message) -> anyhow::Result<Numeric> {
 }
 
 /// The numeric type of a packed field, by its upper-case name.
-pub(super) fn numeric_named(name: &str) -> anyhow::Result<Numeric> {
-    macro_rules! numeric {
-        ($name:literal, $type:ty) => {
-            Numeric {
-                name: $name,
-                size: size_of::<$type>(),
-                read: |b| {
-                    <$type>::from_le_bytes(b[..size_of::<$type>()].try_into().unwrap()) as f64
-                },
-            }
-        };
-    }
+fn numeric_named(name: &str) -> anyhow::Result<NumericType> {
     Ok(match name {
-        "UINT8" => numeric!("u8", u8),
-        "INT8" => numeric!("i8", i8),
-        "UINT16" => numeric!("u16", u16),
-        "INT16" => numeric!("i16", i16),
-        "UINT32" => numeric!("u32", u32),
-        "INT32" => numeric!("i32", i32),
-        "FLOAT32" => numeric!("f32", f32),
-        "FLOAT64" => numeric!("f64", f64),
+        "UINT8" => NumericType::U8,
+        "INT8" => NumericType::I8,
+        "UINT16" => NumericType::U16,
+        "INT16" => NumericType::I16,
+        "UINT32" => NumericType::U32,
+        "INT32" => NumericType::I32,
+        "FLOAT32" => NumericType::F32,
+        "FLOAT64" => NumericType::F64,
         _ => bail!("Unknown numeric type: {name}"),
     })
 }
@@ -716,12 +627,12 @@ pub(super) fn numeric_named(name: &str) -> anyhow::Result<Numeric> {
 /// `foxglove.LocationFix`.
 struct Geo;
 
-impl Converter for Geo {
+impl ViewConverter for Geo {
     fn id(&self) -> &'static str {
         "geo"
     }
-    fn kind(&self) -> &'static str {
-        "geo"
+    fn kind(&self) -> Kind {
+        Kind::Geo
     }
     fn name(&self) -> &'static str {
         "Location"
@@ -733,164 +644,38 @@ impl Converter for Geo {
             && has(defs, "altitude", is_number)
             && has(defs, "frame_id", is_string)
     }
-    fn convert(
-        &self,
-        message: &Message,
-        _payload: &mut Payload,
-    ) -> anyhow::Result<serde_json::Value> {
-        let mut properties = serde_json::Map::new();
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let mut feature = location(message, true)?;
         if let Ok(heading) = message.number("heading")
             && heading.is_finite()
         {
-            properties.insert("heading".into(), heading.into());
+            feature.properties.insert("heading".into(), heading.into());
         }
-        location_value(message, frame_id(message)?, properties)
+        Ok(GeoView {
+            frame_id: message.frame_id()?,
+            features: vec![feature],
+        }
+        .into())
     }
 }
 
-/// A location from a message's `latitude`, `longitude`, `altitude` and, when usable,
-/// `position_covariance`.
-pub(super) fn location_value(
-    message: &Message,
-    frame: serde_json::Value,
-    mut properties: serde_json::Map<String, serde_json::Value>,
-) -> anyhow::Result<serde_json::Value> {
-    let latitude = message.number("latitude")?;
-    let longitude = message.number("longitude")?;
-    let altitude = message.number("altitude")?;
-    ensure!(
-        (-90. ..=90.).contains(&latitude) && (-180. ..=180.).contains(&longitude),
-        "Invalid location: {latitude}, {longitude}"
+/// A location from a message's `latitude`, `longitude`, `altitude` and, when
+/// `covariance` is usable, `position_covariance`.
+pub(super) fn location(message: &Message, covariance: bool) -> anyhow::Result<GeoFeature> {
+    let mut feature = GeoFeature::point(
+        message.number("latitude")?,
+        message.number("longitude")?,
+        Some(message.number("altitude")?),
     );
     // The diagonal of the ENU covariance in row-major order: east and north.
-    if let Ok(covariance) = message.numbers("position_covariance")
+    if covariance
+        && let Ok(covariance) = message.numbers("position_covariance")
         && let [east, _, _, _, north, ..] = covariance[..]
         && east.max(north) > 0.
     {
-        properties.insert("accuracy_m".into(), east.max(north).sqrt().into());
+        feature
+            .properties
+            .insert("accuracy_m".into(), east.max(north).sqrt().into());
     }
-    let mut coordinates = vec![longitude, latitude];
-    if altitude.is_finite() {
-        coordinates.push(altitude);
-    }
-    Ok(json!({
-        "kind": "geo",
-        "frame_id": frame,
-        "features": [{
-            "type": "Feature",
-            "geometry": { "type": "Point", "coordinates": coordinates },
-            "properties": properties,
-        }],
-    }))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mcapdecode::core::FieldDef;
-
-    fn defs(fields: Vec<(&str, DataTypeDef)>) -> FieldDefs {
-        FieldDefs::new(
-            fields
-                .into_iter()
-                .map(|(name, data_type)| FieldDef::new(name, data_type, false))
-                .collect(),
-        )
-    }
-
-    fn image_defs() -> FieldDefs {
-        defs(vec![
-            ("frame_id", DataTypeDef::String),
-            ("data", DataTypeDef::Bytes),
-            ("format", DataTypeDef::String),
-        ])
-    }
-
-    #[test]
-    fn a_type_of_the_right_name_but_wrong_shape_is_not_accepted() {
-        assert!(Image.accepts("foxglove.CompressedImage", &image_defs()));
-        assert!(!Image.accepts("other.CompressedImage", &image_defs()));
-        let wrong = defs(vec![("data", DataTypeDef::String)]);
-        assert!(!Image.accepts("foxglove.CompressedImage", &wrong));
-    }
-
-    #[test]
-    fn foxglove_calibration_is_read_under_either_spelling() {
-        let calibration = |matrix: &'static str, distortion: &'static str| {
-            let list = || {
-                DataTypeDef::List(Box::new(mcapdecode::core::ElementDef::new(
-                    DataTypeDef::F64,
-                    false,
-                )))
-            };
-            defs(vec![
-                ("frame_id", DataTypeDef::String),
-                ("width", DataTypeDef::U32),
-                ("height", DataTypeDef::U32),
-                ("distortion_model", DataTypeDef::String),
-                (matrix, list()),
-                (distortion, list()),
-            ])
-        };
-        let (protobuf, ros) = (calibration("K", "D"), calibration("k", "d"));
-        assert!(CameraCalibration.accepts("foxglove.CameraCalibration", &protobuf));
-        assert!(CameraCalibration.accepts("foxglove_msgs/msg/CameraCalibration", &ros));
-        let k = [400., 0., 320., 0., 400., 240., 0., 0., 1.]
-            .map(Value::F64)
-            .to_vec();
-        let value = Value::Struct(vec![
-            Value::string("camera"),
-            Value::U32(640),
-            Value::U32(480),
-            Value::string("plumb_bob"),
-            Value::List(k),
-            Value::List(vec![]),
-        ]);
-        let message = Message::new(&ros, &value).unwrap();
-        let converted = CameraCalibration
-            .convert(&message, &mut Payload::default())
-            .unwrap();
-        assert_eq!(converted["intrinsics"][0], 400.);
-    }
-
-    #[test]
-    fn image_format_is_normalized_and_checked() {
-        let defs = image_defs();
-        let convert = |format: &str| {
-            let value = Value::Struct(vec![
-                Value::string(""),
-                Value::Bytes(Arc::from([1u8].as_slice())),
-                Value::string(format),
-            ]);
-            let message = Message::new(&defs, &value).unwrap();
-            ImageAdapter(Arc::new(Image)).convert(&message, &mut Payload::default())
-        };
-        let value = convert("JPG").unwrap();
-        assert_eq!(value["format"], "jpeg");
-        assert_eq!(value["frame_id"], serde_json::Value::Null);
-        assert!(convert("bmp").is_err());
-    }
-
-    #[test]
-    fn unset_rotations_are_identity_and_others_are_normalized() {
-        assert_eq!(quaternion(None).unwrap(), [0., 0., 0., 1.]);
-        let defs = defs(vec![
-            ("x", DataTypeDef::F64),
-            ("y", DataTypeDef::F64),
-            ("z", DataTypeDef::F64),
-            ("w", DataTypeDef::F64),
-        ]);
-        let at = |w| {
-            Value::Struct(vec![
-                Value::F64(0.),
-                Value::F64(0.),
-                Value::F64(0.),
-                Value::F64(w),
-            ])
-        };
-        let (zero, two) = (at(0.), at(2.));
-        let read = |value| quaternion(Some(Message::new(&defs, value).unwrap())).unwrap();
-        assert_eq!(read(&zero), [0., 0., 0., 1.]);
-        assert_eq!(read(&two), [0., 0., 0., 1.]);
-    }
+    Ok(feature)
 }

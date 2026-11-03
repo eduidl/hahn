@@ -172,12 +172,20 @@ fn layout(schema_name: &str, defs: &FieldDefs) -> Option<Layout> {
     }
 }
 
-fn named_frames<'a>(parent: &'a str, child: &'a str) -> anyhow::Result<(&'a str, &'a str)> {
-    ensure!(
-        !parent.is_empty() && !child.is_empty(),
-        "A transform must name both of its frames"
-    );
-    Ok((parent, child))
+/// `foxglove.FrameTransforms`. A bad transform leaves out only itself.
+struct FrameTransforms;
+
+impl TransformReader for FrameTransforms {
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        is_foxglove(schema_name, "FrameTransforms") && has(defs, "transforms", transform_list)
+    }
+    fn read(&self, message: &Message) -> anyhow::Result<Vec<TransformSample>> {
+        Ok(message
+            .children("transforms")?
+            .into_iter()
+            .filter_map(|message| sample(message).ok())
+            .collect())
+    }
 }
 
 /// The parent, child and transform of a message, if it holds a usable one.
