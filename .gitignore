@@ -1,11 +1,9 @@
-/target/
 /server/target/
-/web/node_modules/
-/web/dist/
 /client/node_modules/
 /client/dist/
-/output/
-/.playwright-cli/
+/client/.vitest/
+/client/test-results/
+/client/playwright-report/
 *.tsbuildinfo
 
 /data/

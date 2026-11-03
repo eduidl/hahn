@@ -1,5 +1,11 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "root": ".."
+  },
   "files": {
     "includes": ["**", "!src/api.gen.ts", "!**/*.css", "!!dist", "!!node_modules"]
   },
@@ -20,8 +26,6 @@
       "a11y": {
         "noSvgWithoutTitle": "off",
         "useAriaPropsForRole": "off",
-        "useButtonType": "off",
-        "useSemanticElements": "off",
         "noStaticElementInteractions": "off",
         "noNoninteractiveElementToInteractiveRole": "off"
       },
