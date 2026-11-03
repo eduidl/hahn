@@ -22,7 +22,7 @@ import {
 } from "../data/useViewData";
 import { type Transform } from "../data/viewFrames";
 import { type Widget } from "../workspace/widgets";
-import { reframeCamera } from "./sceneCamera";
+import { gridOffset, reframeCamera } from "./sceneCamera";
 
 function createStage(host: HTMLDivElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -31,12 +31,12 @@ function createStage(host: HTMLDivElement) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#171a1e");
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1e6);
-  // Recorded coordinates have z up.
+  // The scene is oriented as the graph's root, taken to be fixed to the ground with z up.
   camera.up.set(0, 0, 1);
   const homePosition = new THREE.Vector3(-20, -20, 20);
   camera.position.copy(homePosition);
   const grid = new THREE.GridHelper(20, 20, "#5b6570", "#343a42");
-  // Stays at the origin: the scene is in the fixed frame, so this is that frame's ground plane.
+  // A level plane through the origin, the followed frame's position; see gridOffset.
   grid.rotation.x = Math.PI / 2;
   scene.add(grid);
   // Layers draw here in the root, shifted to keep coordinates near the camera small.
@@ -99,10 +99,13 @@ function createStage(host: HTMLDivElement) {
     if (box.isEmpty()) return;
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const distance = Math.max(sphere.radius, 1) * 2;
+    // Turning around a point on the grid, below or above the middle of what is shown.
+    sphere.center.z = 0;
     controls.target.copy(sphere.center);
     camera.position.copy(sphere.center).add(new THREE.Vector3(-distance, -distance, distance));
     // Cells of a round number of meters, whatever the size of what is shown.
     grid.scale.setScalar(10 ** Math.ceil(Math.log10(distance) - 1));
+    placeGrid();
     controls.update();
     invalidate();
   };
@@ -135,7 +138,7 @@ function createStage(host: HTMLDivElement) {
   };
   invalidate();
   return {
-    stage: { scene, invalidate, fit, reframe, resetView },
+    stage: { scene: content, invalidate, fit, reframe, resetView, setOrigin },
     dispose: () => {
       cancelAnimationFrame(pending);
       resize.disconnect();
