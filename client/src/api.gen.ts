@@ -185,13 +185,20 @@ export interface components {
         /** @description A count, as a JSON number within the safe integer range. */
         Count: number;
         /**
+         * @description Identifies the failure; clients branch on it and never parse the description. Treat a code you do not know as a failure of unknown kind, never as an empty result. The README lists what each code means.
+         * @enum {string}
+         */
+        ErrorCode: "invalid_request" | "run_not_found" | "group_not_found" | "unknown_topic" | "unknown_field" | "unknown_meta_field" | "unknown_view" | "unknown_frame" | "invalid_selection" | "recording_unreadable" | "internal_error";
+        /**
          * @description The body of every error.
          * @example {
-         *       "error": "description"
+         *       "code": "unknown_topic",
+         *       "error": "Unknown topic: /camera"
          *     }
          */
         ErrorBody: {
-            /** @description What went wrong. */
+            code: components["schemas"]["ErrorCode"];
+            /** @description What went wrong, for people. */
             error: string;
         };
         /** @description `[x, y, z]` in meters. */
@@ -361,7 +368,8 @@ export interface components {
         StreamError: {
             /** @enum {string} */
             type: "error";
-            /** @description The reason. */
+            code: components["schemas"]["ErrorCode"];
+            /** @description The reason, for people. */
             message: string;
         };
         /**

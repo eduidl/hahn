@@ -73,7 +73,16 @@ describe("NDJSON", () => {
       consumeStream(new Response('{"type":"batch","rows":[],"scanned_messages":0}\n'), () => {}),
     ).rejects.toThrow("before completion");
     await expect(
-      consumeStream(new Response('{"type":"error","message":"Decode failed"}\n'), () => {}),
-    ).rejects.toThrow("Decode failed");
+      consumeStream(
+        new Response('{"type":"error","code":"recording_unreadable","message":"Decode failed"}\n'),
+        () => {},
+      ),
+    ).rejects.toMatchObject({ message: "Decode failed", code: "recording_unreadable" });
+    await expect(
+      consumeStream(
+        new Response('{"code":"unknown_topic","error":"Unknown topic"}', { status: 422 }),
+        () => {},
+      ),
+    ).rejects.toMatchObject({ message: "Unknown topic", code: "unknown_topic", status: 422 });
   });
 });

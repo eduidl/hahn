@@ -143,16 +143,23 @@ Coordinates are right-handed, in meters and radians. The server converts recordi
 
 ## Errors
 
-HTTP errors contain `{ "error": "description" }`; terminal stream errors contain `type: "error"` and `message`. Stable machine-readable error codes are not implemented. Do not parse human-readable descriptions to identify errors.
+HTTP errors contain a stable `code` and a human-readable `error`; terminal stream errors contain `type: "error"`, the same `code` and a human-readable `message`. Clients tell failures apart by `code` and never parse the descriptions. A code the client does not know is still a failure, never an empty result. A message that cannot be converted to a view is a `frame` with `error`, not a terminal error, and the stream goes on.
 
-An empty latest message is `null`; an empty history or latest view ends with `complete`. An empty group has no time range and its info request returns 422.
+An empty latest message is `null`; an empty history or latest view ends with `complete`. An empty group has no time range and its info request returns 422 with `recording_unreadable`.
 
-| Status | Meaning |
-|---|---|
-| 400 | Invalid request value or malformed query |
-| 404 | The run or group does not exist |
-| 422 | The topic, field, meta field, view or target frame does not exist, a non-scalar field was given with `preview=false`, or the recording could not be read |
-| 500 | Internal server failure |
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Malformed query, invalid value or combination, or a missing required parameter |
+| 404 | `run_not_found` | The run does not exist |
+| 404 | `group_not_found` | The group does not exist in the run |
+| 422 | `unknown_topic` | The topic does not exist in the group |
+| 422 | `unknown_field` | The field path is well-formed but not in the schema |
+| 422 | `unknown_meta_field` | The meta field does not exist |
+| 422 | `unknown_view` | The topic has no view with this ID |
+| 422 | `unknown_frame` | The transform target frame does not exist |
+| 422 | `invalid_selection` | The field exists but cannot be used for the request, such as a non-scalar field with `preview=false` |
+| 422 | `recording_unreadable` | The recording cannot be opened, read or decoded |
+| 500 | `internal_error` | An unexpected server failure |
 
 ## Compression
 

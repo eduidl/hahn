@@ -14,7 +14,8 @@ pub(crate) use tf::{TfIndex, frames, readers, transforms};
 pub use tf::{TransformReader, TransformSample};
 
 use crate::{
-    ApiError, AppState, blocking,
+    AppState, blocking,
+    error::{ApiError, Code, coded},
     message::{parse_range, parse_time},
     source::{MessageTimes, Source},
     stream::disconnected,
@@ -136,7 +137,12 @@ impl ViewIndex {
                 let converter = views.converters.iter().find(|c| c.id() == view)?;
                 Some((views.defs.clone(), converter.clone()))
             })
-            .ok_or_else(|| anyhow::anyhow!("Unknown view {view:?} of topic {topic:?}"))
+            .ok_or_else(|| {
+                coded(
+                    Code::UnknownView,
+                    format!("Unknown view {view:?} of topic {topic:?}"),
+                )
+            })
     }
 }
 
@@ -156,6 +162,7 @@ enum Header {
         scanned_messages: usize,
     },
     Error {
+        code: &'static str,
         message: String,
     },
 }
@@ -265,16 +272,22 @@ pub(crate) async fn views(
     let (topic, view, target) = (query.topic, query.view, query.target_frame);
     let (source, topic, defs, converter, target) = blocking(move || {
         let source = group.source()?;
+        group.require_topic(&topic)?;
         let (defs, converter) = group.views(&state.converters)?.get(&topic, &view)?;
-        if target.is_some() {
-            anyhow::ensure!(
-                converter.kind() == Kind::Pose,
-                "Target frame is only supported for pose views"
-            );
+        if target.is_some() && converter.kind() != Kind::Pose {
+            return Err(coded(
+                Code::InvalidRequest,
+                "Target frame is only supported for pose views",
+            ));
         }
         let target = target
             .map(|target| {
-                anyhow::ensure!(!target.is_empty(), "Target frame must not be empty");
+                if target.is_empty() {
+                    return Err(coded(
+                        Code::InvalidRequest,
+                        "Target frame must not be empty",
+                    ));
+                }
                 let run = state
                     .runs
                     .iter()
@@ -320,6 +333,7 @@ pub(crate) async fn views(
                 scanned_messages: scanned,
             },
             Err(error) => Header::Error {
+                code: Code::of(&error).as_str(),
                 message: error.to_string(),
             },
         };
@@ -350,6 +364,7 @@ pub(crate) async fn latest(
     let known = query.known_time_ns.as_deref().map(parse_time).transpose()?;
     let chunks = blocking(move || {
         let source = group.source()?;
+        group.require_topic(&query.topic)?;
         let (defs, converter) = group
             .views(&state.converters)?
             .get(&query.topic, &query.view)?;

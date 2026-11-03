@@ -5,6 +5,7 @@ mod support;
 
 mod catalog;
 mod common;
+mod errors;
 mod extending;
 mod memory;
 mod messages;

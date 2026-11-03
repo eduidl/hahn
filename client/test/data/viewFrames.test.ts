@@ -55,7 +55,9 @@ describe("parseFrames", () => {
     });
   });
   it("fails on an error event and on a response cut off", () => {
-    expect(() => parseFrames(concat(frame({ type: "error", message: "boom" })))).toThrow("boom");
+    expect(() =>
+      parseFrames(concat(frame({ type: "error", code: "recording_unreadable", message: "boom" }))),
+    ).toThrow(expect.objectContaining({ message: "boom", code: "recording_unreadable" }));
     expect(() => parseFrames(concat(frame({ type: "frame", time_ns: "1", error: "x" })))).toThrow(
       "ended prematurely",
     );

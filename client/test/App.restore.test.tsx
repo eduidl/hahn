@@ -255,7 +255,7 @@ describe("App session restore", () => {
   });
   it("asks again when the run is gone, keeping the series and layout", async () => {
     save();
-    server(() => json({ error: "not found" }, 404));
+    server(() => json({ code: "run_not_found", error: "Run not found" }, 404));
     render(<App />);
     await waitFor(() => expect(showModal).toHaveBeenCalled());
     expect(shown().widgets["widget-1"].view.x).toEqual({

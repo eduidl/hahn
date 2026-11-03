@@ -2,14 +2,14 @@
 
 use super::convert::{Message, has, is_foxglove, is_string, is_struct, quaternion, vector};
 use crate::{
-    ApiError, AppState, blocking,
+    AppState, blocking,
+    error::{ApiError, Code},
     message::parse_time,
     source::{Source, TimeRange},
 };
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
 };
 use mcapdecode::core::{DataTypeDef, FieldDefs};
 use serde::{Deserialize, Serialize};
@@ -546,8 +546,8 @@ pub(crate) async fn transforms(
     let time = parse_time(&query.time_ns)?;
     let index = run_index(&state, &run).await?;
     if !index.names.contains(query.target.as_str()) {
-        return Err(ApiError(
-            StatusCode::UNPROCESSABLE_ENTITY,
+        return Err(ApiError::new(
+            Code::UnknownFrame,
             format!("Unknown frame: {}", query.target),
         ));
     }

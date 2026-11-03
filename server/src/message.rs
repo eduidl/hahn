@@ -1,12 +1,13 @@
 use crate::{
-    ApiError, AppState, blocking, scalar_fields,
+    AppState, blocking,
+    error::{ApiError, Code, coded},
+    scalar_fields,
     source::{MessageTimes, Source, TimeRange},
     stream::{indexes, scalar, stream_rows},
 };
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
 };
 use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
 use serde::{Deserialize, Serialize};
@@ -46,13 +47,10 @@ pub(crate) async fn latest(
     let field = parse_field(&query.path, &query.meta)?;
     blocking(move || {
         let source = group.source()?;
+        group.require_topic(&query.topic)?;
         let defs = source.field_defs(&query.topic)?;
         check_meta(&*source, &query.meta)?;
-        let index = if field.is_empty() {
-            Vec::new()
-        } else {
-            indexes(&defs, &field).ok_or_else(|| anyhow::anyhow!("Unknown field: {field:?}"))?
-        };
+        let index = field_index(&defs, &field)?;
         let data_type = if index.is_empty() {
             DataTypeDef::Struct(defs.clone().into())
         } else {
@@ -75,9 +73,9 @@ pub(crate) async fn latest(
 
 pub(crate) fn parse_time(value: &str) -> Result<u64, ApiError> {
     value.parse().map_err(|_| {
-        ApiError(
-            StatusCode::BAD_REQUEST,
-            "Timestamps must be unsigned nanosecond strings".into(),
+        ApiError::new(
+            Code::InvalidRequest,
+            "Timestamps must be unsigned nanosecond strings",
         )
     })
 }
@@ -89,9 +87,9 @@ pub(crate) fn parse_range(
     let start = start.as_deref().map(parse_time).transpose()?;
     let end = end.as_deref().map(parse_time).transpose()?;
     if matches!((start, end), (Some(start), Some(end)) if start > end) {
-        return Err(ApiError(
-            StatusCode::BAD_REQUEST,
-            "Start must not exceed end".into(),
+        return Err(ApiError::new(
+            Code::InvalidRequest,
+            "Start must not exceed end",
         ));
     }
     Ok(TimeRange { start, end })
@@ -99,26 +97,35 @@ pub(crate) fn parse_range(
 
 fn parse_field(path: &Option<String>, meta: &Option<String>) -> Result<Vec<String>, ApiError> {
     if path.is_some() && meta.is_some() {
-        return Err(ApiError(
-            StatusCode::BAD_REQUEST,
-            "Path and meta cannot be combined".into(),
+        return Err(ApiError::new(
+            Code::InvalidRequest,
+            "Path and meta cannot be combined",
         ));
     }
     match path {
         Some(path) => serde_json::from_str(path)
-            .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Invalid field path".into())),
+            .map_err(|_| ApiError::new(Code::InvalidRequest, "Invalid field path")),
         None => Ok(Vec::new()),
     }
 }
 
 fn check_meta(source: &dyn Source, meta: &Option<String>) -> anyhow::Result<()> {
-    if let Some(name) = meta {
-        anyhow::ensure!(
-            source.meta_fields().contains(&name.as_str()),
-            "Unknown meta field: {name}"
-        );
+    match meta {
+        Some(name) if !source.meta_fields().contains(&name.as_str()) => Err(coded(
+            Code::UnknownMetaField,
+            format!("Unknown meta field: {name}"),
+        )),
+        _ => Ok(()),
     }
-    Ok(())
+}
+
+/// Where `field` is in a message of `defs`; empty for the whole message.
+fn field_index(defs: &FieldDefs, field: &[String]) -> anyhow::Result<Vec<usize>> {
+    if field.is_empty() {
+        return Ok(Vec::new());
+    }
+    indexes(defs, field)
+        .ok_or_else(|| coded(Code::UnknownField, format!("Unknown field: {field:?}")))
 }
 
 /// Exact like any 64-bit integer, so a string.
@@ -317,18 +324,20 @@ pub(crate) async fn messages(
     let checked = meta.clone();
     let (source, index, data_type, json_text) = blocking(move || {
         let source = group.source()?;
+        group.require_topic(&topic)?;
         let defs = source.field_defs(&topic)?;
         check_meta(&*source, &checked)?;
+        let index = field_index(&defs, &field)?;
         if !preview {
             let mut scalars = Vec::new();
             scalar_fields(&defs, &[], &mut scalars);
-            anyhow::ensure!(scalars.contains(&field), "Unknown scalar field: {field:?}");
+            if !scalars.contains(&field) {
+                return Err(coded(
+                    Code::InvalidSelection,
+                    format!("Exact values need a scalar field: {field:?}"),
+                ));
+            }
         }
-        let index = if field.is_empty() {
-            Vec::new()
-        } else {
-            indexes(&defs, &field).ok_or_else(|| anyhow::anyhow!("Unknown field: {field:?}"))?
-        };
         let data_type = if index.is_empty() {
             DataTypeDef::Struct(defs.into())
         } else {

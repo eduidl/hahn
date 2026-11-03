@@ -7,12 +7,13 @@
 //! `cam_0.mcap` and `cam_1.mcap` may just as well be two cameras.
 
 use crate::{
+    error::{Code, coded},
     source::{self, Format, Source},
     view::{TfIndex, TransformReader, ViewConverter, ViewIndex},
 };
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
 };
@@ -55,6 +56,8 @@ pub(crate) struct Group {
     source: OnceLock<Arc<dyn Source>>,
     #[serde(skip)]
     views: OnceLock<Arc<ViewIndex>>,
+    #[serde(skip)]
+    topic_ids: OnceLock<Arc<HashSet<String>>>,
 }
 
 impl Group {
@@ -67,6 +70,7 @@ impl Group {
             opener,
             source: OnceLock::new(),
             views: OnceLock::new(),
+            topic_ids: OnceLock::new(),
         })
     }
 
@@ -92,6 +96,23 @@ impl Group {
         }
         let views = Arc::new(ViewIndex::build(&*self.source()?, converters)?);
         Ok(self.views.get_or_init(|| views).clone())
+    }
+
+    /// Fails with `unknown_topic` unless the group has `topic`. Blocks, so call it
+    /// inside `blocking`.
+    pub(crate) fn require_topic(&self, topic: &str) -> anyhow::Result<()> {
+        let ids = match self.topic_ids.get() {
+            Some(ids) => ids.clone(),
+            None => {
+                let ids = self.source()?.topics()?.into_iter().map(|t| t.id).collect();
+                self.topic_ids.get_or_init(|| Arc::new(ids)).clone()
+            }
+        };
+        if ids.contains(topic) {
+            Ok(())
+        } else {
+            Err(coded(Code::UnknownTopic, format!("Unknown topic: {topic}")))
+        }
     }
 }
 

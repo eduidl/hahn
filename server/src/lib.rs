@@ -9,6 +9,7 @@
 
 mod catalog;
 pub mod cli;
+mod error;
 mod message;
 mod source;
 mod stream;
@@ -26,12 +27,13 @@ use axum::{
     Json, Router,
     body::to_bytes,
     extract::{Path, Query, State},
-    http::{StatusCode, header},
+    http::header,
     middleware::map_response,
     response::{IntoResponse, Response},
     routing::get,
 };
 use catalog::{Group, Run};
+use error::{ApiError, Code};
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path as FsPath, PathBuf},
@@ -170,13 +172,6 @@ impl Builder {
     }
 }
 
-#[derive(Debug)]
-struct ApiError(StatusCode, String);
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        (self.0, Json(serde_json::json!({"error": self.1}))).into_response()
-    }
-}
 /// Extractor rejections are plain text; the API reports every error as JSON.
 async fn json_errors(response: Response) -> Response {
     let plain = response
@@ -186,24 +181,23 @@ async fn json_errors(response: Response) -> Response {
     if response.status().is_success() || !plain {
         return response;
     }
-    let status = response.status();
+    let code = if response.status().is_client_error() {
+        Code::InvalidRequest
+    } else {
+        Code::InternalError
+    };
     let message = match to_bytes(response.into_body(), usize::MAX).await {
         Ok(body) => String::from_utf8_lossy(&body).into_owned(),
         Err(e) => e.to_string(),
     };
-    ApiError(status, message).into_response()
-}
-impl From<anyhow::Error> for ApiError {
-    fn from(error: anyhow::Error) -> Self {
-        Self(StatusCode::UNPROCESSABLE_ENTITY, error.to_string())
-    }
+    ApiError::new(code, message).into_response()
 }
 impl AppState {
     fn run(&self, run: &str) -> Result<&Run, ApiError> {
         self.runs
             .iter()
             .find(|r| r.id == run)
-            .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "Run not found".into()))
+            .ok_or_else(|| ApiError::new(Code::RunNotFound, "Run not found"))
     }
 
     fn group(&self, run: &str, group: &str) -> Result<Arc<Group>, ApiError> {
@@ -212,7 +206,7 @@ impl AppState {
             .iter()
             .find(|g| g.id == group)
             .cloned()
-            .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "Group not found".into()))
+            .ok_or_else(|| ApiError::new(Code::GroupNotFound, "Group not found"))
     }
 }
 
@@ -240,8 +234,8 @@ async fn runs_list(
 ) -> Result<Response, ApiError> {
     let limit = query.limit.unwrap_or(DEFAULT_RUNS);
     if !(1..=MAX_RUNS).contains(&limit) {
-        return Err(ApiError(
-            StatusCode::BAD_REQUEST,
+        return Err(ApiError::new(
+            Code::InvalidRequest,
             format!("Limit must be between 1 and {MAX_RUNS}"),
         ));
     }
@@ -477,6 +471,6 @@ async fn blocking<T: Send + 'static>(
 ) -> Result<T, ApiError> {
     tokio::task::spawn_blocking(work)
         .await
-        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(|e| ApiError::new(Code::InternalError, e.to_string()))?
         .map_err(Into::into)
 }
