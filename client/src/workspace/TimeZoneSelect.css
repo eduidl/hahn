@@ -1,7 +1,11 @@
 /* A fixed width, so that switching does not move the button beside it. */
 .time-display-toggle {
+  display: flex;
   flex-shrink: 0;
-  width: 72px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 92px;
   margin-left: 12px;
   padding: 5px 0;
 }
