@@ -196,8 +196,31 @@ export class FieldCache {
     this.pins.set(token, { target, scope });
     return () => {
       this.pins.delete(token);
+      // Full histories go once nothing holds them; histories never held are left alone.
+      if (scope === "full") {
+        const unheld = this.blocks.filter(
+          (b) =>
+            b.scope === "full" &&
+            b.complete &&
+            b.source === target.source &&
+            b.topic === target.topic &&
+            !this.pinned(b),
+        );
+        unheld.forEach((b) => this.discard(b));
+        if (unheld.length) this.changed();
+      }
       this.evict();
     };
+  }
+
+  private pinned(block: Block) {
+    return [...this.pins.values()].some(
+      ({ target, scope }) =>
+        scope === block.scope &&
+        target.source === block.source &&
+        target.topic === block.topic &&
+        prefix(block.path, target.path),
+    );
   }
 
   private evict() {
@@ -205,14 +228,7 @@ export class FieldCache {
     let excess = windows.length - 12;
     for (const block of windows) {
       if (excess <= 0) break;
-      const pinned = [...this.pins.values()].some(
-        ({ target, scope }) =>
-          scope === block.scope &&
-          target.source === block.source &&
-          target.topic === block.topic &&
-          prefix(block.path, target.path),
-      );
-      if (!pinned) {
+      if (!this.pinned(block)) {
         this.discard(block);
         excess--;
       }
@@ -403,6 +419,22 @@ export class FieldCache {
       current.listeners.delete(listener);
     });
   }
+}
+
+/** Holds the full histories of `targets`, by key, and lets go of those no longer listed. */
+export function holdHistories(
+  cache: FieldCache,
+  held: Map<string, () => void>,
+  targets: (FieldTarget & { key: string })[],
+) {
+  const keys = new Set(targets.map((t) => t.key));
+  // Hold the new ones first, so that a history still in use is never let go in between.
+  for (const t of targets) if (!held.has(t.key)) held.set(t.key, cache.retain(t, "full"));
+  for (const [key, release] of held)
+    if (!keys.has(key)) {
+      held.delete(key);
+      release();
+    }
 }
 
 export const FieldCacheContext = createContext<FieldCache | null>(null);

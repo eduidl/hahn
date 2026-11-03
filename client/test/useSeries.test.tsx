@@ -62,11 +62,11 @@ describe("full-recording series cache", () => {
     );
     expect(result.current.plotted[0].points).toBe(originalPoints);
     expect(result.current.plotted[0].points).toHaveLength(1);
-    // Removing and adding an already loaded field also uses the cache.
+    // A removed field is let go, so adding it again fetches it again.
     rerender({ selected: [field("y")] });
     rerender({ selected: [field("x"), field("y")] });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    expect(fetch).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(fetch.mock.calls[2][0]).toContain(encodeURIComponent('["x"]'));
   });
 
   it("does not fetch on display-only rerenders, visibility, or style changes", async () => {

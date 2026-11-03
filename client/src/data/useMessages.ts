@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FieldCache } from "./fieldCache";
+import { FieldCache, holdHistories } from "./fieldCache";
 import { appendMessages, type MessageRow } from "../views/table";
 import { errorMessage, type Selected } from "../types";
 import type { Widget } from "../workspace/widgets";
@@ -24,6 +24,7 @@ export function useMessages(
   const fields = sharedCache ?? localCache;
   const cache = useRef(new Map<string, MessageRecord>());
   const requests = useRef(new Map<string, AbortController>());
+  const held = useRef(new Map<string, () => void>());
   const dirty = useRef(false);
   const [revision, setRevision] = useState(0);
   const selections = [
@@ -47,6 +48,8 @@ export function useMessages(
   useEffect(() => {
     cache.current.clear();
     if (!sharedCache) fields.clear();
+    // A new origin comes with a new or cleared cache.
+    held.current = new Map();
     dirty.current = true;
     return () => {
       requests.current.forEach((controller) => controller.abort());
@@ -65,6 +68,7 @@ export function useMessages(
     }
     // Histories are larger than scalar series; release them when no widget uses them.
     for (const key of cache.current.keys()) if (!keys.has(key)) cache.current.delete(key);
+    holdHistories(fields, held.current, selected);
     if (origin === null) return;
     for (const s of selected) {
       if (cache.current.has(s.key)) continue;
