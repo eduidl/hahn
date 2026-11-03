@@ -112,7 +112,3 @@ export function pickableFields(index: FieldIndex, widget: Widget) {
   }
   return { addable, unavailable };
 }
-
-/** Fields that can be added to the widget right now, from the cached candidates. */
-export const addableFields = (index: FieldIndex, widget: Widget): IndexedField[] =>
-  pickableFields(index, widget).addable;

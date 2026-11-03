@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addableFields, dropVerdict } from "../src/workspace/drop";
+import { dropVerdict, pickableFields } from "../src/workspace/drop";
 import { buildFieldIndex } from "../src/workspace/fieldIndex";
 import { keyOf, type Field, type Selected, type Topic } from "../src/types";
 import {
@@ -157,7 +157,9 @@ describe("raw message widget", () => {
     expect(verdict(["speed"], widget("raw", [fields[0]]))).toMatchObject({
       reason: "Already added",
     });
-    expect(addableFields(index, widget("raw")).map((entry) => entry.label)).toContain("/t");
+    expect(pickableFields(index, widget("raw")).addable.map((entry) => entry.label)).toContain(
+      "/t",
+    );
   });
 
   it("does not load its selection as an exact series", () => {
@@ -171,7 +173,8 @@ describe("raw message widget", () => {
 
 describe("addable fields", () => {
   it("filters cached candidates by the widget's current series", () => {
-    const names = (w: Widget) => addableFields(index, w).map((entry) => entry.field.path.join("."));
+    const names = (w: Widget) =>
+      pickableFields(index, w).addable.map((entry) => entry.field.path.join("."));
     expect(names(widget("plot"))).toEqual(["speed", "flag", "mode", "other_mode"]);
     expect(names(widget("plot", [fields[2]]))).toEqual([]);
     expect(names(widget("plot", [fields[1]]))).toEqual([]);
