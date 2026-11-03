@@ -515,3 +515,154 @@ async fn ros2_3d_detections_are_boxes_labeled_by_their_best_hypothesis() {
     // An empty tracking id says nothing.
     assert!(only.get("id").is_none());
 }
+
+#[tokio::test]
+async fn ros2_2d_detections_are_outlines_over_the_image() {
+    use crate::memory::{Topic, list, structure};
+    use hahn::{DataTypeDef as D, Value as V};
+    use shapes::*;
+    let point = structure(vec![("x", D::F64), ("y", D::F64)]);
+    // Since ROS 2: `center.position` and `center.theta`.
+    let center = structure(vec![("position", point), ("theta", D::F64)]);
+    let bbox = structure(vec![
+        ("center", center),
+        ("size_x", D::F64),
+        ("size_y", D::F64),
+    ]);
+    let hypothesis = structure(vec![("class_id", D::String), ("score", D::F64)]);
+    let result = structure(vec![
+        ("hypothesis", hypothesis),
+        ("pose", structure(vec![("pose", shapes::pose())])),
+    ]);
+    let detection = structure(vec![
+        ("header", header()),
+        ("results", list(result)),
+        ("bbox", bbox),
+        ("id", D::String),
+    ]);
+    let boxed = |x: f64, theta: f64| {
+        V::Struct(vec![
+            header_value(0, "camera"),
+            V::List(vec![V::Struct(vec![
+                V::Struct(vec![V::string("cat"), V::F64(0.8)]),
+                V::Struct(vec![pose_value(0.)]),
+            ])]),
+            V::Struct(vec![
+                V::Struct(vec![V::Struct(vec![V::F64(x), V::F64(20.)]), V::F64(theta)]),
+                V::F64(10.),
+                V::F64(4.),
+            ]),
+            V::string("3"),
+        ])
+    };
+    let topic = Topic::new(
+        "detections",
+        "vision_msgs/msg/Detection2DArray",
+        vec![("header", header()), ("detections", list(detection))],
+    )
+    .at(
+        1,
+        vec![
+            header_value(6, "camera"),
+            V::List(vec![
+                boxed(100., 0.),
+                boxed(f64::NAN, 0.),
+                boxed(50., std::f64::consts::FRAC_PI_2),
+            ]),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);
+    let (_, events) = frames(
+        &app,
+        &view_url("views", "detections", "ros_annotations", ""),
+    )
+    .await;
+    let value = &events[0].0["value"];
+    assert_eq!(value["kind"], "image_annotations");
+    assert_eq!(value["stamp_ns"], "6000000000");
+    assert_eq!(value["omitted"], 1);
+    assert_eq!(
+        value["annotations"][0],
+        json!({
+            "type": "line_loop",
+            "points": [[95., 18.], [105., 18.], [105., 22.], [95., 22.]],
+            "label": "cat",
+            "score": 0.8,
+            "id": "3",
+        })
+    );
+    // Turned a quarter, the 10 px width stands upright.
+    let turned: Vec<Vec<f64>> =
+        serde_json::from_value(value["annotations"][1]["points"].clone()).unwrap();
+    let ys: Vec<f64> = turned.iter().map(|p| p[1]).collect();
+    let height =
+        ys.iter().cloned().fold(f64::MIN, f64::max) - ys.iter().cloned().fold(f64::MAX, f64::min);
+    assert!((height - 10.).abs() < 1e-9, "{turned:?}");
+}
+
+#[tokio::test]
+async fn foxglove_image_annotations_keep_their_shapes() {
+    use crate::memory::{Topic, list, structure};
+    use hahn::{DataTypeDef as D, Value as V};
+    let time = structure(vec![("sec", D::U32), ("nsec", D::U32)]);
+    let point = structure(vec![("x", D::F64), ("y", D::F64)]);
+    let circle = structure(vec![
+        ("timestamp", time.clone()),
+        ("position", point.clone()),
+        ("diameter", D::F64),
+    ]);
+    let points = structure(vec![
+        ("timestamp", time.clone()),
+        ("type", D::String),
+        ("points", list(point.clone())),
+    ]);
+    let text = structure(vec![
+        ("timestamp", time.clone()),
+        ("position", point),
+        ("text", D::String),
+    ]);
+    let at = |x: f64, y: f64| V::Struct(vec![V::F64(x), V::F64(y)]);
+    let stamp = V::Struct(vec![V::U32(7), V::U32(0)]);
+    let topic = Topic::new(
+        "marks",
+        "foxglove.ImageAnnotations",
+        vec![
+            ("circles", list(circle)),
+            ("points", list(points)),
+            ("texts", list(text)),
+        ],
+    )
+    .at(
+        1,
+        vec![
+            V::List(vec![V::Struct(vec![stamp.clone(), at(5., 6.), V::F64(4.)])]),
+            V::List(vec![
+                V::Struct(vec![
+                    stamp.clone(),
+                    V::string("LINE_STRIP"),
+                    V::List(vec![at(0., 0.), at(1., 1.)]),
+                ]),
+                V::Struct(vec![
+                    stamp.clone(),
+                    V::string("UNKNOWN"),
+                    V::List(vec![at(0., 0.)]),
+                ]),
+            ]),
+            V::List(vec![V::Struct(vec![stamp, at(2., 3.), V::string("hello")])]),
+        ],
+    );
+    let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);
+    let (_, events) = frames(&app, &view_url("views", "marks", "annotations", "")).await;
+    let value = &events[0].0["value"];
+    assert_eq!(value["stamp_ns"], "7000000000");
+    // A points annotation of no known type is left out and counted.
+    assert_eq!(value["omitted"], 1);
+    assert_eq!(
+        value["annotations"],
+        json!([
+            {"type": "circle", "position": [5., 6.], "diameter": 4.},
+            {"type": "line_strip", "points": [[0., 0.], [1., 1.]]},
+            {"type": "text", "position": [2., 3.], "text": "hello"},
+        ])
+    );
+}

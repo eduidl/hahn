@@ -1,8 +1,9 @@
 //! Converters from recorded message types to the protocol's fixed kinds.
 
 use super::value::{
-    CameraCalibrationView, GeoFeature, GeoLocationView, GeoView, ImageView, Kind, NumericType,
-    PackedField, PathView, PointCloudView, Pose, PoseView, RawImageView, View,
+    Annotation, AnnotationsView, CameraCalibrationView, GeoFeature, GeoLocationView, GeoView,
+    ImageView, Kind, NumericType, PackedField, PathView, PointCloudView, Pose, PoseView,
+    RawImageView, Shape, View,
 };
 use anyhow::{Context, bail, ensure};
 use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
@@ -52,6 +53,7 @@ pub(crate) fn converters() -> Vec<Arc<dyn ViewConverter>> {
         Arc::new(PosesInFrame),
         Arc::new(Geo),
         Arc::new(GeoJson),
+        Arc::new(ImageAnnotations),
     ];
     converters.extend(super::ros2::converters());
     converters
@@ -780,5 +782,123 @@ impl ViewConverter for GeoJson {
             features,
         }
         .into())
+    }
+}
+
+/// An annotation that could not be read, so that it is left out and counted.
+pub(super) fn unreadable_annotation() -> Annotation {
+    Shape::Points(vec![[f64::NAN; 2]]).into()
+}
+
+/// `[x, y]` of a nested point, or not-a-number when it cannot be read.
+pub(super) fn point2(message: &Message, name: &str) -> [f64; 2] {
+    let read = || -> anyhow::Result<[f64; 2]> {
+        let point = message.child(name)?.context("No point")?;
+        Ok([point.number("x")?, point.number("y")?])
+    };
+    read().unwrap_or([f64::NAN; 2])
+}
+
+/// `foxglove.ImageAnnotations`: circles, points and lines, and texts over an image.
+struct ImageAnnotations;
+
+impl ImageAnnotations {
+    const LISTS: [&str; 3] = ["circles", "points", "texts"];
+}
+
+impl ViewConverter for ImageAnnotations {
+    fn id(&self) -> &'static str {
+        "annotations"
+    }
+    fn kind(&self) -> Kind {
+        Kind::ImageAnnotations
+    }
+    fn name(&self) -> &'static str {
+        "Annotations"
+    }
+    fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
+        is_foxglove(schema_name, "ImageAnnotations")
+            && Self::LISTS.iter().any(|name| has(defs, name, is_list))
+    }
+    fn convert(&self, message: &Message) -> anyhow::Result<View> {
+        let mut annotations = Vec::new();
+        let list = |name: &str| -> anyhow::Result<Vec<Message>> {
+            Ok(if message.has(name) {
+                message.children(name)?
+            } else {
+                Vec::new()
+            })
+        };
+        for circle in list("circles")? {
+            annotations.push(match circle.number("diameter") {
+                Ok(diameter) => Shape::Circle {
+                    center: point2(&circle, "position"),
+                    diameter,
+                }
+                .into(),
+                Err(_) => unreadable_annotation(),
+            });
+        }
+        for points in list("points")? {
+            let read = || -> anyhow::Result<Annotation> {
+                let at: Vec<[f64; 2]> = points
+                    .children("points")?
+                    .iter()
+                    .map(|p| {
+                        [
+                            p.number("x").unwrap_or(f64::NAN),
+                            p.number("y").unwrap_or(f64::NAN),
+                        ]
+                    })
+                    .collect();
+                // The type is an enum: named in Protobuf, numbered in ROS 2.
+                let kind = match points.value("type")? {
+                    Value::String(name) => match &**name {
+                        "POINTS" => 1,
+                        "LINE_LOOP" => 2,
+                        "LINE_STRIP" => 3,
+                        "LINE_LIST" => 4,
+                        _ => 0,
+                    },
+                    other => number(other).unwrap_or(0.) as i64,
+                };
+                Ok(match kind {
+                    1 => Shape::Points(at),
+                    2 => Shape::LineLoop(at),
+                    3 => Shape::LineStrip(at),
+                    4 => Shape::LineList(at),
+                    _ => bail!("Unknown points annotation type"),
+                }
+                .into())
+            };
+            annotations.push(read().unwrap_or_else(|_| unreadable_annotation()));
+        }
+        for text in list("texts")? {
+            annotations.push(match text.string("text") {
+                Ok(content) => Shape::Text {
+                    position: point2(&text, "position"),
+                    text: content.to_owned(),
+                }
+                .into(),
+                Err(_) => unreadable_annotation(),
+            });
+        }
+        Ok(AnnotationsView {
+            frame_id: None,
+            annotations,
+        }
+        .into())
+    }
+    /// The message has no time of its own; its annotations each have one, the time
+    /// of the image they mark.
+    fn stamp(&self, message: &Message) -> anyhow::Result<Option<u64>> {
+        for name in Self::LISTS {
+            if message.has(name)
+                && let Some(first) = message.children(name)?.first()
+            {
+                return first.time("timestamp");
+            }
+        }
+        Ok(None)
     }
 }

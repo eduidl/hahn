@@ -492,7 +492,7 @@ export interface components {
             type: "unchanged";
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
-        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"] | components["schemas"]["GeoLocationValue"] | components["schemas"]["Bbox3dValue"];
+        ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"] | components["schemas"]["PositionValue"] | components["schemas"]["PosesValue"] | components["schemas"]["PathValue"] | components["schemas"]["GeoLocationValue"] | components["schemas"]["Bbox3dValue"] | components["schemas"]["ImageAnnotationsValue"];
         /** @description Coordinate frame and measurement time of a spatial value. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
@@ -729,6 +729,33 @@ export interface components {
                 id?: string;
             }[];
             /** @description Boxes left out because they were not finite, had a negative size or could not be read. */
+            omitted: components["schemas"]["Count"];
+        };
+        /** @description Marks over one image, in its pixels, all held by one message, which replaces the last. Which image they mark is not in the value: neither `frame_id` nor topic names establish it, so the user chooses which topics an image shows. A client shows a message's marks over the image with the same `stamp_ns`, or, without stamps, over images recorded at or after them. */
+        ImageAnnotationsValue: {
+            /** @enum {string} */
+            kind: "image_annotations";
+            frame_id?: components["schemas"]["FrameId"];
+            /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
+            stamp_ns?: components["schemas"]["TimeNs"];
+            annotations: {
+                /** @description `points`; `line_strip`, joined in order; `line_loop`, closed, as for a box; `line_list`, separate pairs; `circle`; or `text`. A client skips a type it does not know. */
+                type: string;
+                /** @description For points and lines. */
+                points?: number[][];
+                /** @description The center of a circle, or where a text starts. */
+                position?: number[];
+                /** @description Of a circle, in pixels. */
+                diameter?: number;
+                text?: string;
+                /** @description What it marks, such as a class name. */
+                label?: string;
+                /** @description How sure the detector is, usually 0 to 1. */
+                score?: number;
+                /** @description Which object it marks, as a tracker names it. */
+                id?: string;
+            }[];
+            /** @description Annotations left out because a number in them was not finite or they could not be read. */
             omitted: components["schemas"]["Count"];
         };
     };

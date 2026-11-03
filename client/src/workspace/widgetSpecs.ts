@@ -113,7 +113,7 @@ export const widgetSpecs: Record<Widget["type"], WidgetSpec> = {
     sameKind: false,
     maxSeries: Infinity,
     loadsSeries: false,
-    viewKinds: new Set(["image", "pointcloud"]),
+    viewKinds: new Set(["image", "pointcloud", "image_annotations"]),
   },
   scene: {
     label: "3D",

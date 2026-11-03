@@ -1431,6 +1431,9 @@
           },
           {
             "$ref": "#/components/schemas/Bbox3dValue"
+          },
+          {
+            "$ref": "#/components/schemas/ImageAnnotationsValue"
           }
         ]
       },
@@ -2049,6 +2052,91 @@
             }
           }
         ]
+      },
+      "ImageAnnotationsValue": {
+        "description": "Marks over one image, in its pixels, all held by one message, which replaces the last. Which image they mark is not in the value: neither `frame_id` nor topic names establish it, so the user chooses which topics an image shows. A client shows a message's marks over the image with the same `stamp_ns`, or, without stamps, over images recorded at or after them.",
+        "type": "object",
+        "required": [
+          "kind",
+          "annotations",
+          "omitted"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "image_annotations"
+            ]
+          },
+          "frame_id": {
+            "$ref": "#/components/schemas/FrameId"
+          },
+          "stamp_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "description": "`points`; `line_strip`, joined in order; `line_loop`, closed, as for a box; `line_list`, separate pairs; `circle`; or `text`. A client skips a type it does not know.",
+                  "type": "string"
+                },
+                "points": {
+                  "description": "For points and lines.",
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "`[x, y]` in pixels from the image's top left."
+                  }
+                },
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "The center of a circle, or where a text starts."
+                },
+                "diameter": {
+                  "description": "Of a circle, in pixels.",
+                  "type": "number",
+                  "minimum": 0
+                },
+                "text": {
+                  "type": "string"
+                },
+                "label": {
+                  "description": "What it marks, such as a class name.",
+                  "type": "string"
+                },
+                "score": {
+                  "description": "How sure the detector is, usually 0 to 1.",
+                  "type": "number"
+                },
+                "id": {
+                  "description": "Which object it marks, as a tracker names it.",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "omitted": {
+            "description": "Annotations left out because a number in them was not finite or they could not be read.",
+            "$ref": "#/components/schemas/Count"
+          }
+        }
       }
     },
     "parameters": {
