@@ -143,6 +143,8 @@ async fn ros2_poses_unwrap_their_covariance() {
     let position = async |topic: &str, view: &str| {
         let (_, events) = frames(&app, &view_url("views", topic, view, "")).await;
         assert_eq!(events[0].0["value"]["frame_id"], "map");
+        // The header stamp is the measurement time.
+        assert_eq!(events[0].0["value"]["stamp_ns"], "1");
         events[0].0["value"]["pose"]["position"].clone()
     };
     assert_eq!(position("/odom", "ros_odometry").await, json!([2., 3., 4.]));

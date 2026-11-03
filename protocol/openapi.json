@@ -1343,7 +1343,7 @@
         ]
       },
       "FramedValue": {
-        "description": "Coordinate frame of a spatial value.",
+        "description": "Coordinate frame and measurement time of a spatial value.",
         "type": "object",
         "required": [
           "frame_id"
@@ -1351,6 +1351,10 @@
         "properties": {
           "frame_id": {
             "$ref": "#/components/schemas/FrameId"
+          },
+          "stamp_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
           }
         }
       },
@@ -1632,6 +1636,10 @@
                     }
                   }
                 }
+              },
+              "stamp_ns": {
+                "$ref": "#/components/schemas/TimeNs",
+                "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
               }
             }
           }
@@ -1710,6 +1718,10 @@
           "distortion_model": {
             "type": "string",
             "description": "Name of the distortion model, such as plumb_bob."
+          },
+          "stamp_ns": {
+            "$ref": "#/components/schemas/TimeNs",
+            "description": "When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute."
           }
         }
       },

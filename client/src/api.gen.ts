@@ -473,9 +473,11 @@ export interface components {
         } | components["schemas"]["StreamComplete"] | components["schemas"]["StreamError"];
         /** @description A value of a Hahn type. The rules common to all of them are in the README. */
         ViewValue: components["schemas"]["ImageValue"] | components["schemas"]["PointCloudValue"] | components["schemas"]["GeoValue"] | components["schemas"]["CameraCalibrationValue"] | components["schemas"]["PoseValue"];
-        /** @description Coordinate frame of a spatial value. */
+        /** @description Coordinate frame and measurement time of a spatial value. */
         FramedValue: {
             frame_id: components["schemas"]["FrameId"];
+            /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
+            stamp_ns?: components["schemas"]["TimeNs"];
         };
         /**
          * @description An encoded image or raw pixel image.
@@ -617,6 +619,8 @@ export interface components {
                     [key: string]: unknown;
                 };
             }[];
+            /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
+            stamp_ns?: components["schemas"]["TimeNs"];
         };
         /** @description Pinhole camera calibration. Image coordinates have x right and y down; the optical axis is positive z. */
         CameraCalibrationValue: {
@@ -631,6 +635,8 @@ export interface components {
             distortion: number[];
             /** @description Name of the distortion model, such as plumb_bob. */
             distortion_model: string;
+            /** @description When the value was measured, such as the message's `header.stamp`, on the recording's measurement clock. Omitted when the message has no stamp or a zero one; the frame's `time_ns`, which is recording time, is never a substitute. */
+            stamp_ns?: components["schemas"]["TimeNs"];
         };
         /** @description A position and orientation in frame_id. */
         PoseValue: components["schemas"]["FramedValue"] & {

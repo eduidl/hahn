@@ -122,7 +122,7 @@ For example, a frame with a JSON header of 100 bytes and a blob of 5 bytes is la
 
 A conversion failure is a `frame` with `error`, without a value, and does not stop the stream. The odometry view exposes its current pose in `frame_id`; velocities and covariances remain available as message fields. Point clouds omit points with non-finite positions. Missing poses use identity; zero-length quaternions also mean identity. ROS 2 messages with multi-byte big-endian pixels or points, and `NavSatFix` messages without a fix, are conversion failures. A `PointCloud2` field holding several values per point is left out, as is padding named `_`. These are current converter behaviors, not a general validation policy for future kinds.
 
-The client selects views by supported `kind`. Images in an unsupported format show an error. Current view values do not carry measurement stamps. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image recording time. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
+The client selects views by supported `kind`. Images in an unsupported format show an error. View values carry their measurement time as `stamp_ns` when the message records one (`header.stamp`, or `timestamp` in Foxglove schemas); the client does not use it yet. The 3D view matches images to calibration by frame ID and uses the camera matrix and supported lens distortion to place each image on a tessellated plane. The image panel can project point clouds using `plumb_bob` or `rational_polynomial` distortion, the camera matrix, and transforms at the image recording time. The latest point cloud at or before that time is used; motion between its recording time and the image time is not compensated.
 
 ## Coordinate frames
 
@@ -174,5 +174,5 @@ Not compressing is faster locally, and compressing wins on slow links. When comp
 - Relative times (starting at 0) cannot be told apart from epoch times
 - `/messages` transfers a lot (rows of JSON)
 - `known_time_ns` saves the transfer but not the server's work of reading the message
-- Measurement timestamps and clock resets are not implemented
+- Clients do not yet place values by their measurement time, and clock resets are not modeled
 - Transform and point-cloud placement use recording time, so recording delay can cause spatial errors
