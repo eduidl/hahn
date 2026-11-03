@@ -91,7 +91,7 @@ export function TimeZoneSelect({
         popoverTarget={id}
       >
         {offset}
-        <span aria-hidden="true">▾</span>
+        <span>▾</span>
       </button>
       <div
         id={id}
@@ -194,7 +194,6 @@ export function TimeDisplayToggle({
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        aria-hidden="true"
       >
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v5l3 2" />

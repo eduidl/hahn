@@ -1,8 +1,8 @@
 // The shapes of widgets and of the workspace, and the actions that change it.
-import { type DropEdge } from "./layoutTree";
-import { type MosaicDirection, type MosaicNode } from "react-mosaic-component";
-import { type DragMode, type PlotView } from "../views/Plot";
-import { type Selected, type Topic } from "../types";
+import type { DropEdge } from "./layoutTree";
+import type { MosaicDirection, MosaicNode } from "react-mosaic-component";
+import type { DragMode, PlotView } from "../views/Plot";
+import type { Selected, Topic } from "../types";
 
 export type LegendPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 

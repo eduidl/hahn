@@ -63,7 +63,7 @@ export function AppHeader({
           {run ? (
             <>
               <span className="runs-trigger-name">{run.name}</span>
-              <span aria-hidden="true">▾</span>
+              <span>▾</span>
             </>
           ) : (
             "Select run"
@@ -85,7 +85,6 @@ export function AppHeader({
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              aria-hidden="true"
             >
               <path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v3" />
               <path d="M4 20h15l3-10H7L4 20 2 8h5" />
@@ -137,7 +136,6 @@ export function AppHeader({
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
-          aria-hidden="true"
         >
           <rect x="3" y="4" width="18" height="20" rx="2" />
           <path d="M9 4v16" />
@@ -158,7 +156,6 @@ export function AppHeader({
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          aria-hidden="true"
         >
           <rect x="3" y="3" width="7" height="7" rx="1" />
           <rect x="14" y="3" width="7" height="7" rx="1" />

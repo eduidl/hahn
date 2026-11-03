@@ -268,12 +268,13 @@ export function StatePlot({
   const span = domain[1] - domain[0];
   const percent = (time: number) => ((time - domain[0]) / span) * 100;
   return (
-    <div className="state-plot" ref={plot} aria-label="State timeline">
+    <div className="state-plot" ref={plot} role="group" aria-label="State timeline">
       {visible.map((s) => (
         <div className="state-row" key={s.key}>
           <div className="state-label">
             <SeriesName inline source={s.source} topic={s.topicName ?? s.topic} path={s.path} />
           </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: the playback bar seeks from the keyboard */}
           <div
             className={zoomed ? "state-track state-track-pannable" : "state-track"}
             onClick={(event) => {

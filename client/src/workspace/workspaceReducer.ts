@@ -20,7 +20,7 @@ import {
   containerExists,
   ownerOf,
 } from "./layoutTree";
-import { type MosaicNode } from "react-mosaic-component";
+import type { MosaicNode } from "react-mosaic-component";
 import { defaultPlotView } from "../views/Plot";
 import { clampColumnWidth } from "../views/table";
 

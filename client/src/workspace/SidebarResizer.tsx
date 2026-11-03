@@ -34,7 +34,6 @@ export function SidebarResizer({ onResize }: { onResize: (width: number) => void
     <div
       className="sidebar-resizer"
       role="separator"
-      aria-orientation="vertical"
       aria-label="Resize sidebar"
       tabIndex={0}
       onPointerDown={(event) => {

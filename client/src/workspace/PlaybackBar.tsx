@@ -1,7 +1,6 @@
 import "./PlaybackBar.css";
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -39,7 +38,7 @@ function ownsKey(target: EventTarget | null, key: string) {
 }
 
 const icon = (path: string) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+  <svg width="14" height="14" viewBox="0 0 24 24">
     <path d={path} fill="currentColor" />
   </svg>
 );
@@ -93,7 +92,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
   const offsetText = `${seconds(time)} / ${seconds(fullEnd)} s`;
 
   return (
-    <footer className="playback-bar" aria-label="Playback">
+    <section className="playback-bar" aria-label="Playback">
       <div className="playback-controls">
         <button
           aria-label="Go to start"
@@ -137,7 +136,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
           {icon("M4 5v14l11-7zM16 5h2v14h-2z")}
         </button>
       </div>
-      <div className="playback-time" aria-live="off">
+      <div className="playback-time">
         <span title={label}>{disabled ? "—" : mode === "offset" ? offsetText : clockText}</span>
         <small>{disabled ? "—" : mode === "offset" ? clockText : offsetText}</small>
       </div>
@@ -147,10 +146,7 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
         role="slider"
         tabIndex={disabled ? -1 : 0}
         aria-label="Playback position"
-        aria-valuemin={0}
-        aria-valuemax={fullEnd}
         aria-valuenow={time}
-        aria-valuetext={label}
         aria-disabled={disabled}
         onKeyDown={(event) => {
           if (disabled) return;
@@ -229,6 +225,6 @@ export function PlaybackBar({ info, fullEnd, busy }: Props) {
           <span className="sr-only">{status}</span>
         </span>
       </div>
-    </footer>
+    </section>
   );
 }

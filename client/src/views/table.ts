@@ -11,8 +11,8 @@ export type TableColumn = {
   enumValues?: EnumValue[];
 };
 
-export const minColumnWidth = 64;
-export const maxColumnWidth = 2000;
+const minColumnWidth = 64;
+const maxColumnWidth = 2000;
 export const clampColumnWidth = (width: number) =>
   Math.max(minColumnWidth, Math.min(maxColumnWidth, Math.round(width)));
 
@@ -52,7 +52,7 @@ export function defaultColumnWidth(column: Pick<TableColumn, "dataType" | "enumV
 /** Schema paths, rather than a sample message, keep missing fields as stable columns. */
 export function tableColumns(index: FieldIndex, selected: Selected): TableColumn[] {
   const root = index.byKey.get(selected.key)?.field;
-  if (!root || root.data_type !== "struct")
+  if (root?.data_type !== "struct")
     return [
       {
         label: "Value",

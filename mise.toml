@@ -33,7 +33,11 @@ run = "scripts/conformance.sh"
 
 [tasks.check]
 description = "Run the checks in DEVELOPMENT.md"
-depends = ["test:server", "test:client", "client:build", "format:check", "conformance"]
+depends = ["test:server", "test:client", "client:build", "format:check", "lint", "conformance"]
+
+[tasks.lint]
+description = "Lint the client"
+run = "npm --prefix client run lint"
 
 [tasks."format:check"]
 description = "Check the client formatting"

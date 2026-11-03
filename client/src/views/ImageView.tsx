@@ -124,7 +124,7 @@ export function ImageView({
     async (time, known, signal) => {
       const imageFrame = frame!;
       const image = imageFrame.value;
-      if (!image || image.kind !== "image") throw new Error("Image is unavailable");
+      if (image?.kind !== "image") throw new Error("Image is unavailable");
       if (!clouds.length) return { frame: imageFrame, clouds: [] };
       if (!image.frame_id) return { frame: imageFrame, clouds: [], error: "Image has no frame ID" };
       const calibrations = await Promise.all(

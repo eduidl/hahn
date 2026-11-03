@@ -30,6 +30,7 @@ export function TabName({
   return (
     <input
       className="text-input tab-name-input"
+      // biome-ignore lint/a11y/noAutofocus: shown only when the user asks to rename the tab
       autoFocus={autoFocus}
       aria-label={`${tabLabel(tab)} name`}
       placeholder="Enter tab name"

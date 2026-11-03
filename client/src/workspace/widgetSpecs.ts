@@ -1,6 +1,6 @@
 // What each widget type accepts and how it is described.
-import { type Widget, type Container } from "./widgetModel";
-import { type FieldIndex } from "./fieldIndex";
+import type { Widget, Container } from "./widgetModel";
+import type { FieldIndex } from "./fieldIndex";
 import { topicKey, type Selected, type Topic, type ValueKind } from "../types";
 
 /** What a widget type shows and which series it takes. */
