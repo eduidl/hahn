@@ -152,8 +152,11 @@ it("sets and clears a pose topic's trail duration", () => {
   expect(input.value).toBe("");
   fireEvent.change(input, { target: { value: "2.5" } });
   expect(screen.getByTestId("duration").textContent).toBe("2.5");
-  fireEvent.change(input, { target: { value: "0" } });
+  fireEvent.change(input, { target: { value: "-1" } });
   expect(screen.getByTestId("duration").textContent).toBe("2.5");
+  // Zero shows only the latest value.
+  fireEvent.change(input, { target: { value: "0" } });
+  expect(screen.getByTestId("duration").textContent).toBe("0");
   fireEvent.change(input, { target: { value: "" } });
   expect(screen.getByTestId("duration").textContent).toBe("all");
 });
