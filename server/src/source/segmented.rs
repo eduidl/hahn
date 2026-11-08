@@ -1,7 +1,7 @@
 //! A recording split across files, with independent topics for each segment.
 
 use super::{Format, Source, SourceInfo, TimeRange, TopicMeta, Visit};
-use mcapdecode::core::FieldDefs;
+use mcapdecode::FieldDefs;
 use std::{path::Path, sync::Arc};
 
 struct Segmented {

@@ -14,9 +14,9 @@
 mod support;
 
 use hahn::{
-    FieldDefs, Kind, Message, Pose, PoseView, TransformReader, TransformSample, View,
+    DataTypeDef, FieldDefs, Kind, Message, Pose, PoseView, TransformReader, TransformSample, View,
     ViewConverter,
-    schema::{has, is_number, is_string},
+    schema::{has, is_string},
 };
 
 /// `string frame_id`, `float64 x`, `float64 y`, `float64 theta`: a pose on a plane.
@@ -35,9 +35,9 @@ impl ViewConverter for AcmePose2d {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         schema_name == "acme_msgs/msg/Pose2D"
             && has(defs, "frame_id", is_string)
-            && has(defs, "x", is_number)
-            && has(defs, "y", is_number)
-            && has(defs, "theta", is_number)
+            && has(defs, "x", DataTypeDef::is_numeric)
+            && has(defs, "y", DataTypeDef::is_numeric)
+            && has(defs, "theta", DataTypeDef::is_numeric)
     }
     fn convert(&self, message: &Message) -> anyhow::Result<View> {
         let half = message.number("theta")? / 2.;
@@ -61,9 +61,9 @@ impl TransformReader for AcmeLink2d {
         schema_name == "acme_msgs/msg/Link2D"
             && has(defs, "parent", is_string)
             && has(defs, "child", is_string)
-            && has(defs, "x", is_number)
-            && has(defs, "y", is_number)
-            && has(defs, "theta", is_number)
+            && has(defs, "x", DataTypeDef::is_numeric)
+            && has(defs, "y", DataTypeDef::is_numeric)
+            && has(defs, "theta", DataTypeDef::is_numeric)
     }
     fn read(&self, message: &Message) -> anyhow::Result<Vec<TransformSample>> {
         let half = message.number("theta")? / 2.;

@@ -223,7 +223,7 @@ async fn ros2_compressed_image_format_names_the_encoded_part() {
         topic = topic.at(
             time as u64,
             vec![
-                V::Struct(vec![V::string("camera")]),
+                V::Struct(vec![V::string("camera")].into()),
                 V::string(*format),
                 V::Bytes([1u8].as_slice().into()),
             ],
@@ -267,17 +267,20 @@ mod shapes {
         list(structure(vec![("header", header()), ("pose", pose())]))
     }
     pub fn header_value(sec: i32, frame: &str) -> V {
-        V::Struct(vec![
-            V::Struct(vec![V::I32(sec), V::U32(0)]),
-            V::string(frame),
-        ])
+        V::Struct(
+            vec![
+                V::Struct(vec![V::I32(sec), V::U32(0)].into()),
+                V::string(frame),
+            ]
+            .into(),
+        )
     }
     pub fn vector_value(x: f64) -> V {
-        V::Struct(vec![V::F64(x), V::F64(0.), V::F64(0.)])
+        V::Struct(vec![V::F64(x), V::F64(0.), V::F64(0.)].into())
     }
     pub fn pose_value(x: f64) -> V {
-        let still = V::Struct(vec![V::F64(0.), V::F64(0.), V::F64(0.), V::F64(1.)]);
-        V::Struct(vec![vector_value(x), still])
+        let still = V::Struct(vec![V::F64(0.), V::F64(0.), V::F64(0.), V::F64(1.)].into());
+        V::Struct(vec![vector_value(x), still].into())
     }
 }
 
@@ -304,7 +307,7 @@ async fn ros2_points_pose_arrays_and_paths_are_views() {
             V::List(vec![pose_value(1.), pose_value(f64::NAN), pose_value(2.)]),
         ],
     );
-    let stamped = |x: f64| V::Struct(vec![header_value(0, "map"), pose_value(x)]);
+    let stamped = |x: f64| V::Struct(vec![header_value(0, "map"), pose_value(x)].into());
     let route = Topic::new(
         "route",
         "nav_msgs/msg/Path",
@@ -370,7 +373,7 @@ async fn foxglove_poses_in_frame_are_paths_and_a_pose_in_frame_a_pose() {
     use hahn::{DataTypeDef as D, Value as V};
     use shapes::*;
     let time = crate::memory::structure(vec![("sec", D::U32), ("nsec", D::U32)]);
-    let stamp = V::Struct(vec![V::U32(5), V::U32(0)]);
+    let stamp = V::Struct(vec![V::U32(5), V::U32(0)].into());
     let pose = Topic::new(
         "pose",
         "foxglove.PoseInFrame",
@@ -432,21 +435,27 @@ async fn ros2_3d_detections_are_boxes_labeled_by_their_best_hypothesis() {
             ("id", D::String),
         ])
     };
-    let size = |x: f64| V::Struct(vec![V::F64(x), V::F64(1.), V::F64(1.)]);
-    let covariance = V::Struct(vec![pose_value(0.), V::List(vec![])]);
+    let size = |x: f64| V::Struct(vec![V::F64(x), V::F64(1.), V::F64(1.)].into());
+    let covariance = V::Struct(vec![pose_value(0.), V::List(vec![])].into());
     let scored = |class: &str, score: f64| {
-        V::Struct(vec![
-            V::Struct(vec![V::string(class), V::F64(score)]),
-            covariance.clone(),
-        ])
+        V::Struct(
+            vec![
+                V::Struct(vec![V::string(class), V::F64(score)].into()),
+                covariance.clone(),
+            ]
+            .into(),
+        )
     };
     let boxed = |results: Vec<V>, length: f64, id: &str| {
-        V::Struct(vec![
-            header_value(0, "base"),
-            V::List(results),
-            V::Struct(vec![pose_value(2.), size(length)]),
-            V::string(id),
-        ])
+        V::Struct(
+            vec![
+                header_value(0, "base"),
+                V::List(results),
+                V::Struct(vec![pose_value(2.), size(length)].into()),
+                V::string(id),
+            ]
+            .into(),
+        )
     };
     let current = Topic::new(
         "objects",
@@ -485,11 +494,9 @@ async fn ros2_3d_detections_are_boxes_labeled_by_their_best_hypothesis() {
         vec![
             header_value(4, "base"),
             V::List(vec![boxed(
-                vec![V::Struct(vec![
-                    V::string("person"),
-                    V::F64(0.7),
-                    covariance.clone(),
-                ])],
+                vec![V::Struct(
+                    vec![V::string("person"), V::F64(0.7), covariance.clone()].into(),
+                )],
                 0.5,
                 "",
             )]),
@@ -546,19 +553,34 @@ async fn ros2_2d_detections_are_outlines_over_the_image() {
         ("id", D::String),
     ]);
     let boxed = |x: f64, theta: f64| {
-        V::Struct(vec![
-            header_value(0, "camera"),
-            V::List(vec![V::Struct(vec![
-                V::Struct(vec![V::string("cat"), V::F64(0.8)]),
-                V::Struct(vec![pose_value(0.)]),
-            ])]),
-            V::Struct(vec![
-                V::Struct(vec![V::Struct(vec![V::F64(x), V::F64(20.)]), V::F64(theta)]),
-                V::F64(10.),
-                V::F64(4.),
-            ]),
-            V::string("3"),
-        ])
+        V::Struct(
+            vec![
+                header_value(0, "camera"),
+                V::List(vec![V::Struct(
+                    vec![
+                        V::Struct(vec![V::string("cat"), V::F64(0.8)].into()),
+                        V::Struct(vec![pose_value(0.)].into()),
+                    ]
+                    .into(),
+                )]),
+                V::Struct(
+                    vec![
+                        V::Struct(
+                            vec![
+                                V::Struct(vec![V::F64(x), V::F64(20.)].into()),
+                                V::F64(theta),
+                            ]
+                            .into(),
+                        ),
+                        V::F64(10.),
+                        V::F64(4.),
+                    ]
+                    .into(),
+                ),
+                V::string("3"),
+            ]
+            .into(),
+        )
     };
     let topic = Topic::new(
         "detections",
@@ -626,8 +648,8 @@ async fn foxglove_image_annotations_keep_their_shapes() {
         ("position", point),
         ("text", D::String),
     ]);
-    let at = |x: f64, y: f64| V::Struct(vec![V::F64(x), V::F64(y)]);
-    let stamp = V::Struct(vec![V::U32(7), V::U32(0)]);
+    let at = |x: f64, y: f64| V::Struct(vec![V::F64(x), V::F64(y)].into());
+    let stamp = V::Struct(vec![V::U32(7), V::U32(0)].into());
     let topic = Topic::new(
         "marks",
         "foxglove.ImageAnnotations",
@@ -640,20 +662,30 @@ async fn foxglove_image_annotations_keep_their_shapes() {
     .at(
         1,
         vec![
-            V::List(vec![V::Struct(vec![stamp.clone(), at(5., 6.), V::F64(4.)])]),
+            V::List(vec![V::Struct(
+                vec![stamp.clone(), at(5., 6.), V::F64(4.)].into(),
+            )]),
             V::List(vec![
-                V::Struct(vec![
-                    stamp.clone(),
-                    V::string("LINE_STRIP"),
-                    V::List(vec![at(0., 0.), at(1., 1.)]),
-                ]),
-                V::Struct(vec![
-                    stamp.clone(),
-                    V::string("UNKNOWN"),
-                    V::List(vec![at(0., 0.)]),
-                ]),
+                V::Struct(
+                    vec![
+                        stamp.clone(),
+                        V::string("LINE_STRIP"),
+                        V::List(vec![at(0., 0.), at(1., 1.)]),
+                    ]
+                    .into(),
+                ),
+                V::Struct(
+                    vec![
+                        stamp.clone(),
+                        V::string("UNKNOWN"),
+                        V::List(vec![at(0., 0.)]),
+                    ]
+                    .into(),
+                ),
             ]),
-            V::List(vec![V::Struct(vec![stamp, at(2., 3.), V::string("hello")])]),
+            V::List(vec![V::Struct(
+                vec![stamp, at(2., 3.), V::string("hello")].into(),
+            )]),
         ],
     );
     let (_dir, app) = crate::memory::app(vec![topic], |builder| builder);

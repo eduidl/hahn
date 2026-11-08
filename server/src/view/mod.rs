@@ -30,7 +30,7 @@ use axum::{
 pub use convert::{Message, ViewConverter, schema};
 pub(crate) use frame::CONTENT_TYPE;
 use frame::{Payload, encode};
-use mcapdecode::core::{FieldDefs, Value};
+use mcapdecode::{FieldDefs, Value};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tokio::sync::mpsc;

@@ -9,8 +9,7 @@ anyhow = "1"
 axum = "0.8"
 clap = { version = "4", features = ["derive"] }
 mcap = "0.25"
-mcapdecode = { version = "0.10.0", features = ["rawjson"] }
-memmap2 = "0.9"
+mcapdecode = { version = "0.11.0", features = ["rawjson"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["float_roundtrip", "preserve_order"] }
 tokio = { version = "1", features = ["full"] }

@@ -629,11 +629,11 @@ async fn values_carry_the_measurement_time_their_message_records() {
         "test/Echo",
         vec![("case", T::U32), ("timestamp", time("nsec"))],
     );
-    let stamp = |sec, nanos| V::Struct(vec![V::I32(sec), V::U32(nanos)]);
+    let stamp = |sec, nanos| V::Struct(vec![V::I32(sec), V::U32(nanos)].into());
     let ros = ros
-        .at(5, vec![V::U32(0), V::Struct(vec![stamp(1, 500)])])
-        .at(6, vec![V::U32(1), V::Struct(vec![stamp(0, 0)])])
-        .at(7, vec![V::U32(2), V::Struct(vec![stamp(-1, 0)])]);
+        .at(5, vec![V::U32(0), V::Struct(vec![stamp(1, 500)].into())])
+        .at(6, vec![V::U32(1), V::Struct(vec![stamp(0, 0)].into())])
+        .at(7, vec![V::U32(2), V::Struct(vec![stamp(-1, 0)].into())]);
     let foxglove = foxglove.at(5, vec![V::U32(0), stamp(2, 7)]);
     let (_dir, app) = crate::memory::app(vec![ros, foxglove], |builder| {
         builder.view(Echo(hahn::Kind::Pose, |_| {

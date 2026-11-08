@@ -4,15 +4,15 @@
 //! Foxglove schemas, while the kinds and their validation are shared.
 
 use super::convert::{
-    Message, ViewConverter, calibration, has, is_bytes, is_list, is_number, is_string, is_struct,
-    location, point2, pose_view, raw_image, unreadable_annotation,
+    Message, ViewConverter, calibration, has, is_bytes, is_list, is_string, is_struct, location,
+    point2, pose_view, raw_image, unreadable_annotation,
 };
 use super::value::{
     Annotation, AnnotationsView, Box3, BoxesView, ImageView, Kind, NumericType, PackedField,
     PathView, PointCloudView, PosesView, PositionView, Shape, View,
 };
 use anyhow::{Context, bail, ensure};
-use mcapdecode::core::FieldDefs;
+use mcapdecode::{DataTypeDef, FieldDefs};
 use std::sync::Arc;
 
 pub(super) fn converters() -> Vec<Arc<dyn ViewConverter>> {
@@ -96,9 +96,9 @@ impl ViewConverter for Image {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         schema_name == "sensor_msgs/msg/Image"
             && has(defs, "header", is_struct)
-            && has(defs, "width", is_number)
-            && has(defs, "height", is_number)
-            && has(defs, "step", is_number)
+            && has(defs, "width", DataTypeDef::is_numeric)
+            && has(defs, "height", DataTypeDef::is_numeric)
+            && has(defs, "step", DataTypeDef::is_numeric)
             && has(defs, "encoding", is_string)
             && has(defs, "data", is_bytes)
     }
@@ -128,8 +128,8 @@ impl ViewConverter for CameraInfo {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         schema_name == "sensor_msgs/msg/CameraInfo"
             && has(defs, "header", is_struct)
-            && has(defs, "width", is_number)
-            && has(defs, "height", is_number)
+            && has(defs, "width", DataTypeDef::is_numeric)
+            && has(defs, "height", DataTypeDef::is_numeric)
             && has(defs, "k", is_list)
             && has(defs, "d", is_list)
             && has(defs, "distortion_model", is_string)
@@ -170,11 +170,11 @@ impl ViewConverter for PointCloud2 {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         schema_name == "sensor_msgs/msg/PointCloud2"
             && has(defs, "header", is_struct)
-            && has(defs, "width", is_number)
-            && has(defs, "height", is_number)
+            && has(defs, "width", DataTypeDef::is_numeric)
+            && has(defs, "height", DataTypeDef::is_numeric)
             && has(defs, "fields", is_list)
-            && has(defs, "point_step", is_number)
-            && has(defs, "row_step", is_number)
+            && has(defs, "point_step", DataTypeDef::is_numeric)
+            && has(defs, "row_step", DataTypeDef::is_numeric)
             && has(defs, "data", is_bytes)
     }
     fn convert(&self, message: &Message) -> anyhow::Result<View> {
@@ -301,9 +301,9 @@ impl ViewConverter for NavSatFix {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         schema_name == "sensor_msgs/msg/NavSatFix"
             && has(defs, "header", is_struct)
-            && has(defs, "latitude", is_number)
-            && has(defs, "longitude", is_number)
-            && has(defs, "altitude", is_number)
+            && has(defs, "latitude", DataTypeDef::is_numeric)
+            && has(defs, "longitude", DataTypeDef::is_numeric)
+            && has(defs, "altitude", DataTypeDef::is_numeric)
     }
     fn convert(&self, message: &Message) -> anyhow::Result<View> {
         // STATUS_NO_FIX: the coordinates are whatever the receiver left there.

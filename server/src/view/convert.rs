@@ -6,7 +6,7 @@ use super::value::{
     RawImageView, Shape, View,
 };
 use anyhow::{Context, bail, ensure};
-use mcapdecode::core::{DataTypeDef, FieldDefs, Value};
+use mcapdecode::{DataTypeDef, FieldDefs, Value};
 use std::sync::Arc;
 
 /// Turns messages of the types it accepts into one fixed kind.
@@ -127,7 +127,10 @@ impl<'a> Message<'a> {
         let value = self
             .present(name)?
             .with_context(|| format!("Field {name} has no value"))?;
-        number(value).with_context(|| format!("Field {name} is not a number"))
+        value
+            .try_lossy_f64()
+            .ok()
+            .with_context(|| format!("Field {name} is not a number"))
     }
 
     pub fn numbers(&self, name: &str) -> anyhow::Result<Vec<f64>> {
@@ -135,7 +138,10 @@ impl<'a> Message<'a> {
             Some(Value::List(values) | Value::Array(values)) => values
                 .iter()
                 .map(|value| {
-                    number(value).with_context(|| format!("Field {name} has a non-number"))
+                    value
+                        .try_lossy_f64()
+                        .ok()
+                        .with_context(|| format!("Field {name} has a non-number"))
                 })
                 .collect(),
             None => Ok(Vec::new()),
@@ -148,9 +154,11 @@ impl<'a> Message<'a> {
         match self.present(name)? {
             Some(Value::Bool(value)) => Ok(*value),
             None => Ok(false),
-            Some(value) => {
-                Ok(number(value).with_context(|| format!("Field {name} is not a flag"))? != 0.)
-            }
+            Some(value) => Ok(value
+                .try_lossy_f64()
+                .ok()
+                .with_context(|| format!("Field {name} is not a flag"))?
+                != 0.),
         }
     }
 
@@ -254,28 +262,12 @@ impl<'a> Message<'a> {
     }
 }
 
-fn number(value: &Value) -> Option<f64> {
-    Some(match value {
-        Value::F64(v) => *v,
-        Value::F32(v) => *v as f64,
-        Value::I8(v) => *v as f64,
-        Value::I16(v) => *v as f64,
-        Value::I32(v) => *v as f64,
-        Value::I64(v) => *v as f64,
-        Value::U8(v) => *v as f64,
-        Value::U16(v) => *v as f64,
-        Value::U32(v) => *v as f64,
-        Value::U64(v) => *v as f64,
-        _ => return None,
-    })
-}
-
 /// Checks on a schema, for [`ViewConverter::accepts`].
 pub mod schema {
-    use mcapdecode::core::{DataTypeDef, FieldDefs};
+    use mcapdecode::{DataTypeDef, FieldDefs};
 
     /// Whether `defs` has a field `name` whose type passes `check`, such as
-    /// `has(defs, "x", is_number)`.
+    /// `has(defs, "x", DataTypeDef::is_numeric)`.
     pub fn has(defs: &FieldDefs, name: &str, check: fn(&DataTypeDef) -> bool) -> bool {
         defs.iter()
             .any(|field| field.name == name && check(&field.element.data_type))
@@ -305,25 +297,9 @@ pub mod schema {
             DataTypeDef::String | DataTypeDef::BoundedString(_)
         )
     }
-
-    pub fn is_number(data_type: &DataTypeDef) -> bool {
-        matches!(
-            data_type,
-            DataTypeDef::I8
-                | DataTypeDef::I16
-                | DataTypeDef::I32
-                | DataTypeDef::I64
-                | DataTypeDef::U8
-                | DataTypeDef::U16
-                | DataTypeDef::U32
-                | DataTypeDef::U64
-                | DataTypeDef::F32
-                | DataTypeDef::F64
-        )
-    }
 }
 
-pub(crate) use schema::{has, is_bytes, is_list, is_number, is_string, is_struct};
+pub(crate) use schema::{has, is_bytes, is_list, is_string, is_struct};
 
 /// `[x, y, z, w]`, normalized. A rotation of zero length, which is what an unset
 /// quaternion decodes to, means none.
@@ -374,8 +350,8 @@ impl ViewConverter for CameraCalibration {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         is_foxglove(schema_name, "CameraCalibration")
             && has(defs, "frame_id", is_string)
-            && has(defs, "width", is_number)
-            && has(defs, "height", is_number)
+            && has(defs, "width", DataTypeDef::is_numeric)
+            && has(defs, "height", DataTypeDef::is_numeric)
             // Protobuf capitalizes these, and `foxglove_msgs` does not.
             && (has(defs, "K", is_list) && has(defs, "D", is_list)
                 || has(defs, "k", is_list) && has(defs, "d", is_list))
@@ -466,9 +442,9 @@ impl ViewConverter for RawImage {
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         is_foxglove(schema_name, "RawImage")
             && has(defs, "frame_id", is_string)
-            && has(defs, "width", is_number)
-            && has(defs, "height", is_number)
-            && has(defs, "step", is_number)
+            && has(defs, "width", DataTypeDef::is_numeric)
+            && has(defs, "height", DataTypeDef::is_numeric)
+            && has(defs, "step", DataTypeDef::is_numeric)
             && has(defs, "encoding", is_string)
             && has(defs, "data", is_bytes)
     }
@@ -613,7 +589,7 @@ impl ViewConverter for PointCloud {
         is_foxglove(schema_name, "PointCloud")
             && has(defs, "data", is_bytes)
             && has(defs, "fields", is_list)
-            && has(defs, "point_stride", is_number)
+            && has(defs, "point_stride", DataTypeDef::is_numeric)
             && has(defs, "pose", is_struct)
             && has(defs, "frame_id", is_string)
     }
@@ -655,7 +631,7 @@ impl ViewConverter for PointCloud {
 fn numeric_type(field: &Message) -> anyhow::Result<NumericType> {
     let name = match field.value("type")? {
         Value::String(name) => name.to_string(),
-        value => match number(value).map(|v| v as i64) {
+        value => match value.try_lossy_f64().ok().map(|v| v as i64) {
             Some(1) => "UINT8".into(),
             Some(2) => "INT8".into(),
             Some(3) => "UINT16".into(),
@@ -700,9 +676,9 @@ impl ViewConverter for Geo {
     }
     fn accepts(&self, schema_name: &str, defs: &FieldDefs) -> bool {
         is_foxglove(schema_name, "LocationFix")
-            && has(defs, "latitude", is_number)
-            && has(defs, "longitude", is_number)
-            && has(defs, "altitude", is_number)
+            && has(defs, "latitude", DataTypeDef::is_numeric)
+            && has(defs, "longitude", DataTypeDef::is_numeric)
+            && has(defs, "altitude", DataTypeDef::is_numeric)
             && has(defs, "frame_id", is_string)
     }
     fn convert(&self, message: &Message) -> anyhow::Result<View> {
@@ -866,7 +842,7 @@ impl ViewConverter for ImageAnnotations {
                         "LINE_LIST" => 4,
                         _ => 0,
                     },
-                    other => number(other).unwrap_or(0.) as i64,
+                    other => other.try_lossy_f64().ok().unwrap_or(0.) as i64,
                 };
                 Ok(match kind {
                     1 => Shape::Points(at),

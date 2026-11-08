@@ -7,7 +7,7 @@ use axum::{
     http::header,
     response::{IntoResponse, Response},
 };
-use mcapdecode::core::{FieldDefs, Value};
+use mcapdecode::{FieldDefs, Value};
 use serde::Serialize;
 use std::{
     convert::Infallible,
@@ -37,7 +37,7 @@ pub(crate) fn indexes(defs: &FieldDefs, path: &[String]) -> Option<Vec<usize>> {
     let index = defs.iter().position(|f| &f.name == head)?;
     let mut result = vec![index];
     if !tail.is_empty() {
-        let mcapdecode::core::DataTypeDef::Struct(children) = &defs[index].element.data_type else {
+        let mcapdecode::DataTypeDef::Struct(children) = &defs[index].element.data_type else {
             return None;
         };
         result.extend(indexes(&children.fields, tail)?);

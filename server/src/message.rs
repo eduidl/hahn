@@ -9,7 +9,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
-use mcapdecode::core::{DataTypeDef, EnumDef, FieldDefs, Value};
+use mcapdecode::{DataTypeDef, EnumDef, FieldDefs, Value};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -52,7 +52,7 @@ pub(crate) async fn latest(
         check_meta(&*source, &query.meta)?;
         let index = field_index(&defs, &field)?;
         let data_type = if index.is_empty() {
-            DataTypeDef::Struct(defs.clone().into())
+            DataTypeDef::structure(defs.clone().into())
         } else {
             field_type(&defs, &index).clone()
         };
@@ -191,7 +191,7 @@ fn displayed(
                 }
             }
             (Value::Struct(values), DataTypeDef::Struct(defs)) => {
-                if let ([Value::String(text)], [def]) = (values.as_slice(), &defs.fields[..])
+                if let ([Value::String(text)], [def]) = (&values[..], &defs.fields[..])
                     && let Some(document) = parsed(text)
                 {
                     return json!({ def.name.clone(): document });
@@ -334,7 +334,7 @@ fn to_json(value: &Value, data_type: &DataTypeDef) -> serde_json::Value {
             DataTypeDef::Struct(defs) => defs
                 .fields
                 .iter()
-                .zip(values)
+                .zip(values.iter())
                 .map(|(def, v)| (def.name.clone(), to_json(v, &def.element.data_type)))
                 .collect::<serde_json::Map<_, _>>()
                 .into(),
@@ -406,7 +406,7 @@ pub(crate) async fn messages(
             }
         }
         let data_type = if index.is_empty() {
-            DataTypeDef::Struct(defs.into())
+            DataTypeDef::structure(defs.into())
         } else {
             field_type(&defs, &index).clone()
         };

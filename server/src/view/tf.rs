@@ -11,7 +11,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
-use mcapdecode::core::{DataTypeDef, FieldDefs};
+use mcapdecode::{DataTypeDef, FieldDefs};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},

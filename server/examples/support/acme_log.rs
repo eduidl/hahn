@@ -107,7 +107,7 @@ impl Source for AcmeLogSource {
             if t == topic && after_start && before_end {
                 visit(
                     MessageTimes::from(time),
-                    Value::Struct(vec![Value::F64(value)]),
+                    Value::Struct(vec![Value::F64(value)].into()),
                 )?;
             }
         }

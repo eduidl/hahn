@@ -495,7 +495,6 @@ dependencies = [
  "http-body-util",
  "mcap",
  "mcapdecode",
- "memmap2",
  "prost",
  "prost-types",
  "serde",
@@ -740,9 +739,9 @@ dependencies = [
 
 [[package]]
 name = "mcapdecode"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff0639c69347e58d1a4a935e505abc84fd4448c5a6dee196e12f51ad7830d945"
+checksum = "3af3e7fb6bc8eab3780de16d5e594f1e62b3430cec31f9c6d22afeccc96399fa"
 dependencies = [
  "mcap",
  "mcapdecode-core",
@@ -757,18 +756,18 @@ dependencies = [
 
 [[package]]
 name = "mcapdecode-core"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf61ad7b03b79934f34d446546751959504db2dcc0297d5fe04716167e2e1417"
+checksum = "d06c5762f4028f940ddd6dc87645cba9f83f31b62bd5adddbd3bf6bdd6750c03"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "mcapdecode-protobuf"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48dd1c2a2e2a1310eabd141f56544e70fc4779f09658cc0d5e43e074ddd04ebf"
+checksum = "4ddee5d393c836e2b6ffb2f8bf8e5d4deda02a253029fc26c84826936bb54c61"
 dependencies = [
  "mcapdecode-core",
  "prost-reflect",
@@ -778,18 +777,18 @@ dependencies = [
 
 [[package]]
 name = "mcapdecode-rawjson"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e057866a2888a6f1cfb9ff1f09282c36598b458af92c80059352064db802c62"
+checksum = "3791cc56624657c81af567702e4b41e5e38f6dc061b0669f398b20de6f88c5ef"
 dependencies = [
  "mcapdecode-core",
 ]
 
 [[package]]
 name = "mcapdecode-ros2-common"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa9828d29d5c0c7135538413457899a59a1078510e97743ec299b6f2cf907e56"
+checksum = "92f3e53130b33c84fbecb77526e0cfcf7f316dc3d7fdb6a9c0b88e787dcbaae3"
 dependencies = [
  "bytes",
  "mcapdecode-core",
@@ -798,9 +797,9 @@ dependencies = [
 
 [[package]]
 name = "mcapdecode-ros2idl"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccdd2a516531d1c1d64518f25bfed12c1fe8aef024af070a137c45ed7f37a495"
+checksum = "d53e141270e376f7d6b2b20487d36a6c0d6d9a1e410071303233d7dfbc2ecb93"
 dependencies = [
  "mcapdecode-core",
  "mcapdecode-ros2-common",
@@ -809,9 +808,9 @@ dependencies = [
 
 [[package]]
 name = "mcapdecode-ros2msg"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5649a01efe1711569d15d436b748c190b30906746f1423586a0cd3798697f1d"
+checksum = "d251ebd7a124b7bb6085e88c1e50385c2ca435a9bb444dba3027dc45013e630f"
 dependencies = [
  "mcapdecode-core",
  "mcapdecode-ros2-common",
