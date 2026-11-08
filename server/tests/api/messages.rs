@@ -619,7 +619,7 @@ async fn values_of_every_shape_are_shown_within_the_display_limits() {
         key: Box::new(ElementDef::new(DataTypeDef::String, false)),
         value: Box::new(ElementDef::new(point(), false)),
     };
-    let pair = (V::string("k"), V::Struct(vec![V::F64(1.)]));
+    let pair = (V::string("k"), V::Struct(vec![V::F64(1.)].into()));
     let topic = Topic::new(
         "shapes",
         "test/Shapes",
@@ -633,7 +633,7 @@ async fn values_of_every_shape_are_shown_within_the_display_limits() {
     .at(
         0,
         vec![
-            V::List(vec![V::Struct(vec![V::F64(1.)])]),
+            V::List(vec![V::Struct(vec![V::F64(1.)].into())]),
             V::Bytes(vec![7; 50].into()),
             V::Map(vec![pair.clone()]),
             V::Map(vec![pair; 101]),

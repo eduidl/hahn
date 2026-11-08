@@ -1,12 +1,9 @@
 //! Opt-in checks against the user's real recordings. No copies or rewrites.
 use axum::{body::Body, http::Request};
 use http_body_util::BodyExt;
-use mcapdecode::{
-    McapReader, ReadOptions,
-    core::{DataTypeDef, FieldDefs, Value},
-};
+use mcapdecode::{DataTypeDef, FieldDefs, McapReader, Value};
 use serde_json::{Value as Json, json};
-use std::path::PathBuf;
+use std::{ops::ControlFlow, path::PathBuf};
 use tower::ServiceExt;
 
 fn data_dir() -> PathBuf {
@@ -73,26 +70,23 @@ async fn compare(file_name: &str, topic: &str, fields: &[Vec<String>]) {
         .collect();
     let fields = &fields;
     let root = data_dir();
-    let reader = McapReader::builder()
-        .with_default_decoders()
+    let file = McapReader::builder()
         .with_parallel(false)
-        .build();
-    let path = root.join(file_name);
-    let defs = reader.topic_field_defs(&path, topic).unwrap();
+        .open(root.join(file_name))
+        .unwrap();
+    let defs = file.read().topic(topic).field_defs().unwrap().remove(0).1;
     let mut expected = Vec::new();
-    reader
-        .for_each_decoded_message_with_options(
-            &path,
-            topic,
-            &ReadOptions {
-                limit: Some(8),
-                ..Default::default()
-            },
-            |msg| {
-                expected.push(json!({"time_ns":msg.log_time.to_string(), "values":fields.iter().map(|f| scalar(&defs, &msg.value, f)).collect::<Vec<_>>()}));
-                Ok(())
-            },
-        )
+    file.read()
+        .topic(topic)
+        .decoded()
+        .try_for_each(|_, msg| {
+            expected.push(json!({"time_ns":msg.log_time.to_string(), "values":fields.iter().map(|f| scalar(&defs, &msg.value, f)).collect::<Vec<_>>()}));
+            if expected.len() < 8 {
+                ControlFlow::Continue(())
+            } else {
+                ControlFlow::Break(())
+            }
+        })
         .unwrap();
     assert!(!expected.is_empty());
     let app = hahn::router(&root).unwrap();

@@ -15,9 +15,7 @@ mod source;
 mod stream;
 mod view;
 
-pub use mcapdecode::core::{
-    DataTypeDef, ElementDef, EnumDef, EnumVariant, FieldDef, FieldDefs, Value,
-};
+pub use mcapdecode::{DataTypeDef, ElementDef, EnumDef, EnumVariant, FieldDef, FieldDefs, Value};
 pub use source::{
     BatchVisit, Format, MessageTimes, Source, SourceInfo, TimeRange, TopicMeta, Visit,
 };

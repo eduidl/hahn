@@ -37,7 +37,7 @@ impl Topic {
 
     /// Adds a message of the field values in schema order.
     pub(crate) fn at(mut self, time: u64, values: Vec<Value>) -> Self {
-        self.messages.push((time, Value::Struct(values)));
+        self.messages.push((time, Value::Struct(values.into())));
         self
     }
 }
@@ -52,7 +52,7 @@ pub(crate) fn defs(fields: Vec<(&str, DataTypeDef)>) -> FieldDefs {
 }
 
 pub(crate) fn structure(fields: Vec<(&str, DataTypeDef)>) -> DataTypeDef {
-    DataTypeDef::Struct(defs(fields).into())
+    DataTypeDef::structure(defs(fields).into())
 }
 
 pub(crate) fn list(element: DataTypeDef) -> DataTypeDef {

@@ -9,7 +9,7 @@ mod segmented;
 
 pub use segmented::open_segments;
 
-use mcapdecode::core::{FieldDefs, Value};
+use mcapdecode::{FieldDefs, Value};
 use std::{path::Path, sync::Arc};
 
 /// First backwards search window of the default [`Source::latest_at`]; it

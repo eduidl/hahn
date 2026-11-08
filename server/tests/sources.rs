@@ -8,7 +8,10 @@ use std::path::Path;
 #[test]
 fn sources_hold_no_tests() {
     let mut found = Vec::new();
-    visit(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut found);
+    visit(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        &mut found,
+    );
     assert!(
         found.is_empty(),
         "Move these tests to server/tests/, testing through the public API:\n{}",

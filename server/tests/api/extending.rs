@@ -96,12 +96,15 @@ impl hahn::ViewConverter for AcmePose2d {
         "Pose"
     }
     fn accepts(&self, schema_name: &str, defs: &hahn::FieldDefs) -> bool {
-        use hahn::schema::{has, is_number, is_string};
+        use hahn::{
+            DataTypeDef,
+            schema::{has, is_string},
+        };
         schema_name == "acme_msgs/msg/Pose2D"
             && has(defs, "frame_id", is_string)
-            && has(defs, "x", is_number)
-            && has(defs, "y", is_number)
-            && has(defs, "theta", is_number)
+            && has(defs, "x", DataTypeDef::is_numeric)
+            && has(defs, "y", DataTypeDef::is_numeric)
+            && has(defs, "theta", DataTypeDef::is_numeric)
     }
     fn convert(&self, message: &hahn::Message<'_>) -> anyhow::Result<hahn::View> {
         let half = message.number("theta")? / 2.;
@@ -372,8 +375,8 @@ fn messages_read_rotations_as_unit_quaternions() {
         ("double", quaternion()),
         ("unset", quaternion()),
     ]);
-    let at = |w| V::Struct(vec![V::F64(0.), V::F64(0.), V::F64(0.), V::F64(w)]);
-    let value = V::Struct(vec![at(0.), at(2.), V::Null]);
+    let at = |w| V::Struct(vec![V::F64(0.), V::F64(0.), V::F64(0.), V::F64(w)].into());
+    let value = V::Struct(vec![at(0.), at(2.), V::Null].into());
     let message = Message::new(&defs, &value).unwrap();
     for name in ["zero", "double", "unset"] {
         assert_eq!(

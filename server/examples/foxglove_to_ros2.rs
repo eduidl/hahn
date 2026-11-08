@@ -9,75 +9,47 @@
 mod support;
 
 use anyhow::{Context, bail};
-use mcapdecode::{
-    McapReader, ReadOptions, TimeRange,
-    core::{DataTypeDef, FieldDefs, Value},
-};
-use std::{fs::File, path::Path};
+use mcapdecode::{McapReader, Value};
+use std::{ops::Bound, path::Path};
 use support::ros2::{self, Cdr, Cloud, RosWriter};
 
-/// A decoded struct, read by field name.
+/// A decoded struct, read by the field names its value carries.
 #[derive(Clone, Copy)]
-struct Fields<'a>(&'a FieldDefs, &'a [Value]);
+struct Fields<'a>(&'a Value);
 
 impl<'a> Fields<'a> {
-    fn of(defs: &'a FieldDefs, value: &'a Value) -> anyhow::Result<Self> {
-        match value {
-            Value::Struct(values) => Ok(Self(defs, values)),
-            _ => bail!("Expected a struct"),
-        }
-    }
-    fn get(&self, name: &str) -> Option<(&'a DataTypeDef, &'a Value)> {
-        let index = self.0.iter().position(|field| field.name == name)?;
-        Some((&self.0[index].element.data_type, self.1.get(index)?))
+    fn get(&self, name: &str) -> Option<&'a Value> {
+        self.0.get(name).ok()
     }
     fn string(&self, name: &str) -> &'a str {
-        match self.get(name) {
-            Some((_, Value::String(value))) => value,
-            _ => "",
-        }
+        self.get(name).and_then(|v| v.try_str().ok()).unwrap_or("")
     }
     fn number(&self, name: &str) -> f64 {
-        self.get(name)
-            .and_then(|(_, value)| number(value))
-            .unwrap_or(0.)
+        self.get(name).and_then(number).unwrap_or(0.)
     }
     fn numbers(&self, name: &str) -> Vec<f64> {
-        match self.get(name) {
-            Some((_, Value::List(values) | Value::Array(values))) => {
-                values.iter().filter_map(number).collect()
-            }
-            _ => Vec::new(),
-        }
+        self.list(name).iter().filter_map(number).collect()
     }
     fn bytes(&self, name: &str) -> &'a [u8] {
-        match self.get(name) {
-            Some((_, Value::Bytes(value) | Value::Uint8List(value))) => value,
-            _ => &[],
-        }
+        self.get(name)
+            .and_then(|v| v.try_bytes().ok())
+            .unwrap_or(&[])
+    }
+    fn list(&self, name: &str) -> &'a [Value] {
+        self.get(name)
+            .and_then(|v| v.as_sequence().ok())
+            .unwrap_or(&[])
     }
     fn child(&self, name: &str) -> Option<Fields<'a>> {
-        match self.get(name)? {
-            (DataTypeDef::Struct(defs), Value::Struct(values)) => Some(Self(&defs.fields, values)),
-            _ => None,
-        }
+        self.get(name)
+            .filter(|v| matches!(v, Value::Struct(_)))
+            .map(Self)
     }
     fn children(&self, name: &str) -> Vec<Fields<'a>> {
-        let Some((data_type, Value::List(values) | Value::Array(values))) = self.get(name) else {
-            return Vec::new();
-        };
-        let (DataTypeDef::List(element)
-        | DataTypeDef::BoundedList(element, _)
-        | DataTypeDef::Array(element, _)) = data_type
-        else {
-            return Vec::new();
-        };
-        let DataTypeDef::Struct(defs) = &element.data_type else {
-            return Vec::new();
-        };
-        values
-            .iter()
-            .filter_map(|value| Self::of(&defs.fields, value).ok())
+        let structs = self.list(name).iter();
+        structs
+            .filter(|v| matches!(v, Value::Struct(_)))
+            .map(Self)
             .collect()
     }
     fn vector(&self, name: &str) -> [f64; 3] {
@@ -92,19 +64,7 @@ impl<'a> Fields<'a> {
 }
 
 fn number(value: &Value) -> Option<f64> {
-    Some(match value {
-        Value::F64(v) => *v,
-        Value::F32(v) => *v as f64,
-        Value::I8(v) => *v as f64,
-        Value::I16(v) => *v as f64,
-        Value::I32(v) => *v as f64,
-        Value::I64(v) => *v as f64,
-        Value::U8(v) => *v as f64,
-        Value::U16(v) => *v as f64,
-        Value::U32(v) => *v as f64,
-        Value::U64(v) => *v as f64,
-        _ => return None,
-    })
+    value.try_lossy_f64().ok()
 }
 
 fn ninth(values: Vec<f64>) -> anyhow::Result<[f64; 9]> {
@@ -116,8 +76,8 @@ fn ninth(values: Vec<f64>) -> anyhow::Result<[f64; 9]> {
 /// `sensor_msgs/msg/PointField.datatype` of a `foxglove.PackedElementField`.
 fn point_datatype(field: &Fields) -> anyhow::Result<u8> {
     let name = match field.get("type") {
-        Some((_, Value::String(name))) => name.to_string(),
-        Some((_, value)) => match number(value).map(|v| v as i64) {
+        Some(Value::String(name)) => name.to_string(),
+        Some(value) => match number(value).map(|v| v as i64) {
             Some(1) => "UINT8".into(),
             Some(2) => "INT8".into(),
             Some(3) => "UINT16".into(),
@@ -145,13 +105,13 @@ fn point_datatype(field: &Fields) -> anyhow::Result<u8> {
 
 fn covariance_type(message: &Fields) -> u8 {
     match message.get("position_covariance_type") {
-        Some((_, Value::String(name))) => match name.as_ref() {
+        Some(Value::String(name)) => match name.as_ref() {
             "APPROXIMATED" => 1,
             "DIAGONAL_KNOWN" => 2,
             "KNOWN" => 3,
             _ => 0,
         },
-        Some((_, value)) => number(value).unwrap_or(0.) as u8,
+        Some(value) => number(value).unwrap_or(0.) as u8,
         None => 0,
     }
 }
@@ -292,42 +252,33 @@ fn main() -> anyhow::Result<()> {
     let input = Path::new(input);
     let seconds: Option<u64> = rest.first().map(|s| s.parse()).transpose()?;
 
-    // SAFETY: the input is not modified while this short-lived program runs.
-    let mapping = unsafe { memmap2::Mmap::map(&File::open(input)?)? };
-    let summary = mcap::read::Summary::read(&mapping)?.context("MCAP has no summary")?;
-    let start = summary
-        .stats
-        .as_ref()
-        .context("MCAP has no statistics")?
-        .message_start_time;
-    let options = ReadOptions {
-        time_range: seconds.map(|seconds| TimeRange {
-            start: Some(start),
-            end: Some(start + seconds * 1_000_000_000),
-        }),
-        parallel: Some(false),
-        ..Default::default()
-    };
-
-    let reader = McapReader::builder().with_default_decoders().build();
+    let file = McapReader::open(input)?;
+    let start = *file
+        .message_time_range()
+        .context("MCAP has no messages")?
+        .start();
+    let end = seconds.map(|seconds| start + seconds * 1_000_000_000);
     let mut writer = RosWriter::create(Path::new(output))?;
-    for channel in reader.list_channels(input)? {
-        let Some(schema) = channel.schema_name.as_deref() else {
+    for channel in file.channels() {
+        let Some(schema) = channel.schema.as_ref().map(|schema| schema.name.as_str()) else {
             continue;
         };
-        let Ok(defs) = reader.field_defs_by_channel_id(input, channel.id) else {
+        if file.read().channel(channel.id).field_defs().is_err() {
             println!("skip {} ({schema}): not decoded", channel.topic);
             continue;
-        };
+        }
         let (mut written, mut failed) = (0u64, 0u64);
         let mut first_failure = None;
-        reader.for_each_decoded_message_by_channel_id_with_options(
-            input,
-            channel.id,
-            &options,
-            &mut |message: mcapdecode::core::DecodedMessage| {
-                let result = Fields::of(&defs, &message.value)
-                    .and_then(|fields| rewrite(schema, fields, message.log_time));
+        file.read()
+            .channel(channel.id)
+            .time_range(match end {
+                Some(end) => (Bound::Included(start), Bound::Excluded(end)),
+                None => (Bound::Unbounded, Bound::Unbounded),
+            })
+            .parallel(false)
+            .decoded()
+            .try_for_each(|_, message| {
+                let result = rewrite(schema, Fields(&message.value), message.log_time);
                 match result {
                     Ok(Some((ros_type, cdr))) => {
                         writer
@@ -342,8 +293,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
                 Ok(())
-            },
-        )?;
+            })?;
         println!(
             "{} ({schema}): {written} written, {failed} failed",
             channel.topic
