@@ -214,19 +214,22 @@ impl<'a> Message<'a> {
         })
     }
 
-    /// Nanoseconds from a nested time of `sec` and `nanosec` (ROS) or `nsec`
-    /// (Foxglove). `None` when it is left out, zero (what recorders write for "not
-    /// stamped") or not a valid time: a bad stamp must not cost the value itself.
+    /// Nanoseconds from a nested time of `sec` and `nanosec` (ROS), `sec` and `nsec`
+    /// (Foxglove JSON) or `seconds` and `nanos` (`google.protobuf.Timestamp`). `None`
+    /// when it is left out, zero (what recorders write for "not stamped") or not a
+    /// valid time: a bad stamp must not cost the value itself.
     pub fn time(&self, name: &str) -> anyhow::Result<Option<u64>> {
         let Some(time) = self.child(name).ok().flatten() else {
             return Ok(None);
         };
-        let nanos = if time.has("nanosec") {
-            "nanosec"
+        let (sec, nanos) = if time.has("seconds") {
+            ("seconds", "nanos")
+        } else if time.has("nanosec") {
+            ("sec", "nanosec")
         } else {
-            "nsec"
+            ("sec", "nsec")
         };
-        let (Ok(sec), Ok(nanos)) = (time.number("sec"), time.number(nanos)) else {
+        let (Ok(sec), Ok(nanos)) = (time.number(sec), time.number(nanos)) else {
             return Ok(None);
         };
         if !(sec >= 0. && sec.fract() == 0. && nanos.fract() == 0. && (0. ..1e9).contains(&nanos)) {

@@ -629,13 +629,28 @@ async fn values_carry_the_measurement_time_their_message_records() {
         "test/Echo",
         vec![("case", T::U32), ("timestamp", time("nsec"))],
     );
+    let protobuf = Topic::new(
+        "protobuf",
+        "test/Echo",
+        vec![
+            ("case", T::U32),
+            (
+                "timestamp",
+                structure(vec![("seconds", T::I64), ("nanos", T::I32)]),
+            ),
+        ],
+    );
     let stamp = |sec, nanos| V::Struct(vec![V::I32(sec), V::U32(nanos)].into());
     let ros = ros
         .at(5, vec![V::U32(0), V::Struct(vec![stamp(1, 500)].into())])
         .at(6, vec![V::U32(1), V::Struct(vec![stamp(0, 0)].into())])
         .at(7, vec![V::U32(2), V::Struct(vec![stamp(-1, 0)].into())]);
     let foxglove = foxglove.at(5, vec![V::U32(0), stamp(2, 7)]);
-    let (_dir, app) = crate::memory::app(vec![ros, foxglove], |builder| {
+    let protobuf = protobuf.at(
+        5,
+        vec![V::U32(0), V::Struct(vec![V::I64(3), V::I32(9)].into())],
+    );
+    let (_dir, app) = crate::memory::app(vec![ros, foxglove, protobuf], |builder| {
         builder.view(Echo(hahn::Kind::Pose, |_| {
             hahn::PoseView {
                 frame_id: Some("map".into()),
@@ -674,6 +689,10 @@ async fn values_carry_the_measurement_time_their_message_records() {
     assert_eq!(
         stamps("foxglove").await,
         vec![(json!("5"), json!("2000000007"))]
+    );
+    assert_eq!(
+        stamps("protobuf").await,
+        vec![(json!("5"), json!("3000000009"))]
     );
 }
 
