@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildFieldIndex } from "../../src/workspace/fieldIndex";
 import { WidgetSettings } from "../../src/workspace/WidgetSettings";
 import { widget, widgetSpecs, widgetTypes, type Widget } from "../../src/workspace/widgets";
+import { withStore } from "../dataStore";
 
 const show = (type: Widget["type"]) =>
   render(
@@ -13,6 +14,7 @@ const show = (type: Widget["type"]) =>
       records={[]}
       index={buildFieldIndex([])}
     />,
+    withStore(),
   );
 
 describe("widget settings", () => {

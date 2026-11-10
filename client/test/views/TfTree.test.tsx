@@ -2,7 +2,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fitViewport, layoutFrames, TfTree, zoomViewport } from "../../src/views/TfTree";
+import { useFrames } from "../../src/data/useViewData";
 import { createPlaybackStore, PlaybackContext } from "../../src/workspace/playback";
+import { DataStore, DataStoreContext } from "../../src/data/store";
 import { withStore } from "../dataStore";
 
 afterEach(() => {
@@ -54,12 +56,19 @@ it("loads the current run and distinguishes empty results from errors", async ()
     () => 1,
     () => {},
   );
-  const tree = (runId: string) => (
-    <PlaybackContext.Provider value={store}>
-      <TfTree runId={runId} info={null} />
-    </PlaybackContext.Provider>
-  );
-  const { rerender } = render(tree("first"), withStore("first"));
+  // As in the app, each run comes with its own store.
+  const stores = new Map<string, DataStore>();
+  const tree = (runId: string) => {
+    if (!stores.has(runId)) stores.set(runId, new DataStore(runId));
+    return (
+      <DataStoreContext.Provider value={stores.get(runId)!}>
+        <PlaybackContext.Provider value={store}>
+          <TfTree runId={runId} info={null} />
+        </PlaybackContext.Provider>
+      </DataStoreContext.Provider>
+    );
+  };
+  const { rerender } = render(tree("first"));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "base, parent world" })).toBeTruthy(),
   );
@@ -263,4 +272,23 @@ it("zooms at the pointer with the wheel and stops the page from scrolling", asyn
   // The top left pixel still shows the unit (-390, -210).
   expect(svg.getAttribute("viewBox")).toBe("-390 -210 800 400");
   rect.mockRestore();
+});
+
+it("lists the frames once for the tree and the settings of a 3D view alike", async () => {
+  const fetch = vi.fn(async () => Response.json({ frames: [{ id: "world", parent: null }] }));
+  vi.stubGlobal("fetch", fetch);
+  const { wrapper } = withStore("run");
+  function Both() {
+    const { frames } = useFrames(["run/0"]);
+    return (
+      <PlaybackContext.Provider value={createPlaybackStore()}>
+        <TfTree runId="run" info={null} />
+        <output>{frames.length}</output>
+      </PlaybackContext.Provider>
+    );
+  }
+  render(<Both />, { wrapper });
+  await screen.findByRole("button", { name: "world" });
+  expect(screen.getByRole("status").textContent).toBe("1");
+  expect(fetch).toHaveBeenCalledTimes(1);
 });

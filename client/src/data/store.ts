@@ -1,5 +1,8 @@
 import { createContext, useContext } from "react";
+import type { Schemas } from "../types";
 import { FieldCache } from "./fieldCache";
+import { Once } from "./once";
+import { get } from "./request";
 import { RunTransforms } from "./runTransforms";
 
 /**
@@ -9,10 +12,19 @@ import { RunTransforms } from "./runTransforms";
 export class DataStore {
   /** Message fields of the run's groups. */
   readonly fields = new FieldCache();
+  /** The coordinate frames of the run, as listed once for all its views. */
+  readonly frames: Once<Schemas["FrameInfo"][]> | undefined;
   private readonly runTransforms: RunTransforms | undefined;
 
   constructor(readonly run: string | null) {
-    this.runTransforms = run === null ? undefined : new RunTransforms(`/api/runs/${run}`);
+    const url = `/api/runs/${run}`;
+    this.runTransforms = run === null ? undefined : new RunTransforms(url);
+    this.frames =
+      run === null
+        ? undefined
+        : new Once(
+            async (signal) => (await get<Schemas["FrameList"]>(`${url}/frames`, signal)).frames,
+          );
   }
 
   /** The run's transforms, given the run's URL; none for another run. */
@@ -24,6 +36,7 @@ export class DataStore {
   clear() {
     this.fields.clear();
     this.runTransforms?.clear();
+    this.frames?.clear();
   }
 }
 
