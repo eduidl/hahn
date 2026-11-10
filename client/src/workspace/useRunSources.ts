@@ -3,7 +3,6 @@ import type { Session } from "./persistence";
 import type { WorkspaceAction } from "./widgets";
 import {
   HttpError,
-  get,
   initialSources,
   mergeInfo,
   sourceOf,
@@ -11,6 +10,7 @@ import {
   sourceUrl,
   type LoadedSource,
 } from "../data/sources";
+import { get } from "../data/request";
 import { errorMessage, type RecordingInfo, type Run, type Schemas } from "../types";
 
 /**

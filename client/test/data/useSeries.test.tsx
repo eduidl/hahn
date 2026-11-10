@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { StrictMode } from "react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FieldCache } from "../../src/data/fieldCache";
 import { useSeries } from "../../src/data/useSeries";
 import { keyOf, type Info, type Selected } from "../../src/types";
 
@@ -20,6 +21,11 @@ const field = (name: string): Selected => ({
   hidden: false,
 });
 
+// The cache of a run, as the store gives each widget.
+let cache: FieldCache;
+beforeEach(() => {
+  cache = new FieldCache();
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -48,10 +54,13 @@ function mockFetch() {
 describe("full-recording series cache", () => {
   it("retains existing samples and requests only newly added fields", async () => {
     const fetch = mockFetch();
-    const { result, rerender } = renderHook(({ selected }) => useSeries(info.start_ns, selected), {
-      initialProps: { selected: [field("x")] },
-      wrapper: StrictMode,
-    });
+    const { result, rerender } = renderHook(
+      ({ selected }) => useSeries(info.start_ns, selected, cache),
+      {
+        initialProps: { selected: [field("x")] },
+        wrapper: StrictMode,
+      },
+    );
     await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
     const originalPoints = result.current.plotted[0].points;
     rerender({ selected: [field("x"), field("y")] });
@@ -74,7 +83,7 @@ describe("full-recording series cache", () => {
     const { result, rerender } = renderHook(
       ({ selected, viewport }) => {
         void viewport;
-        return useSeries(info.start_ns, selected);
+        return useSeries(info.start_ns, selected, cache);
       },
       { initialProps: { selected: [field("x")], viewport: [0, 1] } },
     );
@@ -97,7 +106,7 @@ describe("full-recording series cache", () => {
   it("requests each field separately", async () => {
     const fetch = mockFetch();
     const selected = Array.from({ length: 70 }, (_, i) => field(`field${i}`));
-    const { result } = renderHook(() => useSeries(info.start_ns, selected));
+    const { result } = renderHook(() => useSeries(info.start_ns, selected, cache));
     await waitFor(() =>
       expect(result.current.records.filter((r) => r.status === "complete")).toHaveLength(70),
     );
@@ -107,7 +116,9 @@ describe("full-recording series cache", () => {
   it("requests each field from its own recording", async () => {
     const fetch = mockFetch();
     const other: Selected = { ...field("x"), key: keyOf("r/1", "/pose", ["x"]), source: "r/1" };
-    const { result } = renderHook(() => useSeries(info.start_ns, [field("x"), field("y"), other]));
+    const { result } = renderHook(() =>
+      useSeries(info.start_ns, [field("x"), field("y"), other], cache),
+    );
     await waitFor(() =>
       expect(result.current.records.map((r) => r.status)).toEqual([
         "complete",
@@ -139,9 +150,12 @@ describe("full-recording series cache", () => {
         );
       }),
     );
-    const { result, rerender } = renderHook(({ fields }) => useSeries(info.start_ns, fields), {
-      initialProps: { fields: [field("x")] },
-    });
+    const { result, rerender } = renderHook(
+      ({ fields }) => useSeries(info.start_ns, fields, cache),
+      {
+        initialProps: { fields: [field("x")] },
+      },
+    );
     await waitFor(() => expect(result.current.busy).toBe(true));
     rerender({ fields: [] });
     expect(signal?.aborted).toBe(true);
@@ -180,14 +194,13 @@ describe("full-recording series cache", () => {
         { name: "RUN", value: "1" },
       ],
     };
-    const { result } = renderHook(() => useSeries(info.start_ns, [mode]));
+    const { result } = renderHook(() => useSeries(info.start_ns, [mode], cache));
     await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
     expect(result.current.plotted[0].points[0]).toMatchObject({ y: 1, raw: 1 });
   });
 });
 
 it("uses a shared parent history instead of decoding a numerical field again", async () => {
-  const { FieldCache } = await import("../../src/data/fieldCache");
   const shared = new FieldCache();
   const fetch = vi.fn(
     async () =>
@@ -208,7 +221,6 @@ it("uses a shared parent history instead of decoding a numerical field again", a
 });
 
 it("keeps the histories of a shared cache when the origin moves", async () => {
-  const { FieldCache } = await import("../../src/data/fieldCache");
   const shared = new FieldCache();
   const fetch = mockFetch();
   const { result, rerender } = renderHook(

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { StrictMode } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FieldCache } from "../../src/data/fieldCache";
 import { useMessages } from "../../src/data/useMessages";
 import { initialWorkspace, workspaceReducer, type Widget } from "../../src/workspace/widgets";
 import { keyOf, type Selected } from "../../src/types";
@@ -26,6 +27,11 @@ const batch = `${JSON.stringify({
   scanned_messages: 1,
 })}\n`;
 const complete = `${JSON.stringify({ type: "complete", scanned_messages: 1 })}\n`;
+// The cache of a run, as the store gives each widget.
+let cache: FieldCache;
+beforeEach(() => {
+  cache = new FieldCache();
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -37,9 +43,12 @@ describe("message history loading", () => {
     vi.stubGlobal("fetch", fetch);
     const initial = widgets();
     initial.copy = { ...initial["widget-2"], id: "copy" };
-    const { result, rerender } = renderHook(({ items }) => useMessages("1000000000", items), {
-      initialProps: { items: initial },
-    });
+    const { result, rerender } = renderHook(
+      ({ items }) => useMessages("1000000000", items, cache),
+      {
+        initialProps: { items: initial },
+      },
+    );
     await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(result.current.records[0].rows).toHaveLength(1);
@@ -67,9 +76,12 @@ describe("message history loading", () => {
         (_url, options) => new Promise<Response>((resolve) => pending.push({ options, resolve })),
       ),
     );
-    const { result, rerender } = renderHook(({ items }) => useMessages("1000000000", items), {
-      initialProps: { items: widgets() },
-    });
+    const { result, rerender } = renderHook(
+      ({ items }) => useMessages("1000000000", items, cache),
+      {
+        initialProps: { items: widgets() },
+      },
+    );
     rerender({ items: widgets(["x"]) });
     expect((pending[0].options.signal as AbortSignal).aborted).toBe(true);
     await act(async () => {
@@ -97,9 +109,12 @@ describe("message history loading", () => {
         ),
       ),
     );
-    const { result, rerender } = renderHook(({ selected }) => useMessages("1000000000", selected), {
-      initialProps: { selected: widgets() },
-    });
+    const { result, rerender } = renderHook(
+      ({ selected }) => useMessages("1000000000", selected, cache),
+      {
+        initialProps: { selected: widgets() },
+      },
+    );
     await waitFor(() => expect(result.current.records[0]?.rows).toHaveLength(1));
     rerender({ selected: {} });
     await waitFor(() => expect(result.current.busy).toBe(false));
@@ -110,7 +125,7 @@ describe("message history loading", () => {
       "fetch",
       vi.fn(() => Promise.resolve(new Response(batch))),
     );
-    const { result } = renderHook(() => useMessages("1000000000", widgets()), {
+    const { result } = renderHook(() => useMessages("1000000000", widgets(), cache), {
       wrapper: StrictMode,
     });
     await waitFor(() => expect(result.current.records[0]?.status).toBe("error"));

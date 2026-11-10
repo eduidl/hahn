@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FieldCache, holdHistories } from "./fieldCache";
+import { holdHistories, type FieldCache } from "./fieldCache";
 import { appendPoints, point } from "./data";
 import type { Series } from "../views/Plot";
 import { errorMessage, type Selected } from "../types";
@@ -15,9 +15,7 @@ export type CachedSeries = Series & {
  * Points are seconds from `origin`, the start of the open recordings, so only
  * a new origin invalidates them; opening another recording does not.
  */
-export function useSeries(origin: string | null, selected: Selected[], sharedCache?: FieldCache) {
-  const [localCache] = useState(() => new FieldCache());
-  const histories = sharedCache ?? localCache;
+export function useSeries(origin: string | null, selected: Selected[], histories: FieldCache) {
   const cache = useRef(new Map<string, CachedSeries>());
   const requests = useRef(new Map<AbortController, CachedSeries[]>());
   const held = useRef(new Map<string, () => void>());
