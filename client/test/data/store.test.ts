@@ -96,3 +96,21 @@ it("places a whole history with the static transforms already read", async () =>
   await transforms.over(0n, 10n);
   expect(statics()).toBe(1);
 });
+
+it("reads ahead the small views of a group together, a window at a time", async () => {
+  const signals = hang();
+  const fetch = vi.mocked(globalThis.fetch);
+  const views = new DataStore("r").views;
+  const pose = { source: "r/0", topic: "/pose", view: "pose" };
+  const boxes = { source: "r/0", topic: "/boxes", view: "bbox3d" };
+  const release = [views.ahead(pose, 0n, 2, true), views.ahead(boxes, 0n, 2, true)];
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const batches = fetch.mock.calls.filter(([url]) => String(url).endsWith("/views/batch"));
+  expect(batches.map(([, init]) => JSON.parse(String(init!.body)).start_ns)).toEqual([
+    "1000000000",
+    "2000000000",
+  ]);
+  for (const done of release) done();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(signals.every((signal) => signal.aborted)).toBe(true);
+});
