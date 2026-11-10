@@ -1,4 +1,5 @@
-import { ServerError, responseError } from "./errors";
+import { ServerError } from "./errors";
+import { request } from "./request";
 import { sourceUrl } from "./sources";
 import type { Schemas, Selected } from "../types";
 
@@ -71,8 +72,7 @@ async function fetchBuffer(
   maxBytes?: number,
   init?: RequestInit,
 ) {
-  const response = await fetch(url, { ...init, signal });
-  if (!response.ok) throw await responseError(response);
+  const response = await request(url, { ...init, signal });
   if (maxBytes !== undefined && response.body) {
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];

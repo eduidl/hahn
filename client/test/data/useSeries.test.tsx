@@ -206,3 +206,21 @@ it("uses a shared parent history instead of decoding a numerical field again", a
   expect(result.current.plotted[0].points[0].raw).toBe(42);
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+it("keeps the histories of a shared cache when the origin moves", async () => {
+  const { FieldCache } = await import("../../src/data/fieldCache");
+  const shared = new FieldCache();
+  const fetch = mockFetch();
+  const { result, rerender } = renderHook(
+    ({ origin, selected }) => useSeries(origin, selected, shared),
+    { initialProps: { origin: info.start_ns, selected: [field("x")] } },
+  );
+  await waitFor(() => expect(result.current.records[0]?.status).toBe("complete"));
+  // Opening a group that starts earlier moves the origin back by a second.
+  rerender({ origin: "0", selected: [field("x")] });
+  await waitFor(() => expect(result.current.plotted[0]?.points[0]?.x).toBe(1));
+  expect(fetch).toHaveBeenCalledTimes(1);
+  // The history is still let go once no widget shows it.
+  rerender({ origin: "0", selected: [] });
+  await waitFor(() => expect(shared.hasHistory(field("x"))).toBe(false));
+});

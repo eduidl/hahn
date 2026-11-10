@@ -5,6 +5,7 @@ import { fullImage, ImageView, panImage, zoomImage } from "../../src/views/Image
 import { buildFieldIndex } from "../../src/workspace/fieldIndex";
 import { initialWorkspace, workspaceReducer } from "../../src/workspace/widgets";
 import type { Topic } from "../../src/types";
+import { withStore } from "../dataStore";
 
 const mocks = vi.hoisted(() => ({ frame: null as any, fetch: vi.fn(), history: vi.fn() }));
 vi.mock("../../src/data/useViewData", async (importOriginal) => ({
@@ -130,7 +131,10 @@ it("keeps the previous image and points visible while the next projection loads"
   }));
   const info = { start_ns: "0", end_ns: "10", message_count: 1 };
   mocks.frame = image("1");
-  const view = render(<ImageView widget={widget} info={info} index={index} />);
+  const view = render(
+    <ImageView widget={widget} info={info} index={index} />,
+    withStore(widget.series[0].source.split("/")[0]),
+  );
   await waitFor(() => expect(view.container.querySelector("canvas")).not.toBeNull());
   const oldSrc = screen.getByRole("img").getAttribute("src");
   mocks.frame = image("2");
@@ -267,7 +271,10 @@ it("projects a cloud of another frame with transforms resolved at the image's st
     blob: () => new Uint8Array([1]),
   };
   const info = { start_ns: "0", end_ns: "10", message_count: 1 };
-  const view = render(<ImageView widget={widget} info={info} index={index} />);
+  const view = render(
+    <ImageView widget={widget} info={info} index={index} />,
+    withStore(widget.series[0].source.split("/")[0]),
+  );
   await waitFor(() => expect(view.container.querySelector("canvas")).not.toBeNull());
   // Resolved from the run's samples; the server is not asked to resolve.
   expect(requests).toContain("/api/runs/stamped/transforms/static");
@@ -362,7 +369,10 @@ it("overlays the marks of the image's stamp, sought around its time", async () =
     blob: () => new Uint8Array([1]),
   };
   const info = { start_ns: "0", end_ns: "10000000000", message_count: 1 };
-  render(<ImageView widget={widget} info={info} index={index} />);
+  render(
+    <ImageView widget={widget} info={info} index={index} />,
+    withStore(widget.series[0].source.split("/")[0]),
+  );
   // The marks recorded a second after the image, with its stamp, are drawn.
   await waitFor(() => expect(stroke).toHaveBeenCalled());
   expect(mocks.history).toHaveBeenCalledWith(
@@ -439,6 +449,7 @@ it("displays raw images without encoding them as image files", async () => {
       info={{ start_ns: "0", end_ns: "10", message_count: 1 }}
       index={index}
     />,
+    withStore("r"),
   );
   await waitFor(() => expect(screen.getByRole("img").tagName).toBe("CANVAS"));
   expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0);

@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
-import { FieldCache, FieldCacheContext } from "../../src/data/fieldCache";
+import { DataStore, DataStoreContext } from "../../src/data/store";
 import { PlaybackContext, createPlaybackStore } from "../../src/workspace/playback";
 import { useCurrentMessage } from "../../src/data/useCurrentMessage";
 import { keyOf, type Selected } from "../../src/types";
@@ -21,7 +21,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 function setup() {
-  const cache = new FieldCache();
+  const store = new DataStore("r");
+  const cache = store.fields;
   const playback = createPlaybackStore(
     () => 1,
     () => {},
@@ -29,8 +30,8 @@ function setup() {
   playback.reset(7);
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(
-      FieldCacheContext.Provider,
-      { value: cache },
+      DataStoreContext.Provider,
+      { value: store },
       createElement(PlaybackContext.Provider, { value: playback }, children),
     );
   return { cache, playback, wrapper };

@@ -2,6 +2,7 @@
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useTransforms } from "../../src/data/useViewData";
+import { withStore } from "../dataStore";
 
 afterEach(() => {
   cleanup();
@@ -40,6 +41,7 @@ it("keeps a frame at its last place when asked to, and says so by leaving no gap
     ({ ns }) => useTransforms("hold/group", "map", ns, true),
     {
       initialProps: { ns: "1" },
+      wrapper: withStore("hold").wrapper,
     },
   );
   await waitFor(() => expect(result.current.transforms?.time_ns).toBe("1"));
@@ -56,6 +58,7 @@ it("resolves only what the samples cover otherwise, loading them once", async ()
   const fetch = serve();
   const { result, rerender } = renderHook(({ ns }) => useTransforms("once/group", "map", ns), {
     initialProps: { ns: "1" },
+    wrapper: withStore("once").wrapper,
   });
   await waitFor(() => expect(result.current.transforms?.time_ns).toBe("1"));
   rerender({ ns: "4" });
@@ -71,8 +74,9 @@ it("resolves only what the samples cover otherwise, loading them once", async ()
 
 it("resolves on the measurement axis and without interpolation when asked", async () => {
   serve();
-  const { result } = renderHook(() =>
-    useTransforms("axis/group", "map", "5", false, { axis: "stamp", interpolate: false }),
+  const { result } = renderHook(
+    () => useTransforms("axis/group", "map", "5", false, { axis: "stamp", interpolate: false }),
+    { wrapper: withStore("axis").wrapper },
   );
   await waitFor(() => expect(result.current.transforms?.time_ns).toBe("5"));
   // By stamp, b's samples are at 0 and 9; without interpolation the first holds.

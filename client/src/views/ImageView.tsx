@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { secondsFrom } from "../data/data";
 import { runUrl } from "../data/sources";
-import { runTransforms } from "../data/runTransforms";
+import { useDataStore } from "../data/store";
 import { ReportSeriesProblem } from "./seriesViewProblem";
 import { decodeImage } from "../data/imagePixels";
 import { useLatestOnly, useViewFrame } from "../data/useViewData";
@@ -163,6 +163,7 @@ export function ImageView({
     (item) => kind(item) === "image_annotations" && !item.hidden,
   );
   const { frame, error } = useViewFrame(series, info);
+  const store = useDataStore();
   const formatter = useTimeFormatter(info?.start_ns ?? null);
   const choice = calibrationChoice(index, series);
   const calibrationLoader = useRef<ReturnType<typeof createCalibrationLoader>>(undefined);
@@ -219,7 +220,8 @@ export function ImageView({
           const frameId = cloud?.value?.kind === "pointcloud" ? cloud.value.frame_id : null;
           if (!frameId || frameId === image.frame_id) return { series, frame: cloud };
           // At the image's measurement time when it has one, else its log time (ADR 0002).
-          const transforms = runTransforms(runUrl(series.source));
+          const transforms = store.transforms(runUrl(series.source));
+          if (!transforms) throw new Error("The run is no longer open");
           await transforms.ensure(BigInt(time));
           if (signal.aborted) throw new DOMException("Aborted", "AbortError");
           const failure = transforms.error();

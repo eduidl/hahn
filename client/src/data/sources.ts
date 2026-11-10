@@ -9,7 +9,6 @@ import {
   type Schemas,
   type Topic,
 } from "../types";
-import { responseError } from "./errors";
 
 /** Keep display names separate from the server's unique topic identifiers. */
 export function sourceTopics(source: string, topics: Schemas["Topic"][]): Topic[] {
@@ -31,11 +30,7 @@ export function sourceTopics(source: string, topics: Schemas["Topic"][]): Topic[
 
 export { HttpError } from "./errors";
 
-export async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw await responseError(response);
-  return response.json();
-}
+export { get } from "./request";
 
 /** Identifies an open group of the open run. Ids never contain a slash. */
 export const sourceOf = (run: string, group: string) => `${run}/${group}`;

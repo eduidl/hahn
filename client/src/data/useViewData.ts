@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { get, runUrl } from "./sources";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
-import { runTransforms } from "./runTransforms";
+import { useDataStore } from "./store";
 import type { ResolvedFrames, ResolveOptions } from "./tfGraph";
 import {
   fetchLatestFrame,
@@ -206,7 +206,8 @@ export function useTransforms(
 ) {
   const { axis = "time", interpolate = true } = options;
   const near = options.near ?? ns;
-  const store = source ? runTransforms(runUrl(source)) : undefined;
+  const data = useDataStore();
+  const store = source ? data.transforms(runUrl(source)) : undefined;
   const version = useSyncExternalStore(
     store?.subscribe ?? noSubscription,
     store?.getVersion ?? noVersion,

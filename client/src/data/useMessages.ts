@@ -45,11 +45,17 @@ export function useMessages(
     })),
   );
 
+  // Histories held in a cache no longer used are discarded with it.
+  useEffect(() => {
+    held.current = new Map();
+  }, [fields]);
+
   useEffect(() => {
     cache.current.clear();
-    if (!sharedCache) fields.clear();
-    // A new origin comes with a new or cleared cache.
-    held.current = new Map();
+    if (!sharedCache) {
+      fields.clear();
+      held.current = new Map();
+    }
     dirty.current = true;
     return () => {
       for (const controller of requests.current.values()) controller.abort();
@@ -108,7 +114,7 @@ export function useMessages(
           if (requests.current.get(s.key) === controller) requests.current.delete(s.key);
         });
     }
-  }, [origin, selectionKey]);
+  }, [origin, selectionKey, fields]);
 
   useEffect(() => {
     const timer = setInterval(() => {
