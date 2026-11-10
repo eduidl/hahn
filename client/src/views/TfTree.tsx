@@ -2,9 +2,8 @@ import "./TfTree.css";
 import { useTimeFormatter } from "../timeDisplay";
 import { secondsFrom } from "../data/data";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { get } from "../data/sources";
-import { usePlaybackNs, useTransforms, type FrameInfo } from "../data/useViewData";
-import { errorMessage, type Info, type Schemas } from "../types";
+import { usePlaybackNs, useRunFrames, useTransforms, type FrameInfo } from "../data/useViewData";
+import type { Info } from "../types";
 
 type Node = { id: string; parent: string | null; x: number; y: number };
 
@@ -105,7 +104,6 @@ export function TfTree({
   resetCount?: number;
   onCanReset?: (canReset: boolean) => void;
 }) {
-  const [loaded, setLoaded] = useState<{ run: string; frames: FrameInfo[]; error: string }>();
   const [selected, setSelected] = useState<{ run: string; id: string }>();
   const [view, setView] = useState<Viewport>();
   useEffect(() => {
@@ -130,25 +128,12 @@ export function TfTree({
   const drag = useRef<{ x: number; y: number }>(undefined);
   const [poseOffset, setPoseOffset] = useState({ x: 0, y: 0 });
   const poseDrag = useRef<{ x: number; y: number }>(undefined);
-  useEffect(() => {
-    if (!runId) return;
-    const controller = new AbortController();
-    setView(undefined);
-    get<Schemas["FrameList"]>(`/api/runs/${runId}/frames`, controller.signal)
-      .then(({ frames }) => {
-        if (!controller.signal.aborted) setLoaded({ run: runId, frames, error: "" });
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted)
-          setLoaded({ run: runId, frames: [], error: errorMessage(error) });
-      });
-    return () => controller.abort();
-  }, [runId]);
-  const state = loaded?.run === runId ? loaded : undefined;
-  const nodes = useMemo(() => layoutFrames(state?.frames ?? []), [state]);
+  useEffect(() => setView(undefined), [runId]);
+  const state = useRunFrames(runId);
+  const nodes = useMemo(() => layoutFrames(state.frames), [state.frames]);
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const frame =
-    selected?.run === runId ? state?.frames.find((item) => item.id === selected.id) : undefined;
+    selected?.run === runId ? state.frames.find((item) => item.id === selected.id) : undefined;
   const parent = frame?.parent && byId.has(frame.parent) ? frame.parent : null;
   const ns = usePlaybackNs(info);
   const clock = useTimeFormatter(info?.start_ns ?? null);
@@ -198,7 +183,7 @@ export function TfTree({
     setPoseOffset((offset) => ({ x: offset.x + dx, y: offset.y + dy }));
   };
   if (!runId) return <p className="widget-status">Open a run from the header</p>;
-  if (!state) return <p className="widget-status">Loading…</p>;
+  if (!state.loaded && !state.error) return <p className="widget-status">Loading…</p>;
   if (state.error)
     return (
       <p className="widget-status widget-status-error" role="alert">

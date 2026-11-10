@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
-import { get, runUrl } from "./sources";
+import { runUrl } from "./sources";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
+import type { OnceState } from "./once";
 import { useDataStore } from "./store";
 import type { ResolvedFrames, ResolveOptions } from "./tfGraph";
 import {
@@ -156,25 +157,29 @@ export function useViewFrame(series: Selected | undefined, info: Info | null, ba
 
 export type FrameInfo = Schemas["FrameInfo"];
 
-/** The frames of the runs of the given groups, without duplicates. */
+const noSubscription = () => () => {};
+const nothing: OnceState<FrameInfo[]> = { error: "", loading: false };
+const noState = () => nothing;
+const noFrames: FrameInfo[] = [];
+
+/** The frames of the open run, read once for everyone who asks. None for another run. */
+export function useRunFrames(runId: string | null) {
+  const store = useDataStore();
+  const resource = runId !== null && store.run === runId ? store.frames : undefined;
+  const state = useSyncExternalStore(
+    resource?.subscribe ?? noSubscription,
+    resource?.getState ?? noState,
+  );
+  useEffect(() => resource?.load(), [resource]);
+  return { frames: state.value ?? noFrames, error: state.error, loaded: state.value !== undefined };
+}
+
+/** The frames of the run of the given groups; none without groups. */
 export function useFrames(sources: string[]) {
-  const key = JSON.stringify([...new Set(sources.map(runUrl))].sort());
-  const [state, setState] = useState<{ key: string; frames: FrameInfo[]; error: string }>();
-  useEffect(() => {
-    const controller = new AbortController();
-    const list: string[] = JSON.parse(key);
-    Promise.all(list.map((run) => get<Schemas["FrameList"]>(`${run}/frames`, controller.signal)))
-      .then((lists) => {
-        const byId = new Map(lists.flatMap((l) => l.frames).map((f) => [f.id, f]));
-        setState({ key, frames: [...byId.values()], error: "" });
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) setState({ key, frames: [], error: errorMessage(error) });
-      });
-    return () => controller.abort();
-  }, [key]);
-  const frames = useMemo(() => (state?.key === key ? state.frames : []), [state, key]);
-  return { frames, error: state?.key === key ? state.error : "" };
+  const store = useDataStore();
+  const shown = sources.some((source) => runUrl(source) === `/api/runs/${store.run}`);
+  const { frames, error } = useRunFrames(shown ? store.run : null);
+  return { frames, error };
 }
 
 /** What a 3D view renders in: the chosen frame, else the first root of the graph. */
@@ -183,7 +188,6 @@ export const fixedFrameOf = (chosen: string | null, frames: FrameInfo[]) =>
     ? chosen
     : (frames.find((f) => f.parent === null)?.id ?? null);
 
-const noSubscription = () => () => {};
 const noVersion = () => 0;
 
 /**
