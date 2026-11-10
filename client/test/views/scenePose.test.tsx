@@ -2,7 +2,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import * as THREE from "three";
 import { expect, it, vi } from "vitest";
+import { RunTransforms } from "../../src/data/runTransforms";
 import { TfGraph } from "../../src/data/tfGraph";
+import { withStore } from "../dataStore";
 import { BoxesLayer, PoseLayer, PoseSetLayer, PoseTrail } from "../../src/views/sceneLayers";
 import { useSeriesViewProblems } from "../../src/views/seriesViewProblem";
 
@@ -26,10 +28,7 @@ vi.mock("../../src/data/useViewData", async (original) => ({
 
 mocks.graph.mockResolvedValue(new TfGraph());
 
-vi.mock("../../src/data/runTransforms", async (original) => ({
-  ...(await original<typeof import("../../src/data/runTransforms")>()),
-  fetchTransformGraph: mocks.graph,
-}));
+vi.spyOn(RunTransforms.prototype, "over").mockImplementation(mocks.graph);
 
 vi.mock("../../src/data/viewFrames", async (original) => ({
   ...(await original<typeof import("../../src/data/viewFrames")>()),
@@ -120,6 +119,7 @@ it("shows the trajectory up to playback and updates it when seeking", async () =
   const info = { start_ns: "0", end_ns: "10", message_count: 3 };
   const view = render(
     <PoseTrail series={series} info={info} target="map" world="map" stage={stage} />,
+    withStore("r"),
   );
   await waitFor(() =>
     expect((stage.scene.children[0] as THREE.LineSegments).geometry.attributes.position.count).toBe(
@@ -128,7 +128,10 @@ it("shows the trajectory up to playback and updates it when seeking", async () =
   );
   const line = stage.scene.children[0] as THREE.LineSegments;
   expect(line.geometry.drawRange.count).toBe(2);
-  expect(mocks.history).toHaveBeenCalledWith(series, expect.any(AbortSignal));
+  expect(mocks.history).toHaveBeenCalledWith(
+    { source: series.source, topic: series.topic, view: series.view },
+    expect.any(AbortSignal),
+  );
   mocks.ns = 3n;
   view.rerender(<PoseTrail series={series} info={info} target="map" world="map" stage={stage} />);
   expect(line.geometry.drawRange.count).toBe(4);
@@ -190,18 +193,16 @@ it("shows a trail recorded in a stable frame from where the fixed frame is now",
   const trail = () => (
     <PoseTrail series={series} info={info} target="lidar" world="map" stage={stage} />
   );
-  const view = render(trail());
+  const view = render(trail(), withStore("r"));
   await waitFor(() => expect(mocks.history).toHaveBeenCalled());
   // In the stable frame, not in the moving one, where every sample would be at its origin:
   // the poses, recorded in it, are placed with the run's samples over their span.
-  expect(mocks.history).toHaveBeenCalledWith(series, expect.any(AbortSignal));
+  expect(mocks.history).toHaveBeenCalledWith(
+    { source: series.source, topic: series.topic, view: series.view },
+    expect.any(AbortSignal),
+  );
   await waitFor(() =>
-    expect(mocks.graph).toHaveBeenCalledWith(
-      "/api/runs/r",
-      0n,
-      1_000_000_002n,
-      expect.any(AbortSignal),
-    ),
+    expect(mocks.graph).toHaveBeenCalledWith(0n, 1_000_000_002n, expect.any(AbortSignal)),
   );
   const line = stage.scene.children[0] as THREE.LineSegments;
   expect(line.visible).toBe(true);

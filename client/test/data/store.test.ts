@@ -57,3 +57,42 @@ it("keeps reading a view's window while one of the views showing it remains", as
   await expect(b).rejects.toMatchObject({ name: "AbortError" });
   expect(signals.every((signal) => signal.aborted)).toBe(true);
 });
+
+it("reads a view's history once while widgets hold it, and lets it go after", async () => {
+  // A view response that ends at once: a header padded to 8 bytes, and no payload.
+  const header = new TextEncoder().encode('{"type":"complete","scanned_messages":0}');
+  const empty = () => {
+    const bytes = new Uint8Array(8 + Math.ceil(header.length / 8) * 8);
+    new DataView(bytes.buffer).setUint32(0, header.length, true);
+    bytes.set(header, 8);
+    return new Response(bytes);
+  };
+  const fetch = vi.fn(async () => empty());
+  vi.stubGlobal("fetch", fetch);
+  const views = new DataStore("r").views;
+  const target = { source: "r/0", topic: "/gps", view: "geo_location" };
+  const release = [views.retainHistory(target), views.retainHistory(target)];
+  const signal = new AbortController().signal;
+  await Promise.all([views.history(target, signal), views.history(target, signal)]);
+  await views.history(target, signal);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  release[0]();
+  await views.history(target, signal);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  release[1]();
+  await views.history(target, signal);
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it("places a whole history with the static transforms already read", async () => {
+  const fetch = vi.fn(async (url: string) =>
+    Response.json(url.endsWith("/static") ? { transforms: [] } : { samples: [] }),
+  );
+  vi.stubGlobal("fetch", fetch);
+  const transforms = new DataStore("r").transforms("/api/runs/r")!;
+  await transforms.ensure(0n);
+  const statics = () => fetch.mock.calls.filter(([url]) => url.endsWith("/static")).length;
+  expect(statics()).toBe(1);
+  await transforms.over(0n, 10n);
+  expect(statics()).toBe(1);
+});

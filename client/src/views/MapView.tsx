@@ -3,9 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./MapView.css";
 import { errorMessage, type Info, type Selected } from "../types";
-import { usePlaybackNs } from "../data/useViewData";
+import { usePlaybackNs, useViewHistory } from "../data/useViewData";
 import {
-  fetchViewHistory,
   frameIndexAt,
   type GeoLocationValue,
   type GeoValue,
@@ -32,11 +31,12 @@ const latLng = (value: GeoLocationValue): [number, number] => [
  */
 function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; map: L.Map }) {
   const ns = usePlaybackNs(info);
+  const readHistory = useViewHistory(series);
   const [history, setHistory] = useState<{ frames: ViewFrame[]; error: string }>();
   useEffect(() => {
     const controller = new AbortController();
     setHistory(undefined);
-    fetchViewHistory(series, controller.signal)
+    readHistory(controller.signal)
       .then((all) =>
         setHistory({ frames: all.filter((frame) => shapes(frame) || location(frame)), error: "" }),
       )
@@ -44,7 +44,7 @@ function GeoLayer({ series, info, map }: { series: Selected; info: Info | null; 
         if (!controller.signal.aborted) setHistory({ frames: [], error: errorMessage(error) });
       });
     return () => controller.abort();
-  }, [series.key, series.view, info?.start_ns]);
+  }, [series.key, series.view, info?.start_ns, readHistory]);
   const frames = history?.frames;
   const trail = useMemo(() => {
     const points = frames?.filter((frame) => location(frame)) ?? [];

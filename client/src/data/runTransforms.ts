@@ -123,6 +123,20 @@ export class RunTransforms {
     this.changed();
   }
 
+  /**
+   * A graph of the transforms over a range of recording time, read at once: for placing
+   * a whole history, such as a trail, rather than the moment being played.
+   */
+  async over(start: bigint, end: bigint, signal?: AbortSignal): Promise<TfGraph> {
+    const params = new URLSearchParams({ start_ns: String(start), end_ns: String(end) });
+    const [, dynamic] = await Promise.all([
+      this.loadFixed(),
+      get<Schemas["DynamicTransforms"]>(`${this.run}/transforms/dynamic?${params}`, signal),
+    ]);
+    if (this.fixed?.error) throw new Error(this.fixed.error);
+    return new TfGraph(this.fixed?.transforms ?? [], dynamic.samples);
+  }
+
   /** The first failure to load, if any. */
   error() {
     return this.fixed?.error || [...this.chunks.values()].find((c) => c.error)?.error || "";
@@ -138,21 +152,3 @@ export class RunTransforms {
 }
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-/**
- * A graph of `run`'s transforms over a range of recording time, loaded at once: for
- * placing a whole history, such as a trail, rather than the moment being played.
- */
-export async function fetchTransformGraph(
-  run: string,
-  start: bigint,
-  end: bigint,
-  signal?: AbortSignal,
-): Promise<TfGraph> {
-  const params = new URLSearchParams({ start_ns: String(start), end_ns: String(end) });
-  const [fixed, dynamic] = await Promise.all([
-    get<Schemas["StaticTransforms"]>(`${run}/transforms/static`, signal),
-    get<Schemas["DynamicTransforms"]>(`${run}/transforms/dynamic?${params}`, signal),
-  ]);
-  return new TfGraph(fixed.transforms, dynamic.samples);
-}
