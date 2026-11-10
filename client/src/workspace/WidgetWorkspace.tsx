@@ -21,7 +21,9 @@ import { StatePlot } from "../views/StatePlot";
 import type { DropVerdict } from "./drop";
 import { ValueChangesView } from "../views/ValueChangesView";
 import { TableView } from "../views/TableView";
-import type { MessageRecord } from "../data/useMessages";
+import { useMessages, type MessageRecord } from "../data/useMessages";
+import { useSeries } from "../data/useSeries";
+import { useDataStore, useReportActivity } from "../data/store";
 import type { FieldIndex } from "./fieldIndex";
 import { RawMessage } from "../views/RawMessage";
 import { TfTree } from "../views/TfTree";
@@ -40,6 +42,7 @@ import {
   ownerOf,
   containerLayout,
   leaves,
+  requestedSeries,
   withoutLifted,
   widgetMoveMime,
   type Container,
@@ -70,13 +73,10 @@ type Props = {
   runId?: string | null;
   state: WorkspaceState;
   dispatch: Dispatch<WorkspaceAction>;
-  data: Series[];
-  messageRecords: MessageRecord[];
   fieldIndex: FieldIndex;
   info: Info | null;
   sources: OpenSource[];
   fullEnd: number;
-  revision: number;
   /** Whether the topic being dragged fits each widget; null when not dragging. */
   dragVerdict: (widget: Widget) => DropVerdict | null;
   /** Widget type being dragged from the catalog, if any. */
@@ -92,11 +92,44 @@ export function widgetSeries(widget: Widget, data: Series[]): Series[] {
   });
 }
 
+/** Reads the series of a widget that plots them, and hands them to its view. */
+function SeriesData({
+  widget,
+  info,
+  children,
+}: {
+  widget: Widget;
+  info: Info | null;
+  children: (series: Series[], revision: number) => ReactNode;
+}) {
+  const store = useDataStore();
+  const selected = requestedSeries({ [widget.id]: widget });
+  const { plotted, records, revision } = useSeries(info?.start_ns ?? null, selected, store.fields);
+  useReportActivity(records);
+  return children(widgetSeries(widget, plotted), revision);
+}
+
+/** Reads the messages of a table, and hands them to its view. */
+function TableData({
+  widget,
+  info,
+  children,
+}: {
+  widget: Widget;
+  info: Info | null;
+  children: (record: MessageRecord | undefined) => ReactNode;
+}) {
+  const store = useDataStore();
+  const { records } = useMessages(info?.start_ns ?? null, { [widget.id]: widget }, store.fields);
+  useReportActivity(records);
+  return children(records.find((r) => r.key === widget.series[0]?.key));
+}
+
 /** Just enough to find the widget again. How small to make one is up to the user. */
 const minimumWidgetPixels = 10;
 
 function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path: MosaicPath }) {
-  const { state, dispatch, data, info, fullEnd, revision, dragVerdict, drop, openSettings } = props;
+  const { state, dispatch, info, fullEnd, dragVerdict, drop, openSettings } = props;
   const moving = useContext(MoveContext);
   // Alone in its layout, it has nothing to give way to and stays in view.
   const lifted =
@@ -179,43 +212,55 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
           ))
         : null,
     plot: () => (
-      <Plot
-        series={widgetSeries(widget, data)}
-        fullEnd={fullEnd}
-        originNs={info?.start_ns ?? null}
-        revision={revision}
-        mode={widget.mode}
-        legend={widget.legend}
-        view={widget.view}
-        onViewChange={onViewChange}
-        onCanReset={setCanReset}
-        onToggleSeries={(key) =>
-          dispatch({
-            type: "series",
-            id: widget.id,
-            update: (list) =>
-              list.map((item) => (item.key === key ? { ...item, hidden: !item.hidden } : item)),
-          })
-        }
-      />
+      <SeriesData widget={widget} info={info}>
+        {(series, revision) => (
+          <Plot
+            series={series}
+            fullEnd={fullEnd}
+            originNs={info?.start_ns ?? null}
+            revision={revision}
+            mode={widget.mode}
+            legend={widget.legend}
+            view={widget.view}
+            onViewChange={onViewChange}
+            onCanReset={setCanReset}
+            onToggleSeries={(key) =>
+              dispatch({
+                type: "series",
+                id: widget.id,
+                update: (list) =>
+                  list.map((item) => (item.key === key ? { ...item, hidden: !item.hidden } : item)),
+              })
+            }
+          />
+        )}
+      </SeriesData>
     ),
     state: () => (
-      <StatePlot
-        widget={widget}
-        series={widgetSeries(widget, data)}
-        fullEnd={fullEnd}
-        originNs={info?.start_ns ?? null}
-        onViewChange={onViewChange}
-      />
+      <SeriesData widget={widget} info={info}>
+        {(series) => (
+          <StatePlot
+            widget={widget}
+            series={series}
+            fullEnd={fullEnd}
+            originNs={info?.start_ns ?? null}
+            onViewChange={onViewChange}
+          />
+        )}
+      </SeriesData>
     ),
     table: () => (
-      <TableView
-        dispatch={dispatch}
-        widget={widget}
-        record={props.messageRecords.find((r) => r.key === widget.series[0]?.key)}
-        index={props.fieldIndex}
-        originNs={info?.start_ns ?? null}
-      />
+      <TableData widget={widget} info={info}>
+        {(record) => (
+          <TableView
+            dispatch={dispatch}
+            widget={widget}
+            record={record}
+            index={props.fieldIndex}
+            originNs={info?.start_ns ?? null}
+          />
+        )}
+      </TableData>
     ),
     raw: () => <RawMessage widget={widget} info={info} index={props.fieldIndex} />,
     image: () => (
@@ -244,11 +289,11 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
       </Suspense>
     ),
     "value-changes": () => (
-      <ValueChangesView
-        series={widgetSeries(widget, data)}
-        originNs={info?.start_ns ?? null}
-        revision={revision}
-      />
+      <SeriesData widget={widget} info={info}>
+        {(series, revision) => (
+          <ValueChangesView series={series} originNs={info?.start_ns ?? null} revision={revision} />
+        )}
+      </SeriesData>
     ),
   };
   return (

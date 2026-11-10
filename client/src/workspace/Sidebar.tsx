@@ -9,8 +9,7 @@ import type { useTopicDrag } from "./useTopicDrag";
 import { WidgetSettings } from "./WidgetSettings";
 import { useSeriesViewProblems } from "../views/seriesViewProblem";
 import type { Widget, WorkspaceAction } from "./widgets";
-import type { CachedSeries } from "../data/useSeries";
-import type { MessageRecord } from "../data/useMessages";
+import type { LoadRecord } from "../data/activity";
 import { topicKey, type Info, type Topic } from "../types";
 
 export function Sidebar({
@@ -39,7 +38,7 @@ export function Sidebar({
   setTab: (tab: SidebarTab) => void;
   activeWidget: Widget | undefined;
   dispatch: Dispatch<WorkspaceAction>;
-  records: (CachedSeries | MessageRecord)[];
+  records: readonly LoadRecord[];
   index: FieldIndex;
   topics: Topic[];
   sourceNames: Map<string, string>;
