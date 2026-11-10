@@ -13,9 +13,8 @@ import {
 } from "../workspace/widgetModel";
 import { decodeImage } from "../data/imagePixels";
 import type { FieldIndex } from "../workspace/fieldIndex";
-import { usePlaybackNs, useTransforms, useViewFrame } from "../data/useViewData";
+import { usePlaybackNs, useTransforms, useViewFrame, useViewHistory } from "../data/useViewData";
 import {
-  fetchViewHistory,
   pointBuffers,
   type PointCloudValue,
   type Transform,
@@ -25,7 +24,7 @@ import { cameraSurface, defaultImageDistance } from "./camera";
 import { useCameraCalibration } from "./useCameraCalibration";
 import { locate, placePoses, poseTrail, trailWindow } from "./poseTrail";
 import type { ResolvedFrames } from "../data/tfGraph";
-import { fetchTransformGraph } from "../data/runTransforms";
+import { useDataStore } from "../data/store";
 import { runUrl } from "../data/sources";
 
 export type Stage = {
@@ -231,11 +230,13 @@ export function PoseTrail({
     true,
   );
   const placement = world ? transforms?.frames[world] : undefined;
+  const readHistory = useViewHistory(series);
+  const store = useDataStore();
   const [loaded, setLoaded] = useState<{ identity: string; frames: ViewFrame[]; error: string }>();
   useEffect(() => {
     if (!info) return;
     const controller = new AbortController();
-    fetchViewHistory(series, controller.signal)
+    readHistory(controller.signal)
       .then(async (frames) => {
         if (world && frames.length) {
           // Each pose by the transform at its own time, from samples spanning the history
@@ -243,8 +244,9 @@ export function PoseTrail({
           const margin = 1_000_000_000n;
           const first = BigInt(frames[0].time_ns);
           const last = BigInt(frames[frames.length - 1].time_ns);
-          const graph = await fetchTransformGraph(
-            runUrl(series.source),
+          const runTransforms = store.transforms(runUrl(series.source));
+          if (!runTransforms) throw new Error("The run is no longer open");
+          const graph = await runTransforms.over(
             first > margin ? first - margin : 0n,
             last + margin,
             controller.signal,
@@ -261,7 +263,7 @@ export function PoseTrail({
           setLoaded({ identity, frames: [], error: errorMessage(error) });
       });
     return () => controller.abort();
-  }, [identity]);
+  }, [identity, readHistory, store]);
   const history = loaded?.identity === identity ? loaded : undefined;
   const trail = useMemo(() => poseTrail(history?.frames ?? []), [history]);
   const line = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { runUrl } from "./sources";
 import { errorMessage, type Info, type Schemas, type Selected } from "../types";
@@ -120,6 +120,20 @@ export function useViewFrame(series: Selected | undefined, info: Info | null, ba
     return () => playback.setBuffering(current, false);
   }, [playback, buffering]);
   return { frame: displayed, error };
+}
+
+/**
+ * Holds every frame of a view in the store while the caller is shown, and gives how to
+ * read them: once for all the widgets that show the view.
+ */
+export function useViewHistory(series: Pick<Selected, "source" | "topic" | "view">) {
+  const views = useDataStore().views;
+  const { source, topic, view } = series;
+  useEffect(() => views.retainHistory({ source, topic, view }), [views, source, topic, view]);
+  return useCallback(
+    (signal: AbortSignal) => views.history({ source, topic, view }, signal),
+    [views, source, topic, view],
+  );
 }
 
 export type FrameInfo = Schemas["FrameInfo"];

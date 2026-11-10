@@ -3,6 +3,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import MapView from "../../src/views/MapView";
 import { widget } from "../../src/workspace/widgets";
+import { withStore } from "../dataStore";
 
 const mocks = vi.hoisted(() => ({
   ns: 0n as bigint | null,
@@ -10,7 +11,10 @@ const mocks = vi.hoisted(() => ({
   lines: [] as number[][][],
   fit: vi.fn(),
 }));
-vi.mock("../../src/data/useViewData", () => ({ usePlaybackNs: () => mocks.ns }));
+vi.mock("../../src/data/useViewData", async (original) => ({
+  ...(await original<typeof import("../../src/data/useViewData")>()),
+  usePlaybackNs: () => mocks.ns,
+}));
 vi.mock("../../src/data/viewFrames", async (original) => ({
   ...(await original<typeof import("../../src/data/viewFrames")>()),
   fetchViewHistory: mocks.history,
@@ -75,7 +79,7 @@ it("shows only the past location trail, respects duration, and fits the current 
     },
   ];
   const info = { start_ns: "0", end_ns: "5000000000", message_count: 4 };
-  const view = render(<MapView widget={mapWidget} info={info} />);
+  const view = render(<MapView widget={mapWidget} info={info} />, withStore("r"));
   await waitFor(() => expect(mocks.fit).toHaveBeenCalled());
   expect(mocks.fit.mock.calls[0][0]).toEqual([[11, 1]]);
   expect(mocks.lines).toEqual([]);
