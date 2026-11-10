@@ -6,8 +6,8 @@ import { useSceneFrame } from "../../src/views/Scene3D";
 import { withStore } from "../dataStore";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock("../../src/data/sources", async (original) => ({
-  ...(await original<typeof import("../../src/data/sources")>()),
+vi.mock("../../src/data/request", async (original) => ({
+  ...(await original<typeof import("../../src/data/request")>()),
   get: mocks.get,
 }));
 

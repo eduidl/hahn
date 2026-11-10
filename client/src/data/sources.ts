@@ -30,8 +30,6 @@ export function sourceTopics(source: string, topics: Schemas["Topic"][]): Topic[
 
 export { HttpError } from "./errors";
 
-export { get } from "./request";
-
 /** Identifies an open group of the open run. Ids never contain a slash. */
 export const sourceOf = (run: string, group: string) => `${run}/${group}`;
 export function sourceUrl(source: string) {

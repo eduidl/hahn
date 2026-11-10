@@ -1,5 +1,5 @@
 import type { Schemas } from "../types";
-import { get } from "./sources";
+import { get } from "./request";
 import { TfGraph, type DynamicTransform, type StaticTransform } from "./tfGraph";
 
 /** Recording time covered by one request for dynamic samples. */

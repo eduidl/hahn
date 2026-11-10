@@ -1,6 +1,6 @@
 import "./RunsDialog.css";
 import { useEffect, useRef, useState } from "react";
-import { get } from "../data/sources";
+import { get } from "../data/request";
 import { errorMessage, type RunList } from "../types";
 
 const LIMIT = 50;

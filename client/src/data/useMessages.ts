@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FieldCache, holdHistories } from "./fieldCache";
+import { holdHistories, type FieldCache } from "./fieldCache";
 import { appendMessages, type MessageRow } from "../views/table";
 import { errorMessage, type Selected } from "../types";
 import type { Widget } from "../workspace/widgets";
@@ -18,10 +18,8 @@ export type MessageRecord = {
 export function useMessages(
   origin: string | null,
   widgets: Record<string, Widget>,
-  sharedCache?: FieldCache,
+  fields: FieldCache,
 ) {
-  const [localCache] = useState(() => new FieldCache());
-  const fields = sharedCache ?? localCache;
   const cache = useRef(new Map<string, MessageRecord>());
   const requests = useRef(new Map<string, AbortController>());
   const held = useRef(new Map<string, () => void>());
@@ -56,10 +54,6 @@ export function useMessages(
 
   useEffect(() => {
     cache.current.clear();
-    if (!sharedCache) {
-      fields.clear();
-      held.current = new Map();
-    }
     dirty.current = true;
     return () => {
       for (const controller of requests.current.values()) controller.abort();
