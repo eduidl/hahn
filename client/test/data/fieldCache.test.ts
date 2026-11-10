@@ -102,6 +102,32 @@ describe("shared field cache", () => {
     expect(cache.read({ ...root, path: ["$meta", "publish_time"] })).toBeUndefined();
   });
 
+  it("reads a playback range on its own while a history of the topic is under way", async () => {
+    const histories: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const fetch = vi.fn(async (url: string) => {
+      if (new URL(url, "http://x").searchParams.has("start_ns")) return stream();
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            histories.push(controller);
+          },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetch);
+    const cache = new FieldCache();
+    const history = new AbortController();
+    const pending = cache.load(root, history.signal, () => {}).catch(() => {});
+    const range = { start_ns: "0", end_ns: "2000000000" };
+    await cache.load(root, new AbortController().signal, () => {}, range);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(cache.read(child, "0:2000000000")?.map((r) => r.value)).toEqual([1, 2]);
+    expect(histories).toHaveLength(1);
+    history.abort();
+    histories[0].close();
+    await pending;
+  });
+
   it("selects a small playback range from a history with its predecessor", async () => {
     vi.stubGlobal(
       "fetch",

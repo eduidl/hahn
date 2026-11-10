@@ -357,7 +357,9 @@ export class FieldCache {
         (job.exact || !exact) &&
         job.block.source === target.source &&
         job.block.topic === target.topic &&
-        (job.block.scope === "full" || job.block.scope === scope) &&
+        // A range is read on its own while a history is under way: the history is
+        // only read from once complete, which may take far longer than the range.
+        job.block.scope === scope &&
         prefix(job.block.path, target.path),
     );
     const key = `${keyOf(target.source, target.topic, target.path)}:${scope}${exact ? ":exact" : ""}`;
