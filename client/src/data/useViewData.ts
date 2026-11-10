@@ -5,14 +5,8 @@ import { errorMessage, type Info, type Schemas, type Selected } from "../types";
 import type { OnceState } from "./once";
 import { useDataStore } from "./store";
 import type { ResolvedFrames, ResolveOptions } from "./tfGraph";
-import {
-  fetchLatestFrame,
-  fetchBatchedViewHistory,
-  fetchViewHistory,
-  frameIndexAt,
-  ViewWindowTooLarge,
-  type ViewFrame,
-} from "./viewFrames";
+import { viewWindowNs, type ViewWindow } from "./viewCache";
+import { frameIndexAt, type ViewFrame } from "./viewFrames";
 
 type Loaded<T> = { identity: string; value?: T; error?: string };
 
@@ -81,51 +75,24 @@ export function usePlaybackNs(info: Info | null) {
 export function useViewFrame(series: Selected | undefined, info: Info | null, batch = false) {
   const ns = usePlaybackNs(info);
   const playback = usePlaybackStore();
+  const views = useDataStore().views;
   const token = useRef(Symbol("view-frame"));
-  const large = useRef<string | null>(null);
   const previous = useRef<{ identity: string; frame: ViewFrame }>(undefined);
   const identity = series && info ? `${series.key}:${series.view}:${info.start_ns}` : null;
-  const windowNs = 1_000_000_000n;
-  const start = ns === null ? null : (ns / windowNs) * windowNs;
-  const loaded = useLatestOnly<{
-    start: bigint;
-    seed?: ViewFrame | null;
-    frames?: ViewFrame[];
-    tooLarge?: boolean;
-  }>(identity, start === null ? null : String(start), async (key, known, signal) => {
-    const start = BigInt(key);
-    if (large.current === identity) return { start, tooLarge: true };
-    try {
-      const [seed, frames] = await Promise.all([
-        known?.frames && known.start + windowNs === start
-          ? Promise.resolve(known.frames.at(-1) ?? known.seed ?? null)
-          : fetchLatestFrame(series!, key, undefined, signal),
-        batch
-          ? fetchBatchedViewHistory(series!, signal, {
-              start_ns: key,
-              end_ns: String(start + windowNs),
-            })
-          : fetchViewHistory(
-              series!,
-              signal,
-              { start_ns: key, end_ns: String(start + windowNs) },
-              8 * 1024 * 1024,
-            ),
-      ]);
-      return { start, seed, frames };
-    } catch (error) {
-      if (error instanceof ViewWindowTooLarge) {
-        if (!signal.aborted) large.current = identity;
-        return { start, tooLarge: true };
-      }
-      throw error;
-    }
-  });
+  const start = ns === null ? null : (ns / viewWindowNs) * viewWindowNs;
+  const loaded = useLatestOnly<ViewWindow>(
+    identity,
+    start === null ? null : String(start),
+    (key, _known, signal) => views.window(series!, BigInt(key), signal, batch),
+  );
+  useEffect(() => {
+    if (series && identity && start !== null) return views.retain(series, start);
+  }, [views, identity, start]);
   const window = loaded?.value?.start === start ? loaded.value : undefined;
   const fallback = useLatestOnly<ViewFrame | null>(
     identity && (!window || window.tooLarge) ? `${identity}:${start}` : null,
     (!window || window.tooLarge) && ns !== null ? String(ns) : null,
-    (key, known, signal) => fetchLatestFrame(series!, key, known, signal),
+    (key, known, signal) => views.latest(series!, key, known, signal),
   );
   const index = window?.frames && ns !== null ? frameIndexAt(window.frames, ns) : -1;
   const frame =

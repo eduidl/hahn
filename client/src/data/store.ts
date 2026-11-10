@@ -4,6 +4,7 @@ import { FieldCache } from "./fieldCache";
 import { Once } from "./once";
 import { get } from "./request";
 import { RunTransforms } from "./runTransforms";
+import { ViewCache } from "./viewCache";
 
 /**
  * Everything the client reads of one open run (ADR 0010). Widgets ask the store for
@@ -12,6 +13,8 @@ import { RunTransforms } from "./runTransforms";
 export class DataStore {
   /** Message fields of the run's groups. */
   readonly fields = new FieldCache();
+  /** Views of the run's groups at the playback position. */
+  readonly views = new ViewCache();
   /** The coordinate frames of the run, as listed once for all its views. */
   readonly frames: Once<Schemas["FrameInfo"][]> | undefined;
   private readonly runTransforms: RunTransforms | undefined;
@@ -35,6 +38,7 @@ export class DataStore {
   /** Forgets what has been read and stops the requests under way. */
   clear() {
     this.fields.clear();
+    this.views.clear();
     this.runTransforms?.clear();
     this.frames?.clear();
   }

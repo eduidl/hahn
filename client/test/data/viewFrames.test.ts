@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchViewHistory,
-  fetchBatchedViewHistory,
+  ViewBatches,
   frameIndexAt,
   parseFrames,
   pointBuffers,
@@ -59,16 +59,9 @@ it("batches views for one group and reports each stream independently", async ()
   vi.stubGlobal("fetch", fetch);
   const signal = new AbortController().signal;
   const range = { start_ns: "0", end_ns: "30" };
-  const first = fetchBatchedViewHistory(
-    { source: "r/0", topic: "/a", view: "pose" },
-    signal,
-    range,
-  );
-  const second = fetchBatchedViewHistory(
-    { source: "r/0", topic: "/b", view: "pose" },
-    signal,
-    range,
-  );
+  const batches = new ViewBatches();
+  const first = batches.fetch({ source: "r/0", topic: "/a", view: "pose" }, signal, range);
+  const second = batches.fetch({ source: "r/0", topic: "/b", view: "pose" }, signal, range);
   const [ok, error] = await Promise.allSettled([first, second]);
   expect(fetch).toHaveBeenCalledOnce();
   expect(ok.status).toBe("fulfilled");
@@ -92,16 +85,9 @@ it("keeps a batch running when only one consumer cancels", async () => {
   const first = new AbortController();
   const second = new AbortController();
   const range = { start_ns: "0", end_ns: "30" };
-  const a = fetchBatchedViewHistory(
-    { source: "r/0", topic: "/a", view: "pose" },
-    first.signal,
-    range,
-  );
-  const b = fetchBatchedViewHistory(
-    { source: "r/0", topic: "/b", view: "pose" },
-    second.signal,
-    range,
-  );
+  const batches = new ViewBatches();
+  const a = batches.fetch({ source: "r/0", topic: "/a", view: "pose" }, first.signal, range);
+  const b = batches.fetch({ source: "r/0", topic: "/b", view: "pose" }, second.signal, range);
   const cancelled = expect(a).rejects.toMatchObject({ name: "AbortError" });
   await new Promise((resolve) => setTimeout(resolve, 10));
   first.abort();

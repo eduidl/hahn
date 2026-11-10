@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { changeWidget, expect, openRun, test } from "./support";
+import { changeWidget, expect, openRun, test, widgetAction } from "./support";
 
 /** Turns the initial plot into the given widget and drops topics on it. */
 async function show(page: Page, type: string, topics: string[]) {
@@ -15,6 +15,29 @@ async function show(page: Page, type: string, topics: string[]) {
 }
 
 const errors = (page: Page) => page.getByRole("tab", { name: /^Errors/ });
+
+test("two images of one topic read each second of it once", async ({ page }) => {
+  const windows: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/views") && url.searchParams.get("topic") === "/camera")
+      windows.push(url.searchParams.get("start_ns")!);
+  });
+  const first = await show(page, "Image", ["/camera"]);
+  await expect(first.getByRole("img", { name: "/camera" })).toBeVisible();
+  await widgetAction(first, "Split right");
+  const images = page.getByRole("main").getByRole("region", { name: "Image" });
+  await expect(images).toHaveCount(2);
+  await page
+    .getByRole("tabpanel", { name: "Topics" })
+    .getByText("/camera", { exact: true })
+    .dragTo(images.last());
+  await expect(images.last().getByRole("img", { name: "/camera" })).toBeVisible();
+  await page.getByRole("button", { name: "Go to end" }).click();
+  await expect(images.getByRole("img", { name: "/camera" })).toHaveCount(2);
+  await expect.poll(() => windows.length).toBeGreaterThan(1);
+  expect(new Set(windows).size).toBe(windows.length);
+});
 
 test("an image shows, and a point cloud without calibration is explained", async ({ page }) => {
   const widget = await show(page, "Image", ["/camera"]);
