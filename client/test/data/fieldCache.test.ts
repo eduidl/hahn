@@ -214,3 +214,27 @@ it("lets go of a full history once nothing holds it", async () => {
   // A history nobody held is left alone.
   expect(cache.read(other)).toHaveLength(3);
 });
+
+it("reads whole strings for an exact history, which also serves previews", async () => {
+  const text = { ...root, path: ["text"] };
+  const fetch = vi.fn(async (_url: string) =>
+    stream(rows.map((row) => ({ ...row, value: "whole" }))),
+  );
+  vi.stubGlobal("fetch", fetch);
+  const cache = new FieldCache();
+  const signal = new AbortController().signal;
+  // A preview read under way does not serve an exact one.
+  const preview = cache.load(text, signal, () => {});
+  const exact = cache.load(text, signal, () => {}, undefined, true);
+  await Promise.all([preview, exact]);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(fetch.mock.calls[1][0]).toContain("preview=false");
+  expect(cache.readScalar(text, "string")?.map((row) => row.value)).toEqual([
+    "whole",
+    "whole",
+    "whole",
+  ]);
+  await cache.load(text, signal, () => {});
+  await cache.load(text, signal, () => {}, undefined, true);
+  expect(fetch).toHaveBeenCalledTimes(2);
+});

@@ -45,10 +45,14 @@ export function useMessages(
     })),
   );
 
-  // Histories held in a cache no longer used are discarded with it.
-  useEffect(() => {
-    held.current = new Map();
-  }, [fields]);
+  // Histories are let go when the cache is no longer used, or the hook is.
+  useEffect(
+    () => () => {
+      for (const release of held.current.values()) release();
+      held.current = new Map();
+    },
+    [fields],
+  );
 
   useEffect(() => {
     cache.current.clear();
