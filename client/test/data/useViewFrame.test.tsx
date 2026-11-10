@@ -3,6 +3,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
 import { PlaybackContext, createPlaybackStore } from "../../src/workspace/playback";
+import { DataStore, DataStoreContext } from "../../src/data/store";
 import { useViewFrame } from "../../src/data/useViewData";
 import { ViewWindowTooLarge, type ViewFrame } from "../../src/data/viewFrames";
 import { keyOf, type Selected } from "../../src/types";
@@ -36,8 +37,13 @@ function setup() {
     () => {},
   );
   playback.reset(7);
+  const store = new DataStore("r");
   const wrapper = ({ children }: { children: ReactNode }) =>
-    createElement(PlaybackContext.Provider, { value: playback }, children);
+    createElement(
+      DataStoreContext.Provider,
+      { value: store },
+      createElement(PlaybackContext.Provider, { value: playback }, children),
+    );
   return { playback, wrapper };
 }
 
@@ -116,4 +122,24 @@ it("keeps the last frame while loading the next window, but not after seeking be
   expect(result.current.frame?.time_ns).toBe("1500000000");
   act(() => playback.seek(0.2));
   expect(result.current.frame?.time_ns).toBe("1000000000");
+});
+
+it("reads a window once for views showing the same topic, and keeps it for seeking back", async () => {
+  vi.mocked(fetchLatestFrame).mockResolvedValue(frame("500000000"));
+  vi.mocked(fetchViewHistory).mockImplementation(async (_target, _signal, range) => [
+    frame(range!.start_ns),
+  ]);
+  const { playback, wrapper } = setup();
+  const { result } = renderHook(
+    () => [useViewFrame(selected, info), useViewFrame({ ...selected, key: "other" }, info)],
+    { wrapper },
+  );
+  await waitFor(() => expect(result.current[1].frame?.time_ns).toBe("1000000000"));
+  expect(result.current[0].frame?.time_ns).toBe("1000000000");
+  expect(fetchViewHistory).toHaveBeenCalledTimes(1);
+  act(() => playback.seek(1));
+  await waitFor(() => expect(result.current[0].frame?.time_ns).toBe("2000000000"));
+  act(() => playback.seek(0));
+  await waitFor(() => expect(result.current[0].frame?.time_ns).toBe("1000000000"));
+  expect(fetchViewHistory).toHaveBeenCalledTimes(2);
 });

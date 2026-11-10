@@ -197,48 +197,51 @@ type BatchPending = {
   active: boolean;
   abort: () => void;
 };
-const batches = new Map<string, BatchPending[]>();
+/** Coalesces small views requested together for the same group and time range. */
+export class ViewBatches {
+  private pending = new Map<string, BatchPending[]>();
 
-/** Coalesce small views requested together for the same group and time range. */
-export function fetchBatchedViewHistory(
-  target: ViewTarget,
-  signal: AbortSignal,
-  range: { start_ns: string; end_ns: string },
-): Promise<ViewFrame[]> {
-  const key = JSON.stringify([target.source, range.start_ns, range.end_ns]);
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
-    const entry: BatchPending = {
-      target,
-      signal,
-      active: true,
-      resolve: (frames) => {
-        entry.active = false;
-        signal.removeEventListener("abort", entry.abort);
-        resolve(frames);
-      },
-      reject: (error) => {
-        entry.active = false;
-        signal.removeEventListener("abort", entry.abort);
-        reject(error);
-      },
-      abort: () => entry.reject(new DOMException("Aborted", "AbortError")),
-    };
-    let pending = batches.get(key);
-    if (!pending) {
-      pending = [];
-      batches.set(key, pending);
-      setTimeout(() => {
-        batches.delete(key);
-        const active = pending!.filter((item) => item.active);
-        for (let i = 0; i < active.length; i += 32) {
-          void sendBatch(active.slice(i, i + 32), range);
-        }
-      }, 0);
-    }
-    pending.push(entry);
-    signal.addEventListener("abort", entry.abort, { once: true });
-  });
+  fetch(
+    target: ViewTarget,
+    signal: AbortSignal,
+    range: { start_ns: string; end_ns: string },
+  ): Promise<ViewFrame[]> {
+    const key = JSON.stringify([target.source, range.start_ns, range.end_ns]);
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+      const entry: BatchPending = {
+        target,
+        signal,
+        active: true,
+        resolve: (frames) => {
+          entry.active = false;
+          signal.removeEventListener("abort", entry.abort);
+          resolve(frames);
+        },
+        reject: (error) => {
+          entry.active = false;
+          signal.removeEventListener("abort", entry.abort);
+          reject(error);
+        },
+        abort: () => entry.reject(new DOMException("Aborted", "AbortError")),
+      };
+      let pending = this.pending.get(key);
+      if (!pending) {
+        const queued: BatchPending[] = [];
+        pending = queued;
+        this.pending.set(key, queued);
+        setTimeout(() => {
+          this.pending.delete(key);
+          const active = queued.filter((item) => item.active);
+          for (let i = 0; i < active.length; i += 32) {
+            void sendBatch(active.slice(i, i + 32), range);
+          }
+        }, 0);
+      }
+      pending.push(entry);
+      signal.addEventListener("abort", entry.abort, { once: true });
+    });
+  }
 }
 
 async function sendBatch(entries: BatchPending[], range: { start_ns: string; end_ns: string }) {
