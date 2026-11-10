@@ -142,6 +142,11 @@ export class ViewCache {
     return fetchLatestFrame(target, ns, known, signal);
   }
 
+  /** The frames of a view over a range of recording time, for a moment other than playback's. */
+  range(target: ViewTarget, range: { start_ns: string; end_ns: string }, signal: AbortSignal) {
+    return fetchViewHistory(target, signal, range);
+  }
+
   /** Forgets every window and stops the reads under way. */
   clear() {
     for (const entry of [...this.entries.values(), ...this.histories.values()])

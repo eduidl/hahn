@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ViewFrame } from "../../src/data/viewFrames";
 import type { Selected, Topic } from "../../src/types";
 import { buildFieldIndex } from "../../src/workspace/fieldIndex";
+import { pickCalibration } from "../../src/data/calibration";
 import {
   applyCalibration,
   calibrationChoice,
-  pickCalibration,
   type Calibration,
 } from "../../src/views/useCameraCalibration";
 

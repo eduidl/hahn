@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Schemas } from "../types";
+import { createCalibrationLoader } from "./calibration";
 import { FieldCache } from "./fieldCache";
 import { Once } from "./once";
 import { get } from "./request";
@@ -15,6 +16,8 @@ export class DataStore {
   readonly fields = new FieldCache();
   /** Views of the run's groups at the playback position. */
   readonly views = new ViewCache();
+  /** The calibration of an image, read for each second of images. */
+  calibration = createCalibrationLoader();
   /** The coordinate frames of the run, as listed once for all its views. */
   readonly frames: Once<Schemas["FrameInfo"][]> | undefined;
   private readonly runTransforms: RunTransforms | undefined;
@@ -39,6 +42,8 @@ export class DataStore {
   clear() {
     this.fields.clear();
     this.views.clear();
+    this.calibration.clear();
+    this.calibration = createCalibrationLoader();
     this.runTransforms?.clear();
     this.frames?.clear();
   }

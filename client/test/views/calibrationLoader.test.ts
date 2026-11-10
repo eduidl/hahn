@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import type { ViewFrame } from "../../src/data/viewFrames";
-import { createCalibrationLoader } from "../../src/views/useCameraCalibration";
+import { createCalibrationLoader } from "../../src/data/calibration";
 
 vi.mock("../../src/data/viewFrames", async (original) => ({
   ...(await original<typeof import("../../src/data/viewFrames")>()),
@@ -68,4 +68,20 @@ it("reuses the last calibration before an empty range", async () => {
   expect(await load(target, image("10900000000"), signal)).toBe(earlier);
   expect(fetchLatestFrame).toHaveBeenCalledTimes(1);
   expect(fetchViewHistory).toHaveBeenCalledTimes(1);
+});
+
+it("reads a second of images once for the widgets showing them alike", async () => {
+  vi.mocked(fetchLatestFrame).mockResolvedValue(null);
+  vi.mocked(fetchViewHistory).mockResolvedValue([frame("10000000000")]);
+  const load = createCalibrationLoader();
+  const signal = new AbortController().signal;
+  const other = { ...target, topic: "/other" };
+  await Promise.all([
+    load(target, image("10000000000"), signal),
+    load(target, image("10500000000"), signal),
+    load(other, image("10000000000"), signal),
+  ]);
+  // Another calibration in between does not displace the first.
+  await load(target, image("10900000000"), signal);
+  expect(fetchViewHistory).toHaveBeenCalledTimes(2);
 });
