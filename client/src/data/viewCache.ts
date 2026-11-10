@@ -15,6 +15,19 @@ export const viewWindowNs = 1_000_000_000n;
 const keptWindows = 8;
 /** A window larger than this is not read at once; its frames are read one at a time. */
 const maxWindowBytes = 8 * 1024 * 1024;
+/** Recording time read ahead of the playback position at normal speed (ADR 0010). */
+export const viewLookaheadNs = 10_000_000_000n;
+const maxLookaheadWindows = 40;
+/** Reads ahead under way at once, leaving the browser's connections to a host for others. */
+const maxAheadRequests = 4;
+/** Bytes of held windows beyond which no further window is read ahead. */
+const maxHeldBytes = 256 * 1024 * 1024;
+
+/** Windows to read ahead of the playback position: further when playing faster. */
+export function lookaheadWindows(speed: number) {
+  const ns = Number(viewLookaheadNs) * Math.max(1, speed);
+  return Math.min(maxLookaheadWindows, Math.ceil(ns / Number(viewWindowNs)));
+}
 
 /**
  * The frames of one window of recording time, with the frame before it, or the
@@ -31,7 +44,10 @@ type Entry<T> = {
   result?: T;
   /** Requests waiting for the result; when the last one leaves, the read stops. */
   waiting: number;
+  bytes?: number;
 };
+
+type AheadTask = { target: ViewTarget; start: bigint; batch: boolean; signal: AbortSignal };
 
 const targetKey = (target: ViewTarget) =>
   JSON.stringify([target.source, target.topic, target.view ?? ""]);
@@ -51,6 +67,9 @@ export class ViewCache {
   /** Views whose windows are too large to read at once. */
   private large = new Set<string>();
   private batches = new ViewBatches();
+  /** Windows to read ahead, nearest to their playback position first. */
+  private queue: { task: AheadTask; distance: number }[] = [];
+  private aheadRunning = 0;
 
   /**
    * The window starting at `start`, a multiple of `viewWindowNs`. With `batch`, it is
@@ -125,6 +144,42 @@ export class ViewCache {
     };
   }
 
+  /** The window at `start` when it has been read, without waiting. */
+  peek(target: ViewTarget, start: bigint): ViewWindow | undefined {
+    if (this.large.has(targetKey(target))) return { start, tooLarge: true };
+    return this.entries.get(windowKey(target, start))?.result;
+  }
+
+  /**
+   * Reads and keeps the `count` windows after the one at `start`, nearest first, until
+   * the returned function lets them go. Views too large to read at once are not read ahead.
+   */
+  ahead(target: ViewTarget, start: bigint, count: number, batch = false): () => void {
+    if (count <= 0 || this.large.has(targetKey(target))) return () => {};
+    const controller = new AbortController();
+    const releases: (() => void)[] = [];
+    for (let i = 1; i <= count; i++) {
+      const at = start + BigInt(i) * viewWindowNs;
+      releases.push(this.retain(target, at));
+      this.queue.push({
+        task: { target, start: at, batch, signal: controller.signal },
+        distance: i,
+      });
+    }
+    this.queue.sort((a, b) => a.distance - b.distance);
+    this.pump();
+    return () => {
+      this.queue = this.queue.filter(({ task }) => task.signal !== controller.signal);
+      // Let go only after whoever follows has joined the reads it shares, as when the
+      // playback position moves on by a window.
+      queueMicrotask(() => {
+        controller.abort();
+        for (const release of releases) release();
+        this.pump();
+      });
+    };
+  }
+
   /** Keeps the window at `start` while it is shown. */
   retain(target: ViewTarget, start: bigint) {
     const key = windowKey(target, start);
@@ -157,18 +212,78 @@ export class ViewCache {
     this.historyPins.clear();
     this.large.clear();
     this.batches = new ViewBatches();
+    this.queue = [];
+  }
+
+  /** Starts the reads ahead that fit, nearest first. */
+  private pump() {
+    while (this.aheadRunning < maxAheadRequests && this.queue.length) {
+      const { task } = this.queue[0];
+      const key = windowKey(task.target, task.start);
+      if (task.signal.aborted || this.large.has(targetKey(task.target))) {
+        this.queue.shift();
+        continue;
+      }
+      const entry = this.entries.get(key);
+      if (entry?.result) {
+        this.queue.shift();
+        continue;
+      }
+      if (entry) {
+        // Already under way for someone else: wait on it too, so it goes on for this.
+        this.queue.shift();
+        this.window(task.target, task.start, task.signal, task.batch).catch(() => {});
+        continue;
+      }
+      if (this.heldBytes() >= maxHeldBytes) return;
+      this.queue.shift();
+      // Small views of a group read ahead the same window together, as one request.
+      const together = [task];
+      if (task.batch) {
+        const rest = [];
+        for (const item of this.queue) {
+          const other = item.task;
+          if (
+            other.batch &&
+            other.start === task.start &&
+            other.target.source === task.target.source
+          )
+            together.push(other);
+          else rest.push(item);
+        }
+        this.queue = rest;
+      }
+      this.aheadRunning++;
+      void Promise.allSettled(
+        together.map((item) => this.window(item.target, item.start, item.signal, item.batch)),
+      ).then(() => {
+        this.aheadRunning--;
+        this.pump();
+      });
+    }
+  }
+
+  private heldBytes() {
+    let total = 0;
+    for (const entry of this.entries.values())
+      if (entry.result && this.pins.has(entry.key)) total += entry.bytes ?? 0;
+    return total;
   }
 
   private read(target: ViewTarget, start: bigint, key: string, batch: boolean) {
     const controller = new AbortController();
     const { signal } = controller;
     const range = { start_ns: String(start), end_ns: String(start + viewWindowNs) };
-    // The frame before the window is the last of the window before, when that is kept.
-    const before = this.entries.get(windowKey(target, start - viewWindowNs))?.result;
-    const seed =
-      before && !before.tooLarge
-        ? Promise.resolve(before.frames.at(-1) ?? before.seed)
-        : fetchLatestFrame(target, String(start), undefined, signal);
+    // The frame before the window is the last of the window before, when that is kept
+    // or being read, as when reading ahead.
+    const latest = () => fetchLatestFrame(target, String(start), undefined, signal);
+    const before = this.entries.get(windowKey(target, start - viewWindowNs));
+    const seed = before
+      ? before.promise.then(
+          (window) => (window.tooLarge ? latest() : (window.frames.at(-1) ?? window.seed)),
+          latest,
+        )
+      : latest();
     const frames = batch
       ? this.batches.fetch(target, signal, range)
       : fetchViewHistory(target, signal, range, maxWindowBytes);
@@ -179,8 +294,16 @@ export class ViewCache {
       promise: Promise.all([seed, frames]).then(
         ([seed, frames]): ViewWindow => ({ start, seed, frames }),
         (error): ViewWindow => {
+          const view = targetKey(target);
+          // Stopped as another window of the view was found too large.
+          if (this.large.has(view)) return { start, tooLarge: true };
           if (!(error instanceof ViewWindowTooLarge)) throw error;
-          if (!signal.aborted) this.large.add(targetKey(target));
+          if (signal.aborted) return { start, tooLarge: true };
+          this.large.add(view);
+          // The view's other windows, read ahead, would be too large as well.
+          for (const other of this.entries.values())
+            if (other !== entry && other.key.startsWith(`${view}:`) && !other.result)
+              other.controller.abort();
           return { start, tooLarge: true };
         },
       ),
@@ -189,7 +312,10 @@ export class ViewCache {
       (result) => {
         if (this.entries.get(key) !== entry) return;
         if (result.tooLarge) this.entries.delete(key);
-        else entry.result = result;
+        else {
+          entry.result = result;
+          entry.bytes = result.frames.reduce((sum, frame) => sum + (frame.bytes ?? 0), 0);
+        }
         this.evict();
       },
       // A failed window is read again when next asked for.

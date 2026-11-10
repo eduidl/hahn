@@ -5,7 +5,7 @@ import { errorMessage, type Info, type Schemas, type Selected } from "../types";
 import type { OnceState } from "./once";
 import { useDataStore } from "./store";
 import type { ResolvedFrames, ResolveOptions } from "./tfGraph";
-import { viewWindowNs, type ViewWindow } from "./viewCache";
+import { lookaheadWindows, viewWindowNs, type ViewWindow } from "./viewCache";
 import { frameIndexAt, type ViewFrame } from "./viewFrames";
 
 type Loaded<T> = { identity: string; value?: T; error?: string };
@@ -88,7 +88,22 @@ export function useViewFrame(series: Selected | undefined, info: Info | null, ba
   useEffect(() => {
     if (series && identity && start !== null) return views.retain(series, start);
   }, [views, identity, start]);
-  const window = loaded?.value?.start === start ? loaded.value : undefined;
+  // Read ahead of the playback position, also while paused, so that playing goes on
+  // into the next windows without waiting for them.
+  const speed = usePlayback((s) => s.speed);
+  const end = info ? BigInt(info.end_ns) : null;
+  useEffect(() => {
+    if (!series || !identity || start === null || end === null || end < start) return;
+    const count = Math.min(lookaheadWindows(speed), Number((end - start) / viewWindowNs));
+    return views.ahead(series, start, count, batch);
+  }, [views, identity, start, end, speed, batch]);
+  // A window read ahead is used at once, before the request for it answers.
+  const window =
+    loaded?.value?.start === start
+      ? loaded.value
+      : series && identity && start !== null
+        ? views.peek(series, start)
+        : undefined;
   const fallback = useLatestOnly<ViewFrame | null>(
     identity && (!window || window.tooLarge) ? `${identity}:${start}` : null,
     (!window || window.tooLarge) && ns !== null ? String(ns) : null,

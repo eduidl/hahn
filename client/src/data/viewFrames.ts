@@ -19,6 +19,8 @@ export type ViewFrame = {
   error?: string;
   /** Resolves the value's blob references. */
   blob: (ref: BlobRef) => Uint8Array;
+  /** Bytes of the response the frame takes, for limiting what is kept. */
+  bytes?: number;
 };
 export type ViewResponse = { frames: ViewFrame[]; unchanged: boolean };
 
@@ -57,6 +59,7 @@ export function parseFrames(buffer: ArrayBuffer, stream?: number): ViewResponse 
         value: "value" in header ? header.value : undefined,
         error: "error" in header ? header.error : undefined,
         blob: ({ $blob }) => new Uint8Array(buffer, payload + $blob.offset, $blob.length),
+        bytes: payload + payloadLength - at,
       });
     at = payload + payloadLength;
   }
