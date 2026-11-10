@@ -7,12 +7,7 @@ import { useDataStore } from "../data/store";
 import { ReportSeriesProblem } from "./seriesViewProblem";
 import { decodeImage } from "../data/imagePixels";
 import { useLatestOnly, useViewFrame } from "../data/useViewData";
-import {
-  fetchLatestFrame,
-  fetchViewHistory,
-  pointBuffers,
-  type ViewFrame,
-} from "../data/viewFrames";
+import { pointBuffers, type ViewFrame } from "../data/viewFrames";
 import {
   annotationWindowNs,
   drawAnnotations,
@@ -25,11 +20,7 @@ import type { FieldIndex } from "../workspace/fieldIndex";
 import type { Widget } from "../workspace/widgets";
 import { cameraDistortionError, cloudToCameraMatrix, projectCameraPoint } from "./camera";
 import { wheelZoomFactor } from "./Plot";
-import {
-  applyCalibration,
-  calibrationChoice,
-  createCalibrationLoader,
-} from "./useCameraCalibration";
+import { applyCalibration, calibrationChoice } from "./useCameraCalibration";
 
 const mimeTypes: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -166,8 +157,6 @@ export function ImageView({
   const store = useDataStore();
   const formatter = useTimeFormatter(info?.start_ns ?? null);
   const choice = calibrationChoice(index, series);
-  const calibrationLoader = useRef<ReturnType<typeof createCalibrationLoader>>(undefined);
-  calibrationLoader.current ??= createCalibrationLoader();
   const identity =
     series && info
       ? JSON.stringify([
@@ -194,7 +183,7 @@ export function ImageView({
       const marks = await Promise.all(
         overlays.map(async (overlay): Promise<Marks> => {
           try {
-            const frames = await fetchViewHistory(overlay, signal, range);
+            const frames = await store.views.range(overlay, range, signal);
             return { series: overlay, matched: matchAnnotations(frames, imageFrame) };
           } catch (error) {
             if (signal.aborted) throw error;
@@ -207,7 +196,7 @@ export function ImageView({
         return { frame: imageFrame, clouds: [], marks, error: "Image has no frame ID" };
       const failed = (error: string) => ({ frame: imageFrame, clouds: [], marks, error });
       if (!choice.target) return failed("No camera calibration chosen for this image");
-      const found = await calibrationLoader.current!(choice.target, imageFrame, signal);
+      const found = await store.calibration(choice.target, imageFrame, signal);
       if (found?.error) return failed(found.error);
       if (found?.value?.kind !== "camera_calibration")
         return failed("No camera calibration for this image");
@@ -216,7 +205,7 @@ export function ImageView({
       const resolved = await Promise.all(
         clouds.map(async (series) => {
           const previous = known?.clouds.find((item) => item.series.key === series.key)?.frame;
-          const cloud = await fetchLatestFrame(series, time, previous, signal);
+          const cloud = await store.views.latest(series, time, previous, signal);
           const frameId = cloud?.value?.kind === "pointcloud" ? cloud.value.frame_id : null;
           if (!frameId || frameId === image.frame_id) return { series, frame: cloud };
           // At the image's measurement time when it has one, else its log time (ADR 0002).
