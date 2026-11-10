@@ -12,7 +12,7 @@ import { TabSettings } from "./TabControls";
 import { useMemo, type Dispatch, type ReactNode } from "react";
 import { SeriesName } from "../SeriesName";
 import type { FieldIndex } from "./fieldIndex";
-import type { CachedSeries } from "../data/useSeries";
+import type { LoadRecord } from "../data/activity";
 import { tableColumns } from "../views/table";
 import { defaultImageDistance } from "../views/camera";
 import { topicKey, type Selected } from "../types";
@@ -31,7 +31,7 @@ import {
 export type WidgetSettingsProps = {
   widget: Widget;
   dispatch: Dispatch<WorkspaceAction>;
-  records: Pick<CachedSeries, "key" | "status" | "received">[];
+  records: readonly Pick<LoadRecord, "key" | "status" | "received">[];
   index: FieldIndex;
 };
 

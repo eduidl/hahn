@@ -7,7 +7,9 @@ import {
   screen,
   within,
   act,
+  waitFor,
 } from "@testing-library/react";
+import type { Info } from "../../src/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useReducer, useState, type ReactNode } from "react";
 import type { MosaicNode } from "react-mosaic-component";
@@ -73,13 +75,17 @@ const initial = () =>
 function Harness({
   initialState = initial(),
   catalog = null,
+  info = null,
+  data,
 }: {
   initialState?: WorkspaceState;
   catalog?: Widget["type"] | null;
+  info?: Info | null;
+  data?: DataStore;
 }) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [playback] = useState(createPlaybackStore);
-  const [store] = useState(() => new DataStore("r"));
+  const [store] = useState(() => data ?? new DataStore("r"));
   const selected = state.activeId ? state.widgets[state.activeId] : null;
   return (
     <DataStoreContext.Provider value={store}>
@@ -87,13 +93,10 @@ function Harness({
         <WidgetWorkspace
           state={state}
           dispatch={dispatch}
-          data={[]}
-          messageRecords={[]}
           fieldIndex={index}
-          info={null}
+          info={info}
           sources={[]}
           fullEnd={1}
-          revision={0}
           dragVerdict={() => null}
           widgetDrag={catalog}
           drop={vi.fn()}
@@ -500,4 +503,45 @@ describe("Tab widget interactions", () => {
     expect(screen.getByRole("region", { name: "Tabs" })).toBeDefined();
     expect(document.querySelector('[data-widget-id="widget-2"]')).not.toBeNull();
   });
+});
+
+it("reads a field once for the widgets showing it, and tells the store how it stands", async () => {
+  const fetch = vi.fn(
+    async () =>
+      new Response(
+        '{"type":"batch","rows":[{"time_ns":"1000000000","value":1}],"scanned_messages":1}\n{"type":"complete","scanned_messages":1}\n',
+      ),
+  );
+  vi.stubGlobal("fetch", fetch);
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const series = {
+    key: "x",
+    source: "r/0",
+    topic: "/pose",
+    path: ["x"],
+    color: "red",
+    lineWidth: 1,
+    hidden: false,
+  };
+  const state = reduce(initialWorkspace(), { type: "add", widgetType: "value-changes" });
+  for (const id of Object.keys(state.widgets)) state.widgets[id].series = [series];
+  const store = new DataStore("r");
+  const info = { start_ns: "0", end_ns: "2000000000", message_count: 1 };
+  const view = render(<Harness initialState={state} info={info} data={store} />);
+  await waitFor(() =>
+    expect(store.activity.getSnapshot().map((record) => record.status)).toEqual([
+      "complete",
+      "complete",
+    ]),
+  );
+  expect(fetch).toHaveBeenCalledTimes(1);
+  view.unmount();
+  expect(store.activity.getSnapshot()).toEqual([]);
+  vi.unstubAllGlobals();
 });

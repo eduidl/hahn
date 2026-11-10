@@ -1,5 +1,5 @@
 import { topicKey, type Topic } from "../types";
-import type { CachedSeries } from "../data/useSeries";
+import type { LoadRecord } from "../data/activity";
 import type { SeriesViewProblem } from "../views/seriesViewProblem";
 
 export function ErrorsTab({
@@ -15,7 +15,7 @@ export function ErrorsTab({
   count: number;
   error: string;
   sourceErrors: { group: { source: string; name: string }; error: string }[];
-  runtimeErrors: Pick<CachedSeries, "key" | "source" | "topic" | "topicName" | "error">[];
+  runtimeErrors: Pick<LoadRecord, "key" | "source" | "topic" | "topicName" | "error">[];
   viewProblems: SeriesViewProblem[];
   unreadable: Topic[];
   multiSource: boolean;

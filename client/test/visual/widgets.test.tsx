@@ -35,13 +35,10 @@ function Workspace({ initialState }: { initialState: WorkspaceState }) {
             <WidgetWorkspace
               state={state}
               dispatch={dispatch}
-              data={[]}
-              messageRecords={[]}
               fieldIndex={index}
               info={null}
               sources={[]}
               fullEnd={1}
-              revision={0}
               dragVerdict={() => null}
               widgetDrag={null}
               drop={() => {}}

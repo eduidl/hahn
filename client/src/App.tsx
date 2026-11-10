@@ -16,15 +16,12 @@ import { useTopicDrag } from "./workspace/useTopicDrag";
 import {
   addSelectedAction,
   initialWorkspace,
-  requestedSeries,
   workspaceReducer,
   type Widget,
 } from "./workspace/widgets";
 import { secondsFrom } from "./data/data";
-import { DataStore, DataStoreContext } from "./data/store";
+import { DataStore, DataStoreContext, useActivity } from "./data/store";
 import { SourceNames } from "./data/sources";
-import { useMessages } from "./data/useMessages";
-import { useSeries } from "./data/useSeries";
 import {
   DisplayTimeMode,
   chosenTimeZone,
@@ -78,18 +75,13 @@ export function App() {
     () => usableWorkspace(workspace, seriesEnvironment),
     [workspace, seriesEnvironment],
   );
-  const demand = requestedSeries(shownWorkspace.widgets);
   const [widgetDrag, setWidgetDrag] = useState<Widget["type"] | null>(null);
   // One store per open run; its data stays while groups of the run open and close.
   const store = useMemo(() => new DataStore(runId), [runId]);
   useEffect(() => () => store.clear(), [store]);
-  const fieldCache = store.fields;
-  const { plotted, records, revision, busy } = useSeries(
-    info?.start_ns ?? null,
-    demand,
-    fieldCache,
-  );
-  const messages = useMessages(info?.start_ns ?? null, shownWorkspace.widgets, fieldCache);
+  // Widgets read on their own; the sidebar and the playback bar show it all together.
+  const records = useActivity(store);
+  const busy = records.some((record) => record.status === "loading");
   const fullEnd = info ? Math.max(1e-9, secondsFrom(info.end_ns, info.start_ns)) : 1;
   const [playback] = useState(createPlaybackStore);
   const serverZone = usableTimeZone(run?.timezone);
@@ -170,7 +162,7 @@ export function App() {
                       setTab={setTab}
                       activeWidget={activeWidget}
                       dispatch={dispatch}
-                      records={[...records, ...messages.records]}
+                      records={records}
                       index={index}
                       topics={topics}
                       sourceNames={sourceNames}
@@ -197,13 +189,10 @@ export function App() {
                         runId={runId}
                         state={shownWorkspace}
                         dispatch={dispatch}
-                        data={plotted}
-                        messageRecords={messages.records}
                         fieldIndex={index}
                         info={info}
                         sources={sourceDetails}
                         fullEnd={fullEnd}
-                        revision={revision}
                         dragVerdict={topicDrag.dragVerdict}
                         widgetDrag={widgetDrag}
                         drop={topicDrag.drop}
@@ -214,7 +203,7 @@ export function App() {
                       />
                     </main>
                   </div>
-                  <PlaybackBar info={info} fullEnd={fullEnd} busy={busy || messages.busy} />
+                  <PlaybackBar info={info} fullEnd={fullEnd} busy={busy} />
                 </div>
               </SourceNames.Provider>
             </DisplayTimeMode.Provider>

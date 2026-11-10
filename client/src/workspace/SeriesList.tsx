@@ -5,11 +5,11 @@ import { useContext, type ReactNode } from "react";
 import { SeriesEnvironmentContext, seriesStates } from "./seriesState";
 import { SeriesName } from "../SeriesName";
 import { useSeriesViewProblem } from "../views/seriesViewProblem";
-import type { CachedSeries } from "../data/useSeries";
+import type { LoadRecord } from "../data/activity";
 import type { PointMarkers, Selected } from "../types";
 import { widgetSpecs } from "./widgetSpecs";
 
-export function statusLabel(record: Pick<CachedSeries, "status" | "received"> | undefined) {
+export function statusLabel(record: Pick<LoadRecord, "status" | "received"> | undefined) {
   if (!record) return "Waiting";
   if (record.status === "loading") return `Loading · ${record.received.toLocaleString()}`;
   if (record.status === "complete")
