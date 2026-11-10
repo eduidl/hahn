@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { holdHistories, type FieldCache } from "./fieldCache";
-import { appendPoints, consumeStream, point } from "./data";
+import { FieldCache, holdHistories } from "./fieldCache";
+import { appendPoints, point } from "./data";
 import type { Series } from "../views/Plot";
-import { request } from "./request";
-import { messagesUrl } from "./sources";
-import type { MessageRow } from "../views/table";
 import { errorMessage, type Selected } from "../types";
 
 export type CachedSeries = Series & {
@@ -19,6 +16,8 @@ export type CachedSeries = Series & {
  * a new origin invalidates them; opening another recording does not.
  */
 export function useSeries(origin: string | null, selected: Selected[], sharedCache?: FieldCache) {
+  const [localCache] = useState(() => new FieldCache());
+  const histories = sharedCache ?? localCache;
   const cache = useRef(new Map<string, CachedSeries>());
   const requests = useRef(new Map<AbortController, CachedSeries[]>());
   const held = useRef(new Map<string, () => void>());
@@ -37,10 +36,14 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
     })),
   );
 
-  // Histories held in a cache no longer used are discarded with it.
-  useEffect(() => {
-    held.current = new Map();
-  }, [sharedCache]);
+  // Histories are let go when the cache is no longer used, or the hook is.
+  useEffect(
+    () => () => {
+      for (const release of held.current.values()) release();
+      held.current = new Map();
+    },
+    [histories],
+  );
 
   useEffect(() => {
     cache.current = new Map();
@@ -67,12 +70,12 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
         cache.current.delete(key);
         dirty.current = true;
       }
-    if (sharedCache) holdHistories(sharedCache, held.current, fields);
+    holdHistories(histories, held.current, fields);
     // Wait out quick field additions, without cancelling existing streams.
     const timer = setTimeout(() => {
       for (const field of fields) {
         if (!cache.current.has(field.key)) {
-          const hit = sharedCache?.readScalar(field, field.dataType);
+          const hit = histories.readScalar(field, field.dataType);
           if (hit) {
             cache.current.set(field.key, {
               ...field,
@@ -87,41 +90,6 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
               received: hit.length,
             });
             dirty.current = true;
-          } else if (sharedCache?.hasPendingScalar(field, field.dataType)) {
-            const controller = new AbortController();
-            const target: CachedSeries = { ...field, points: [], status: "loading", received: 0 };
-            cache.current.set(field.key, target);
-            requests.current.set(controller, [target]);
-            dirty.current = true;
-            sharedCache
-              .load(field, controller.signal, (event) => {
-                if (controller.signal.aborted) return;
-                if (event.type === "batch")
-                  target.points = appendPoints(
-                    target.points,
-                    event.rows.map((row) =>
-                      point(
-                        {
-                          time_ns: row.time_ns,
-                          values: [row.value as number | string | boolean | null],
-                        },
-                        0,
-                        origin,
-                      ),
-                    ),
-                  );
-                if (event.type === "complete") target.status = "complete";
-                if (event.type !== "error") target.received = event.scanned_messages;
-                dirty.current = true;
-              })
-              .catch((error) => {
-                if (!controller.signal.aborted) {
-                  target.status = "error";
-                  target.error = errorMessage(error);
-                  dirty.current = true;
-                }
-              })
-              .finally(() => requests.current.delete(controller));
           } else {
             const controller = new AbortController();
             const target: CachedSeries = {
@@ -136,12 +104,16 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
             cache.current.set(field.key, target);
             requests.current.set(controller, [target]);
             dirty.current = true;
-            // Always load all timestamps, including the final message.
-            request(messagesUrl(field, { exact: true }), { signal: controller.signal })
-              .then((response) =>
-                consumeStream<MessageRow>(response, (event) => {
+            // A history of the field or its parent under way serves numbers; strings
+            // are read whole. Either way all timestamps load, including the last one.
+            const exact = !histories.hasPendingScalar(field, field.dataType);
+            histories
+              .load(
+                field,
+                controller.signal,
+                (event) => {
                   if (controller.signal.aborted) return;
-                  if (event.type === "batch") {
+                  if (event.type === "batch")
                     target.points = appendPoints(
                       target.points,
                       event.rows.map((row) =>
@@ -155,18 +127,12 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                         ),
                       ),
                     );
-                    target.received = event.scanned_messages;
-                  }
-                  if (event.type === "complete") {
-                    target.status = "complete";
-                    target.received = event.scanned_messages;
-                    sharedCache?.putScalar(
-                      target,
-                      target.points.map((p) => ({ time_ns: p.ns, value: p.raw })),
-                    );
-                  }
+                  if (event.type === "complete") target.status = "complete";
+                  if (event.type !== "error") target.received = event.scanned_messages;
                   dirty.current = true;
-                }),
+                },
+                undefined,
+                exact,
               )
               .catch((error) => {
                 if (!controller.signal.aborted) {
@@ -175,15 +141,13 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
                   dirty.current = true;
                 }
               })
-              .finally(() => {
-                requests.current.delete(controller);
-              });
+              .finally(() => requests.current.delete(controller));
           }
         }
       }
     }, 120);
     return () => clearTimeout(timer);
-  }, [origin, selectionKey, sharedCache]);
+  }, [origin, selectionKey, histories]);
 
   useEffect(() => {
     const timer = setInterval(() => {

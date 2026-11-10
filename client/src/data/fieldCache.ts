@@ -23,6 +23,8 @@ type Listener = (event: StreamEvent<MessageRow>) => void;
 type Job = {
   block: Block;
   controller: AbortController;
+  /** Whether strings are read whole, so that an exact read never waits on previews. */
+  exact: boolean;
   listeners: Set<Listener>;
   done: Promise<void>;
 };
@@ -337,10 +339,12 @@ export class FieldCache {
     signal: AbortSignal,
     onEvent: Listener,
     range?: { start_ns: string; end_ns: string },
+    /** Strings whole rather than previews, for a scalar field's full history. */
+    exact = false,
   ): Promise<void> {
     if (signal.aborted) return Promise.resolve();
     const scope = range ? `${range.start_ns}:${range.end_ns}` : "full";
-    const hit = this.read(target, scope);
+    const hit = exact ? this.readScalar(target, "string") : this.read(target, scope);
     if (hit) {
       onEvent({ type: "batch", rows: hit, scanned_messages: hit.length });
       onEvent({ type: "complete", scanned_messages: hit.length });
@@ -349,26 +353,28 @@ export class FieldCache {
     const ancestor = [...this.jobs.values()].find(
       (job) =>
         !job.controller.signal.aborted &&
+        // Whole strings serve a read of previews, but not the other way round.
+        (job.exact || !exact) &&
         job.block.source === target.source &&
         job.block.topic === target.topic &&
         (job.block.scope === "full" || job.block.scope === scope) &&
         prefix(job.block.path, target.path),
     );
-    const key = `${keyOf(target.source, target.topic, target.path)}:${scope}`;
+    const key = `${keyOf(target.source, target.topic, target.path)}:${scope}${exact ? ":exact" : ""}`;
     let job = ancestor ?? this.jobs.get(key);
     if (job?.controller.signal.aborted) job = undefined;
     if (!job) {
       const block = this.block(target, scope);
       const controller = new AbortController();
-      job = { block, controller, listeners: new Set(), done: Promise.resolve() };
+      job = { block, controller, exact, listeners: new Set(), done: Promise.resolve() };
       this.jobs.set(key, job);
       const current = job;
       const generation = this.generation;
-      job.done = request(messagesUrl(target, { range }), { signal: controller.signal })
+      job.done = request(messagesUrl(target, { range, exact }), { signal: controller.signal })
         .then((response) =>
           consumeStream<MessageRow>(response, (event) => {
             if (controller.signal.aborted || generation !== this.generation) return;
-            if (event.type === "batch") this.append(block, event.rows);
+            if (event.type === "batch") this.append(block, event.rows, exact);
             if (event.type === "complete") block.complete = true;
             for (const listener of current.listeners) listener(event);
             this.changed();
