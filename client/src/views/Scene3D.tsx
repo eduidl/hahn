@@ -14,7 +14,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { errorMessage, topicKey, type Info } from "../types";
 import { runUrl } from "../data/sources";
-import { runTransforms } from "../data/runTransforms";
+import { useDataStore } from "../data/store";
 import { usePlaybackStore } from "../workspace/playback";
 import type { FieldIndex } from "../workspace/fieldIndex";
 import {
@@ -278,6 +278,7 @@ export function useSceneFrame(
   info: Info | null,
 ) {
   const playback = usePlaybackStore();
+  const store = useDataStore();
   const run = source ? runUrl(source) : null;
   const previous = useRef<{ stage: Stage; run: string; frame: string }>(undefined);
   const [shown, setShown] = useState<string | null>(null);
@@ -297,7 +298,8 @@ export function useSceneFrame(
     }
     const controller = new AbortController();
     const time = BigInt(info.start_ns) + BigInt(Math.round(playback.getState().time * 1e9));
-    const transforms = runTransforms(run);
+    const transforms = store.transforms(run);
+    if (!transforms) return;
     transforms
       .ensure(time)
       .then(() => {
@@ -318,7 +320,7 @@ export function useSceneFrame(
           setError(`Could not change fixed frame: ${errorMessage(error)}`);
       });
     return () => controller.abort();
-  }, [stage, run, target, info?.start_ns, playback]);
+  }, [stage, run, target, info?.start_ns, playback, store]);
   return { target: shown, error };
 }
 

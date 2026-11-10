@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { holdHistories, type FieldCache } from "./fieldCache";
 import { appendPoints, consumeStream, point } from "./data";
 import type { Series } from "../views/Plot";
+import { request } from "./request";
 import { messagesUrl } from "./sources";
 import type { MessageRow } from "../views/table";
 import { errorMessage, type Selected } from "../types";
@@ -36,10 +37,13 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
     })),
   );
 
+  // Histories held in a cache no longer used are discarded with it.
+  useEffect(() => {
+    held.current = new Map();
+  }, [sharedCache]);
+
   useEffect(() => {
     cache.current = new Map();
-    // The shared cache is replaced along with the origin.
-    held.current = new Map();
     dirty.current = true;
     return () => {
       for (const controller of requests.current.keys()) controller.abort();
@@ -133,7 +137,7 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
             requests.current.set(controller, [target]);
             dirty.current = true;
             // Always load all timestamps, including the final message.
-            fetch(messagesUrl(field, { exact: true }), { signal: controller.signal })
+            request(messagesUrl(field, { exact: true }), { signal: controller.signal })
               .then((response) =>
                 consumeStream<MessageRow>(response, (event) => {
                   if (controller.signal.aborted) return;
@@ -179,7 +183,7 @@ export function useSeries(origin: string | null, selected: Selected[], sharedCac
       }
     }, 120);
     return () => clearTimeout(timer);
-  }, [origin, selectionKey]);
+  }, [origin, selectionKey, sharedCache]);
 
   useEffect(() => {
     const timer = setInterval(() => {

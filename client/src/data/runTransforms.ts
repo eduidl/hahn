@@ -24,8 +24,21 @@ export class RunTransforms {
   private listeners = new Set<() => void>();
   private version = 0;
   private resolver = new TfGraph();
+  private controller = new AbortController();
 
   constructor(readonly run: string) {}
+
+  /** Forgets everything loaded and stops the loads under way. */
+  clear() {
+    this.controller.abort();
+    this.controller = new AbortController();
+    this.fixed = undefined;
+    this.fixedLoad = undefined;
+    this.chunks.clear();
+    this.loading.clear();
+    this.resolver = new TfGraph();
+    this.changed();
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -57,12 +70,14 @@ export class RunTransforms {
   }
 
   private loadFixed() {
-    this.fixedLoad ??= get<Schemas["StaticTransforms"]>(`${this.run}/transforms/static`)
+    const { signal } = this.controller;
+    this.fixedLoad ??= get<Schemas["StaticTransforms"]>(`${this.run}/transforms/static`, signal)
       .then(
         ({ transforms }) => ({ transforms, error: "" }),
         (error) => ({ transforms: [], error: messageOf(error) }),
       )
       .then((fixed) => {
+        if (signal.aborted) return;
         this.fixed = fixed;
         this.resolver.setFixed(fixed.transforms);
         this.changed();
@@ -78,12 +93,14 @@ export class RunTransforms {
         start_ns: String(k * chunkNs),
         end_ns: String((k + 1n) * chunkNs),
       });
-      load = get<Schemas["DynamicTransforms"]>(`${this.run}/transforms/dynamic?${params}`)
+      const { signal } = this.controller;
+      load = get<Schemas["DynamicTransforms"]>(`${this.run}/transforms/dynamic?${params}`, signal)
         .then(
           ({ samples }) => ({ samples, error: "" }),
           (error) => ({ samples: [], error: messageOf(error) }),
         )
         .then((chunk) => {
+          if (signal.aborted) return;
           this.loading.delete(k);
           this.chunks.set(k, chunk);
           this.resolver.add(k, chunk.samples);
@@ -121,14 +138,6 @@ export class RunTransforms {
 }
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-let current: RunTransforms | undefined;
-
-/** The transforms of `run`. Only one run is open at a time, so only its are kept. */
-export function runTransforms(run: string) {
-  if (current?.run !== run) current = new RunTransforms(run);
-  return current;
-}
 
 /**
  * A graph of `run`'s transforms over a range of recording time, loaded at once: for

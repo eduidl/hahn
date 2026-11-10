@@ -21,7 +21,7 @@ import {
   type Widget,
 } from "./workspace/widgets";
 import { secondsFrom } from "./data/data";
-import { FieldCache, FieldCacheContext } from "./data/fieldCache";
+import { DataStore, DataStoreContext } from "./data/store";
 import { SourceNames } from "./data/sources";
 import { useMessages } from "./data/useMessages";
 import { useSeries } from "./data/useSeries";
@@ -80,8 +80,10 @@ export function App() {
   );
   const demand = requestedSeries(shownWorkspace.widgets);
   const [widgetDrag, setWidgetDrag] = useState<Widget["type"] | null>(null);
-  const fieldCache = useMemo(() => new FieldCache(), [info?.start_ns]);
-  useEffect(() => () => fieldCache.clear(), [fieldCache]);
+  // One store per open run; its data stays while groups of the run open and close.
+  const store = useMemo(() => new DataStore(runId), [runId]);
+  useEffect(() => () => store.clear(), [store]);
+  const fieldCache = store.fields;
   const { plotted, records, revision, busy } = useSeries(
     info?.start_ns ?? null,
     demand,
@@ -110,7 +112,7 @@ export function App() {
 
   return (
     <SeriesEnvironmentContext.Provider value={seriesEnvironment}>
-      <FieldCacheContext.Provider value={fieldCache}>
+      <DataStoreContext.Provider value={store}>
         <PlaybackContext.Provider value={playback}>
           <DisplayTimeZone.Provider value={chosenTimeZone(zoneSource, serverZone)}>
             <DisplayTimeMode.Provider value={timeDisplay}>
@@ -218,7 +220,7 @@ export function App() {
             </DisplayTimeMode.Provider>
           </DisplayTimeZone.Provider>
         </PlaybackContext.Provider>
-      </FieldCacheContext.Provider>
+      </DataStoreContext.Provider>
     </SeriesEnvironmentContext.Provider>
   );
 }

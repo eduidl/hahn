@@ -13,6 +13,7 @@ import { useReducer, useState, type ReactNode } from "react";
 import type { MosaicNode } from "react-mosaic-component";
 import { createPlaybackStore, PlaybackContext } from "../../src/workspace/playback";
 import { WidgetWorkspace } from "../../src/workspace/WidgetWorkspace";
+import { DataStore, DataStoreContext } from "../../src/data/store";
 import { WidgetSettings } from "../../src/workspace/WidgetSettings";
 import { buildFieldIndex } from "../../src/workspace/fieldIndex";
 import {
@@ -78,30 +79,33 @@ function Harness({
 }) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [playback] = useState(createPlaybackStore);
+  const [store] = useState(() => new DataStore("r"));
   const selected = state.activeId ? state.widgets[state.activeId] : null;
   return (
-    <PlaybackContext.Provider value={playback}>
-      <WidgetWorkspace
-        state={state}
-        dispatch={dispatch}
-        data={[]}
-        messageRecords={[]}
-        fieldIndex={index}
-        info={null}
-        sources={[]}
-        fullEnd={1}
-        revision={0}
-        dragVerdict={() => null}
-        widgetDrag={catalog}
-        drop={vi.fn()}
-        openSettings={vi.fn()}
-      />
-      {selected && (
-        <aside aria-label="設定">
-          <WidgetSettings widget={selected} dispatch={dispatch} index={index} records={[]} />
-        </aside>
-      )}
-    </PlaybackContext.Provider>
+    <DataStoreContext.Provider value={store}>
+      <PlaybackContext.Provider value={playback}>
+        <WidgetWorkspace
+          state={state}
+          dispatch={dispatch}
+          data={[]}
+          messageRecords={[]}
+          fieldIndex={index}
+          info={null}
+          sources={[]}
+          fullEnd={1}
+          revision={0}
+          dragVerdict={() => null}
+          widgetDrag={catalog}
+          drop={vi.fn()}
+          openSettings={vi.fn()}
+        />
+        {selected && (
+          <aside aria-label="設定">
+            <WidgetSettings widget={selected} dispatch={dispatch} index={index} records={[]} />
+          </aside>
+        )}
+      </PlaybackContext.Provider>
+    </DataStoreContext.Provider>
   );
 }
 function transfer(type: string, value = "") {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { FieldCache, useFieldCache } from "./fieldCache";
+import { useDataStore } from "./store";
 import { usePlayback, usePlaybackStore } from "../workspace/playback";
 import { messageAt } from "../views/TableView";
 import type { MessageRow } from "../views/table";
@@ -10,9 +10,7 @@ const windowNs = 2_000_000_000n;
 export function useCurrentMessage(series: Selected | undefined, info: Info | null) {
   const playback = usePlaybackStore();
   const consumer = useRef(Symbol("current-message"));
-  const shared = useFieldCache();
-  const [local] = useState(() => new FieldCache());
-  const cache = shared ?? local;
+  const cache = useDataStore().fields;
   const time = usePlayback((s) => s.time);
   const revision = useSyncExternalStore(cache.subscribe, () => cache.revision);
   const ns = info ? BigInt(info.start_ns) + BigInt(Math.round(time * 1e9)) : 0n;
@@ -96,12 +94,6 @@ export function useCurrentMessage(series: Selected | undefined, info: Info | nul
       setFallback({ identity, row: predecessor });
     }
   }, [identity, rows, index, predecessor, fallback?.identity]);
-  useEffect(
-    () => () => {
-      if (!shared) local.clear();
-    },
-    [local, shared],
-  );
 
   const message =
     index >= 0

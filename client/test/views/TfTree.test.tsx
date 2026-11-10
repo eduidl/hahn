@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fitViewport, layoutFrames, TfTree, zoomViewport } from "../../src/views/TfTree";
 import { createPlaybackStore, PlaybackContext } from "../../src/workspace/playback";
+import { withStore } from "../dataStore";
 
 afterEach(() => {
   cleanup();
@@ -58,7 +59,7 @@ it("loads the current run and distinguishes empty results from errors", async ()
       <TfTree runId={runId} info={null} />
     </PlaybackContext.Provider>
   );
-  const { rerender } = render(tree("first"));
+  const { rerender } = render(tree("first"), withStore("first"));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "base, parent world" })).toBeTruthy(),
   );
@@ -105,6 +106,7 @@ it("shows the selected frame relative to its last recorded parent at playback ti
         info={{ start_ns: "1000000000", end_ns: "11000000000", message_count: 1 }}
       />
     </PlaybackContext.Provider>,
+    withStore("run"),
   );
   fireEvent.click(await screen.findByRole("button", { name: "base, parent world" }));
   expect(await screen.findByText("Parent Frame: world")).toBeTruthy();
@@ -137,6 +139,7 @@ it("pans by the same amount on both axes when the tree is letterboxed", async ()
         info={{ start_ns: "1000000000", end_ns: "11000000000", message_count: 1 }}
       />
     </PlaybackContext.Provider>,
+    withStore("run"),
   );
   await screen.findByRole("button", { name: "world" });
   const svg = container.querySelector("svg")!;
@@ -191,7 +194,7 @@ it("zooms from the fitted view and returns to it on reset", async () => {
     </PlaybackContext.Provider>
   );
   const store = createPlaybackStore();
-  const { container, rerender } = render(tree(0));
+  const { container, rerender } = render(tree(0), withStore("run"));
   await screen.findByRole("button", { name: "world" });
   expect(onCanReset).toHaveBeenLastCalledWith(false);
   const box = () => container.querySelector("svg")!.getAttribute("viewBox");
@@ -247,6 +250,7 @@ it("zooms at the pointer with the wheel and stops the page from scrolling", asyn
     <PlaybackContext.Provider value={createPlaybackStore()}>
       <TfTree runId="run" info={null} />
     </PlaybackContext.Provider>,
+    withStore("run"),
   );
   await screen.findByRole("button", { name: "world" });
   const svg = container.querySelector("svg")!;

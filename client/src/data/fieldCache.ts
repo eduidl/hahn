@@ -1,5 +1,5 @@
-import { createContext, useContext } from "react";
 import { consumeStream, type StreamEvent } from "./data";
+import { get, request } from "./request";
 import { messagesUrl, setField, sourceUrl } from "./sources";
 import type { Json, MessageRow } from "../views/table";
 import { isMetaPath, keyOf, type Selected } from "../types";
@@ -317,18 +317,13 @@ export class FieldCache {
     const controller = new AbortController();
     const params = new URLSearchParams({ topic: target.topic, time_ns });
     setField(params, target.path);
-    const result = fetch(`${sourceUrl(target.source)}/messages/latest?${params}`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body?.error ?? `HTTP ${response.status}`);
-        return body as MessageRow | null;
-      })
-      .catch((error) => {
-        this.seeds.delete(key);
-        throw error;
-      });
+    const result = get<MessageRow | null>(
+      `${sourceUrl(target.source)}/messages/latest?${params}`,
+      controller.signal,
+    ).catch((error) => {
+      this.seeds.delete(key);
+      throw error;
+    });
     this.seeds.set(key, { controller, result });
     while (this.seeds.size > 32) this.seeds.delete(this.seeds.keys().next().value!);
     return result;
@@ -369,7 +364,7 @@ export class FieldCache {
       this.jobs.set(key, job);
       const current = job;
       const generation = this.generation;
-      job.done = fetch(messagesUrl(target, { range }), { signal: controller.signal })
+      job.done = request(messagesUrl(target, { range }), { signal: controller.signal })
         .then((response) =>
           consumeStream<MessageRow>(response, (event) => {
             if (controller.signal.aborted || generation !== this.generation) return;
@@ -435,9 +430,4 @@ export function holdHistories(
       held.delete(key);
       release();
     }
-}
-
-export const FieldCacheContext = createContext<FieldCache | null>(null);
-export function useFieldCache() {
-  return useContext(FieldCacheContext);
 }
