@@ -254,6 +254,12 @@ export function WidgetControls({
           {changingType && (
             <div
               className="popover-surface widget-actions submenu"
+              // In the top layer like the menu, where every engine places it by its
+              // anchor; WebKitGTK ignores the anchor of a fixed element inside a popover.
+              popover="manual"
+              ref={(submenu) => {
+                submenu?.togglePopover?.(true);
+              }}
               role="menu"
               aria-label="Widget type"
               style={{ positionAnchor: submenuAnchor }}
