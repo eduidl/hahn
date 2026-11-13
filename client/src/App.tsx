@@ -11,6 +11,7 @@ import { browserStorage, loadSession, type SidebarTab } from "./workspace/persis
 import { PlaybackContext, createPlaybackStore } from "./workspace/playback";
 import { SeriesEnvironmentContext, usableWorkspace } from "./workspace/seriesState";
 import { useRunSources } from "./workspace/useRunSources";
+import { takeRequestedRun } from "./workspace/address";
 import { useSession } from "./workspace/useSession";
 import { useTopicDrag } from "./workspace/useTopicDrag";
 import {
@@ -22,6 +23,7 @@ import {
 import { secondsFrom } from "./data/data";
 import { DataStore, DataStoreContext, useActivity } from "./data/store";
 import { SourceNames } from "./data/sources";
+import { inDesktopApp, selectRecording } from "./desktop";
 import {
   DisplayTimeMode,
   chosenTimeZone,
@@ -33,7 +35,13 @@ import {
 
 export function App() {
   const [saved] = useState(() => loadSession(browserStorage()));
-  const [runsOpen, setRunsOpen] = useState(!saved?.runId);
+  const desktop = inDesktopApp();
+  // The desktop app decides the run, by the address it opens: a reload opens the same
+  // run, and without one the window waits for the user to pick a recording.
+  const [initialRun] = useState(() =>
+    desktop ? takeRequestedRun(true) : (takeRequestedRun() ?? saved?.runId ?? null),
+  );
+  const [runsOpen, setRunsOpen] = useState(!initialRun && !desktop);
   const [resetOpen, setResetOpen] = useState(false);
   const [zoneSource, setZoneSource] = useState<TimeZoneSource>(saved?.zoneSource ?? "browser");
   const [timeDisplay, setTimeDisplay] = useState<TimeDisplay>(saved?.timeDisplay ?? "absolute");
@@ -59,7 +67,7 @@ export function App() {
     sourceNames,
     selectRun,
     toggleSource,
-  } = useRunSources(saved, dispatch, () => setRunsOpen(true));
+  } = useRunSources(saved, dispatch, () => setRunsOpen(!desktop), initialRun);
   const activeWidget = workspace.activeId ? workspace.widgets[workspace.activeId] : undefined;
   const [search, setSearch] = useState("");
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
@@ -138,7 +146,7 @@ export function App() {
                     zoneSource={zoneSource}
                     serverZone={serverZone}
                     sidebarOpen={sidebarOpen}
-                    onOpenRuns={() => setRunsOpen(true)}
+                    onOpenRuns={() => (desktop ? selectRecording() : setRunsOpen(true))}
                     onToggleSource={(id, open) => {
                       toggleSource(id, open);
                       clearTopicFilter();

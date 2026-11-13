@@ -6,6 +6,9 @@ rust = "1.97.1"
 [tasks."client:install"]
 description = "Install client dependencies"
 run = "npm --prefix client ci"
+# Skipped while node_modules matches the lockfile.
+sources = ["client/package-lock.json"]
+outputs = ["client/node_modules/.package-lock.json"]
 
 [tasks."client:dev"]
 description = "Run the client dev server; /api goes to port 3000"
@@ -14,6 +17,22 @@ run = "npm --prefix client run dev"
 [tasks."client:build"]
 description = "Build the client"
 run = "npm --prefix client run build"
+
+[tasks."desktop:install"]
+description = "Install the desktop app's tools"
+run = "npm --prefix desktop ci"
+sources = ["desktop/package-lock.json"]
+outputs = ["desktop/node_modules/.package-lock.json"]
+
+[tasks."desktop:dev"]
+description = "Run the desktop app with the client's development server; pass a recording to open it"
+depends = ["client:install", "desktop:install"]
+run = "npm --prefix desktop run dev --"
+
+[tasks."desktop:build"]
+description = "Build the desktop app's installers"
+depends = ["client:install", "desktop:install"]
+run = "npm --prefix desktop run build"
 
 [tasks.format]
 description = "Format the client"

@@ -53,6 +53,7 @@ import {
   type WorkspaceAction,
   type WorkspaceState,
 } from "./widgets";
+import { noRunHint } from "../desktop";
 
 // Three.js and Leaflet are large, and only needed once such a widget exists.
 const Scene3D = lazy(() => import("../views/Scene3D"));
@@ -419,9 +420,7 @@ function WidgetWindow({ widget, path, ...props }: Props & { widget: Widget; path
                 )}
                 {!selfContained && !widget.series.length && !verdict && (
                   <div className="empty">
-                    <p>
-                      {info ? widgetSpecs[widget.type].emptyHint : "Open a run from the header"}
-                    </p>
+                    <p>{info ? widgetSpecs[widget.type].emptyHint : noRunHint()}</p>
                   </div>
                 )}
               </div>

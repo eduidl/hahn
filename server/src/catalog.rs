@@ -1,6 +1,7 @@
 //! Maps the data directory onto the API's runs and groups.
 //!
-//! Each entry directly under the root is one run: a file is a run with a single
+//! A root that is a file is the only run, with that file as its single group.
+//! Otherwise each entry directly under the root is one run: a file is a run with a single
 //! group, a directory is a run whose files are its groups. A directory holding a
 //! rosbag2 `metadata.yaml` is a bag: its `<prefix>_<n>.<ext>` files are the
 //! segments of one group. Elsewhere such files stay separate groups, since
@@ -149,6 +150,21 @@ pub(crate) fn discover(
     timezone: Option<String>,
     formats: &[Arc<dyn Format>],
 ) -> anyhow::Result<Vec<Run>> {
+    if root.is_file() {
+        let format = format_of(formats, root).ok_or_else(|| {
+            anyhow::anyhow!("{} is not a recording in a known format", root.display())
+        })?;
+        let name = root
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+        return Ok(vec![Run {
+            id: encode(&name),
+            name: name.clone(),
+            timezone,
+            groups: vec![Group::new(name, vec![root.to_owned()], format)],
+            tf: OnceLock::new(),
+        }]);
+    }
     let mut runs = Vec::new();
     for entry in entries(root)? {
         let (path, kind) = (entry.path(), entry.file_type()?);

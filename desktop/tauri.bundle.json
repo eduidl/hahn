@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": {
+      "script": "npm run build",
+      "cwd": "../client"
+    }
+  },
+  "bundle": {
+    "resources": {
+      "../client/dist/": "web/"
+    }
+  }
+}

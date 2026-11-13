@@ -16,17 +16,21 @@ import { errorMessage, type RecordingInfo, type Run, type Schemas } from "../typ
 /**
  * The open run and its groups: what is open, what has loaded, and the restore of a saved session.
  * `onRestoreFailed` asks the user for another run when the saved one could not be loaded.
+ * `initialRun` is the run to open first, the saved one unless said otherwise. The saved session
+ * is restored only for its own run; for another run or none, the saved widgets stay and their
+ * series move to the run's groups as when the user selects another run.
  */
 export function useRunSources(
   saved: Session | null | undefined,
   dispatch: Dispatch<WorkspaceAction>,
   onRestoreFailed: () => void,
+  initialRun: string | null = saved?.runId ?? null,
 ) {
-  const [runId, setRunId] = useState<string | null>(saved?.runId ?? null);
+  const [runId, setRunId] = useState<string | null>(initialRun);
   // The saved session until its run is confirmed. Saving waits for that, so a
   // half-restored state cannot overwrite the session.
-  const pendingRestore = useRef(saved?.runId ? saved : null);
-  const [restoring, setRestoring] = useState(Boolean(saved?.runId));
+  const pendingRestore = useRef(saved?.runId && saved.runId === initialRun ? saved : null);
+  const [restoring, setRestoring] = useState(pendingRestore.current !== null);
   const [run, setRun] = useState<Run | null>(null);
   const previousRun = useRef<Run | null>(null);
   // Open groups of the run, in the order they were opened.

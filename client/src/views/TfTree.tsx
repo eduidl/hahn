@@ -4,6 +4,7 @@ import { secondsFrom } from "../data/data";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePlaybackNs, useRunFrames, useTransforms, type FrameInfo } from "../data/useViewData";
 import type { Info } from "../types";
+import { noRunHint } from "../desktop";
 
 type Node = { id: string; parent: string | null; x: number; y: number };
 
@@ -182,7 +183,7 @@ export function TfTree({
     }
     setPoseOffset((offset) => ({ x: offset.x + dx, y: offset.y + dy }));
   };
-  if (!runId) return <p className="widget-status">Open a run from the header</p>;
+  if (!runId) return <p className="widget-status">{noRunHint()}</p>;
   if (!state.loaded && !state.error) return <p className="widget-status">Loading…</p>;
   if (state.error)
     return (

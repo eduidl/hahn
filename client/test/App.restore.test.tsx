@@ -14,6 +14,13 @@ vi.mock("../src/workspace/WidgetWorkspace", () => ({
   ),
 }));
 
+// Outside the desktop app unless a test says otherwise.
+const tauri = vi.hoisted(() => ({ inApp: false, invoke: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({
+  isTauri: () => tauri.inApp,
+  invoke: tauri.invoke,
+}));
+
 const key = "hahn.session";
 const series: Selected = {
   key: keyOf("run/b", "/pose", ["x"]),
@@ -108,6 +115,9 @@ describe("App session restore", () => {
     cleanup();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    window.history.replaceState(null, "", "/");
+    tauri.inApp = false;
+    tauri.invoke.mockReset();
   });
 
   it("asks for a run when nothing is saved", () => {
@@ -138,6 +148,89 @@ describe("App session restore", () => {
     render(<App />);
     const trigger = await screen.findByRole("button", { name: "Select run: Synthetic" });
     expect(trigger.textContent).toContain("Synthetic");
+  });
+  describe("opening the run the address asks for", () => {
+    const other = {
+      id: "other",
+      name: "Other",
+      groups: [{ id: "x", name: "X", default_open: true }],
+    };
+    // Group "x" of the other run has the same topics as group "b".
+    const serve = () => {
+      server(() => json(run));
+      const answer = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation((url: string) =>
+        url === "/api/runs/other"
+          ? json(other)
+          : answer(url.replace("/other/groups/x/", "/run/groups/b/")),
+      );
+    };
+
+    it("opens it without asking, moving the saved series to it", async () => {
+      save();
+      serve();
+      window.history.replaceState(null, "", "/?run=other");
+      render(<App />);
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith("/api/runs/other/groups/x", expect.anything()),
+      );
+      expect(showModal).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalledWith("/api/runs/run", expect.anything());
+      await waitFor(() => expect(shown().widgets["widget-1"].series[0].source).toBe("other/x"));
+      // A reload restores what is open now instead of opening the run again.
+      expect(window.location.search).toBe("");
+      await waitFor(() => expect(stored().runId).toBe("other"));
+    });
+    it("restores the saved session when it asks for the saved run", async () => {
+      save();
+      serve();
+      window.history.replaceState(null, "", "/?run=run");
+      render(<App />);
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith("/api/runs/run/groups/b", expect.anything()),
+      );
+      await waitFor(() => expect(shown().widgets["widget-1"].series).toEqual([series]));
+      expect(window.location.search).toBe("");
+    });
+  });
+  it("asks the desktop app for a recording instead of listing runs", async () => {
+    tauri.inApp = true;
+    tauri.invoke.mockResolvedValue(undefined);
+    server(() => json(run));
+    render(<App />);
+    expect(showModal).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Select run" }));
+    expect(tauri.invoke).toHaveBeenCalledWith("select_recording");
+    expect(showModal).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^\/api\/runs\?/),
+      expect.anything(),
+    );
+  });
+  describe("in the desktop app", () => {
+    beforeEach(() => {
+      tauri.inApp = true;
+    });
+
+    it("opens no run until one is picked, keeping the saved widgets", async () => {
+      save();
+      server(() => json(run));
+      render(<App />);
+      expect(screen.getByRole("button", { name: "Select run" })).toBeTruthy();
+      await waitFor(() => expect(stored().runId).toBeNull());
+      expect(showModal).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(shown().widgets["widget-1"].view.x).toEqual({ center: 0.2, zoom: 4 });
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+    it("restores the session of the run it opens, and again on reload", async () => {
+      save();
+      server(() => json(run));
+      window.history.replaceState(null, "", "/?run=run");
+      render(<App />);
+      await waitFor(() => expect(shown().widgets["widget-1"].series).toEqual([series]));
+      expect(window.location.search).toBe("?run=run");
+    });
   });
   it("closes the widget list once a drag has begun, not during dragstart", () => {
     server(() => json(run));

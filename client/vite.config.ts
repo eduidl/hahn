@@ -4,9 +4,12 @@ import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { configDefaults } from "vitest/config";
 
-export default defineConfig({
+// The desktop app serves the API on its own port (desktop/src/main.rs).
+const apiPorts: Record<string, number> = { desktop: 3917 };
+
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  server: { proxy: { "/api": "http://127.0.0.1:3000" } },
+  server: { proxy: { "/api": `http://127.0.0.1:${apiPorts[mode] ?? 3000}` } },
   test: {
     projects: [
       {
@@ -29,4 +32,4 @@ export default defineConfig({
       },
     ],
   },
-});
+}));

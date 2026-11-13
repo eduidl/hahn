@@ -156,6 +156,30 @@ async fn data_directory_maps_onto_runs_and_groups() {
 }
 
 #[tokio::test]
+async fn a_recording_file_is_the_only_run() {
+    let dir = fixture(10, true);
+    let path = dir.path().join("test.mcap");
+    std::fs::write(dir.path().join("other.mcap"), "").unwrap();
+    let app = hahn::router(&path).unwrap();
+    assert_eq!(
+        run_names(&app).await,
+        vec![("test.mcap".to_owned(), vec!["test.mcap".to_owned()])]
+    );
+    // It reads like the same file as a run of its directory, under the same id.
+    let in_dir = hahn::router(dir.path()).unwrap();
+    let (_, alone) = raw_get(&app, "/api/runs").await;
+    let (_, listed) = raw_get(&in_dir, "/api/runs?q=test").await;
+    assert_eq!(alone["items"], listed["items"]);
+    let base = resolve(&app, "/g").await;
+    let (status, info) = raw_get(&app, &base).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(info, raw_get(&in_dir, &base).await.1);
+    // A file no format reads is not served.
+    std::fs::write(dir.path().join("notes.txt"), "").unwrap();
+    assert!(hahn::router(&dir.path().join("notes.txt")).is_err());
+}
+
+#[tokio::test]
 async fn numbered_files_of_a_bag_read_as_one_recording() {
     const COUNT: usize = 100;
     let dir = tempfile::tempdir().unwrap();

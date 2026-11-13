@@ -89,7 +89,8 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// Serves the recordings in `data_dir`, read once when the router is built.
+    /// Serves the recordings in `data_dir`, read once when the router is built. When
+    /// `data_dir` is a recording file, it is the only run.
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
         Self {
             data_dir: data_dir.into(),

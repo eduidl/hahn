@@ -3,6 +3,7 @@ import { useContext } from "react";
 import { SourceNames, type OpenSource } from "../data/sources";
 import { useTimeFormatter } from "../timeDisplay";
 import type { Info } from "../types";
+import { noRunHint } from "../desktop";
 
 /** Exact span of a range, to the millisecond. Nanosecond times do not fit a Number. */
 export function formatDuration(info: Pick<Info, "start_ns" | "end_ns">): string {
@@ -22,7 +23,7 @@ export function SourceInfo({ info, sources }: { info: Info | null; sources: Open
   const names = useContext(SourceNames);
   const start = useTimeFormatter(info?.start_ns ?? null, "absolute");
   const end = useTimeFormatter(info?.end_ns ?? null, "absolute");
-  if (!sources.length) return <p className="widget-status">Open a run from the header</p>;
+  if (!sources.length) return <p className="widget-status">{noRunHint()}</p>;
   if (sources.some((source) => source.loading)) return <p className="widget-status">Loading…</p>;
   const failed = sources.filter((source) => source.error);
   const multiple = sources.length > 1;

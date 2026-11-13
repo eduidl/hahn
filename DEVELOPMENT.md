@@ -62,6 +62,19 @@ cargo run --manifest-path server/Cargo.toml --locked --release --example foxglov
 
 Start the server, then run `npm --prefix client run dev`. Vite forwards `/api` to port 3000.
 
+## Desktop app
+
+`desktop/` wraps the server and the built client in a Tauri window ([ADR 0011](docs/adr/0011-desktop-app.md)). It adds no API, and the client differs only in what "Select run" does (`client/src/desktop.ts`), so the checks above cover what it shows. After changing `desktop/`, or the `hahn` crate's public API it uses, check that it builds, starts with no run when given no recording, opens the recording it is given, and opens another one from "Select run" and by dropping an MCAP file onto the window:
+
+```bash
+cargo clippy --manifest-path desktop/Cargo.toml --locked
+npm --prefix desktop run dev -- data/ros2_scene.mcap
+```
+
+`npm --prefix desktop run dev` runs `tauri dev`. The window loads the client from Vite on port 5174 (`npm --prefix client run dev:desktop`), which forwards `/api` to the app on port 3917 instead of 3000, so it can run beside a server started for the browser. Client changes are applied in place; changes to `desktop/` or `server/src/` rebuild and restart the app. `npm --prefix desktop run build` merges `desktop/tauri.bundle.json`, which builds the client and bundles it; the app run from the repository serves `client/dist` instead.
+
+Building it needs the system libraries listed in the README. `mise run check` does not build it, so that the other checks run without them.
+
 ## Measuring performance
 
 Use a release build with a real topic and field.

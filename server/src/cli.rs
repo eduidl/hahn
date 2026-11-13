@@ -7,7 +7,8 @@ use std::{net::SocketAddr, path::PathBuf};
 #[derive(Parser)]
 #[command(about = "Progressive plot viewer for MCAP recordings")]
 struct Args {
-    /// Directory containing immutable MCAP recordings (including subdirectories).
+    /// Directory containing immutable MCAP recordings (including subdirectories), or a
+    /// single recording file.
     #[arg(long, default_value = "data")]
     data_dir: PathBuf,
     #[arg(long, default_value = "127.0.0.1:3000")]
